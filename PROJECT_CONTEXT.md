@@ -88,6 +88,6 @@
 
 - 프로젝트 기준 위치: `C:\workSpace\album_release`
 - 업로드 대상: `git@github.com:JaeH0ng/album_release_schedule.git`
-- GitHub 전역 CLI 활성 계정은 마지막 확인 시 `jaell0ng-cpu`였다.
-- 이 저장소에서만 `JaeH0ng` 인증을 쓰기 위해 저장소 로컬 SSH 키 설정을 적용할 예정이다.
-- SSH 인증이 확인되기 전에는 원격 저장소에 푸시하지 않는다.
+- GitHub 전역 CLI 활성 계정은 2026-06-18 확인 시 `jaell0ng-cpu`였다.
+- 이 저장소에는 전용 SSH 키와 로컬 Git 설정을 적용했으며, 2026-06-18 `JaeH0ng` 계정 인증을 확인했다.
+- 원격 푸시 전에는 전용 SSH 키가 `JaeH0ng`로 인증되는지 확인한다.
