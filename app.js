@@ -794,6 +794,12 @@ function formatDotDate(value) {
   return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
 }
 
+function formatDayLabel(value) {
+  const date = typeof value === "string" ? parseDate(value) : value;
+  const weekday = ["일", "월", "화", "수", "목", "금", "토"][date.getDay()];
+  return `${date.getMonth() + 1}월 ${date.getDate()}일 ${weekday}요일`;
+}
+
 function formatSyncTimestamp(date) {
   return new Intl.DateTimeFormat("ko-KR", {
     month: "numeric",
@@ -2009,10 +2015,17 @@ function renderCalendar() {
           if (dayEvents.length === 0) classes.push("is-empty");
 
           return `
-            <div class="${classes.join(" ")}">
+            <div class="${classes.join(" ")}" data-date="${iso}">
               <div class="day-heading">
-                <span>${dayNames[index]}</span>
-                <span class="day-number">${day.getDate()}</span>
+                <div class="day-heading-main">
+                  <span class="day-weekday">${dayNames[index]}</span>
+                  <span class="day-number">${day.getDate()}</span>
+                </div>
+                <div class="day-heading-side">
+                  <span class="day-date-label">${formatDotDate(day)}</span>
+                  ${iso === todayIso ? '<span class="day-today-chip">오늘</span>' : ""}
+                  ${dayEvents.length ? `<span class="day-count">${dayEvents.length}개</span>` : ""}
+                </div>
               </div>
               <div class="day-events">
                 ${dayEvents.map(renderEvent).join("")}
@@ -2055,9 +2068,21 @@ function renderEvent(event) {
   const classes = ["calendar-event"];
   if (event.milestone) classes.push("is-milestone");
   if (complete) classes.push("is-complete");
+  const plan = getEventPlan(event.id);
+  const phaseLabel = phase?.label || "일정";
+  const focusBadge =
+    plan.focusStatus === "accepted"
+      ? '<span class="event-badge is-focus">이번 주</span>'
+      : plan.focusStatus === "hold"
+        ? '<span class="event-badge is-hold">보류</span>'
+        : "";
 
   return `
     <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${event.id}">
+      <div class="event-badges">
+        <span class="event-badge">${phaseLabel}</span>
+        ${focusBadge}
+      </div>
       <div class="event-topline">
         <input
           class="event-check"
@@ -2068,6 +2093,7 @@ function renderEvent(event) {
         <button class="event-title-button" type="button">${event.title}</button>
       </div>
       <p class="event-meta">${event.end ? formatDateRange(event) : event.duration}</p>
+      <p class="event-submeta">${formatDayLabel(event.date)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
     </div>
   `;
 }
