@@ -1193,10 +1193,13 @@ function updateAuthChrome() {
 function updateAppModeChrome() {
   const standalone =
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  const mobile = window.innerWidth <= 760;
   document.body.classList.toggle("body-standalone", standalone);
-  document.body.classList.toggle("body-mobile-compact", window.innerWidth <= 760 && state.mobileCompact);
+  document.body.classList.toggle("body-mobile-compact", mobile && state.mobileCompact);
+  document.body.classList.toggle("body-mobile", mobile);
   const toggle = document.querySelector("#mobile-focus-toggle");
   if (toggle) {
+    toggle.hidden = !mobile;
     toggle.textContent = state.mobileCompact ? "전체 보기" : "집중 보기";
   }
 }
