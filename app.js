@@ -1670,6 +1670,10 @@ function holdEvent(eventId) {
   updateEventPlan(eventId, { focusStatus: "hold" });
 }
 
+function dismissEvent(eventId) {
+  updateEventPlan(eventId, { focusStatus: "dismissed", overrideDate: null });
+}
+
 function resetEventPlan(eventId) {
   updateEventPlan(eventId, { focusStatus: "none", overrideDate: null });
 }
@@ -1699,11 +1703,17 @@ function getWeeklyFocusItems() {
     .map((event) => ({ event, source: "accepted" }));
   const acceptedIds = new Set(explicitAccepted.map(({ event }) => event.id));
   const currentWeek = incomplete
-    .filter((event) => !acceptedIds.has(event.id) && getEventPlan(event.id).focusStatus !== "hold" && isEventInCurrentWeek(event))
+    .filter((event) => {
+      const status = getEventPlan(event.id).focusStatus;
+      return !acceptedIds.has(event.id) && status !== "hold" && status !== "dismissed" && isEventInCurrentWeek(event);
+    })
     .map((event) => ({ event, source: "current" }));
   const focusIds = new Set([...acceptedIds, ...currentWeek.map(({ event }) => event.id)]);
   const fallbackNext = incomplete
-    .filter((event) => !focusIds.has(event.id) && getEventPlan(event.id).focusStatus !== "hold")
+    .filter((event) => {
+      const status = getEventPlan(event.id).focusStatus;
+      return !focusIds.has(event.id) && status !== "hold" && status !== "dismissed";
+    })
     .map((event) => ({ event, source: "next" }));
 
   return [...explicitAccepted, ...currentWeek, ...fallbackNext]
@@ -1717,6 +1727,12 @@ function getHeldEvents() {
     .slice(0, 4);
 }
 
+function getDismissedEvents() {
+  return getIncompleteEvents()
+    .filter((event) => event.kind !== "opportunity" && getEventPlan(event.id).focusStatus === "dismissed")
+    .slice(0, 4);
+}
+
 function getPullForwardCandidates() {
   const acceptedIds = new Set(getWeeklyFocusItems().map(({ event }) => event.id));
   return getIncompleteEvents()
@@ -1725,7 +1741,8 @@ function getPullForwardCandidates() {
       return (
         event.kind !== "opportunity" &&
         !acceptedIds.has(event.id) &&
-        plan.focusStatus !== "hold"
+        plan.focusStatus !== "hold" &&
+        plan.focusStatus !== "dismissed"
       );
     })
     .sort((left, right) => parseDate(left.date) - parseDate(right.date))
@@ -1842,6 +1859,7 @@ function renderDashboard() {
   const weeklyFocusItems = getWeeklyFocusItems();
   const acceptedFocus = weeklyFocusItems.map(({ event }) => event);
   const heldEvents = getHeldEvents();
+  const dismissedEvents = getDismissedEvents();
   const urgencyEvents = getPullForwardCandidates();
   const user = getAuthUser();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
@@ -1854,6 +1872,7 @@ function renderDashboard() {
       <div class="app-home-pills">
         <span class="meta-pill">오늘 집중 ${acceptedFocus.length}개</span>
         <span class="meta-pill">보류 ${heldEvents.length}개</span>
+        <span class="meta-pill">이번 주 안 함 ${dismissedEvents.length}개</span>
         <span class="meta-pill">다음 후보 ${urgencyEvents.length}개</span>
       </div>
       <div class="app-home-cta">
@@ -1886,9 +1905,9 @@ function renderDashboard() {
       detail: heldEvents[0] ? heldEvents[0].title : "보류 항목 없음",
     },
     {
-      value: urgencyEvents.length,
-      label: "다음 후보",
-      detail: urgencyEvents[0] ? urgencyEvents[0].title : "당겨올 후보 없음",
+      value: dismissedEvents.length,
+      label: "이번 주 안 함",
+      detail: dismissedEvents[0] ? dismissedEvents[0].title : "제외 항목 없음",
     },
   ]
     .map(
@@ -1919,6 +1938,10 @@ function renderDashboard() {
   document.querySelector("#hold-list").innerHTML = heldEvents.length
     ? heldEvents.map((event) => renderDashboardTaskCard(event, "hold")).join("")
     : '<p class="empty-copy">보류 중인 작업이 없습니다.</p>';
+
+  document.querySelector("#dismissed-list").innerHTML = dismissedEvents.length
+    ? dismissedEvents.map((event) => renderDashboardTaskCard(event, "dismissed")).join("")
+    : '<p class="empty-copy">이번 주 안 하기로 정한 작업이 없습니다.</p>';
 
   const recentDone = getRecentCompletedEvents();
   document.querySelector("#recent-done-list").innerHTML = recentDone.length
@@ -1997,16 +2020,30 @@ function renderDashboardTaskCard(event, mode) {
           ? "다음 우선순위"
           : mode === "hold"
             ? "보류 중"
+            : mode === "dismissed"
+              ? "이번 주 안 함"
             : delayed
               ? "지연 중"
               : "다음 후보";
   const restoreButton = isPulled
     ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">원래 일정</button>`
     : "";
-  const acceptButton =
+  const primaryButton =
     mode === "accepted" || mode === "current"
       ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${event.id}">보류</button>`
       : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${event.id}">수락</button>`;
+  const dismissButton =
+    mode === "dismissed"
+      ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">다시 후보로</button>`
+      : `<button class="opportunity-action is-danger" type="button" data-dashboard-action="dismiss" data-event-id="${event.id}">이번 주 안 함</button>`;
+  const completeButton =
+    mode === "dismissed"
+      ? ""
+      : `<button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${event.id}">완료</button>`;
+  const pullButton =
+    mode === "dismissed"
+      ? ""
+      : `<button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${event.id}">이번 주로 당겨오기</button>`;
 
   return `
     <article class="focus-item">
@@ -2019,9 +2056,10 @@ function renderDashboardTaskCard(event, mode) {
         ${plan.focusStatus === "accepted" ? '<span class="meta-pill">직접 수락함</span>' : ""}
       </div>
       <div class="focus-actions">
-        ${acceptButton}
-        <button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${event.id}">이번 주로 당겨오기</button>
-        <button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${event.id}">완료</button>
+        ${primaryButton}
+        ${pullButton}
+        ${dismissButton}
+        ${completeButton}
         ${restoreButton}
       </div>
     </article>
@@ -2035,6 +2073,7 @@ function bindDashboardTaskControls() {
       const action = button.dataset.dashboardAction;
       if (action === "accept") acceptEventForThisWeek(eventId);
       if (action === "hold") holdEvent(eventId);
+      if (action === "dismiss") dismissEvent(eventId);
       if (action === "pull") pullEventIntoThisWeek(eventId);
       if (action === "restore") resetEventPlan(eventId);
       if (action === "complete") toggleCompleted(eventId, true);
@@ -2222,6 +2261,7 @@ async function deleteAdminOpportunity() {
 
 function renderCalendar() {
   const weekList = document.querySelector("#week-list");
+  renderCalendarOverview();
   const bounds = getCalendarBounds();
   const firstWeek = startOfWeek(bounds.start);
   const lastDate = bounds.end;
@@ -2302,6 +2342,61 @@ function renderCalendar() {
   bindEventControls();
 }
 
+function renderCalendarOverview() {
+  const container = document.querySelector("#calendar-overview");
+  if (!container) return;
+
+  const months = [
+    { key: "2026-06", label: "6월" },
+    { key: "2026-07", label: "7월" },
+    { key: "2026-08", label: "8월" },
+    { key: "2026-09", label: "9월" },
+    { key: "2026-10", label: "10월" },
+    { key: "2026-11", label: "11월" },
+    { key: "2026-12", label: "12월" },
+  ];
+  const phaseRows = phases.filter((phase) => phase.id !== "opportunity");
+
+  const monthHeader = months.map((month) => `<span>${month.label}</span>`).join("");
+  const rows = phaseRows
+    .map((phase) => {
+      const phaseEvents = state.events.filter((event) => event.phase === phase.id && event.kind !== "opportunity");
+      if (!phaseEvents.length) return "";
+      const start = phaseEvents[0].date.slice(0, 7);
+      const lastEvent = phaseEvents.at(-1);
+      const end = (lastEvent.end || lastEvent.date).slice(0, 7);
+      const startIndex = months.findIndex((month) => month.key === start);
+      const endIndex = months.findIndex((month) => month.key === end);
+      const completed = phaseEvents.filter((event) => state.completed.has(event.id)).length;
+      const current = getCurrentPhase(today).id === phase.id;
+
+      const cells = months
+        .map((month, index) => {
+          const active = index >= startIndex && index <= endIndex;
+          const isStart = index === startIndex;
+          const isEnd = index === endIndex;
+          return `<span class="overview-phase-cell${active ? " is-active" : ""}${isStart ? " is-start" : ""}${isEnd ? " is-end" : ""}" style="--phase-color:${phase.color}"></span>`;
+        })
+        .join("");
+
+      return `
+        <article class="calendar-overview-row${current ? " is-current" : ""}">
+          <div class="calendar-overview-meta">
+            <strong>${phase.label}</strong>
+            <span>${completed}/${phaseEvents.length}</span>
+          </div>
+          <div class="calendar-overview-track">${cells}</div>
+        </article>
+      `;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <div class="calendar-overview-months">${monthHeader}</div>
+    <div class="calendar-overview-rows">${rows}</div>
+  `;
+}
+
 function renderEvent(event) {
   const phase = phaseMap.get(event.phase);
   const complete = state.completed.has(event.id);
@@ -2315,6 +2410,8 @@ function renderEvent(event) {
       ? '<span class="event-badge is-focus">이번 주</span>'
       : plan.focusStatus === "hold"
         ? '<span class="event-badge is-hold">보류</span>'
+        : plan.focusStatus === "dismissed"
+          ? '<span class="event-badge is-dismissed">안 함</span>'
         : "";
 
   return `
