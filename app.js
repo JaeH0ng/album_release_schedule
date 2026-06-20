@@ -1623,15 +1623,22 @@ function isEventInCurrentWeek(event) {
   return date >= weekStart && date <= weekEnd;
 }
 
-function getAcceptedFocusEvents() {
+function getWeeklyFocusItems() {
   const incomplete = getIncompleteEvents().filter((event) => event.kind !== "opportunity");
-  const explicitAccepted = incomplete.filter((event) => getEventPlan(event.id).focusStatus === "accepted");
-  const acceptedIds = new Set(explicitAccepted.map((event) => event.id));
-  const autoWeekly = incomplete
+  const explicitAccepted = incomplete
+    .filter((event) => getEventPlan(event.id).focusStatus === "accepted")
+    .map((event) => ({ event, source: "accepted" }));
+  const acceptedIds = new Set(explicitAccepted.map(({ event }) => event.id));
+  const currentWeek = incomplete
     .filter((event) => !acceptedIds.has(event.id) && getEventPlan(event.id).focusStatus !== "hold" && isEventInCurrentWeek(event))
-    .slice(0, 3);
-  return [...explicitAccepted, ...autoWeekly]
-    .sort((left, right) => parseDate(left.date) - parseDate(right.date))
+    .map((event) => ({ event, source: "current" }));
+  const focusIds = new Set([...acceptedIds, ...currentWeek.map(({ event }) => event.id)]);
+  const fallbackNext = incomplete
+    .filter((event) => !focusIds.has(event.id) && getEventPlan(event.id).focusStatus !== "hold")
+    .map((event) => ({ event, source: "next" }));
+
+  return [...explicitAccepted, ...currentWeek, ...fallbackNext]
+    .sort((left, right) => parseDate(left.event.date) - parseDate(right.event.date))
     .slice(0, 5);
 }
 
@@ -1642,7 +1649,7 @@ function getHeldEvents() {
 }
 
 function getPullForwardCandidates() {
-  const acceptedIds = new Set(getAcceptedFocusEvents().map((event) => event.id));
+  const acceptedIds = new Set(getWeeklyFocusItems().map(({ event }) => event.id));
   return getIncompleteEvents()
     .filter((event) => {
       const plan = getEventPlan(event.id);
@@ -1763,7 +1770,8 @@ function renderPhaseFilters() {
 function renderDashboard() {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
-  const acceptedFocus = getAcceptedFocusEvents();
+  const weeklyFocusItems = getWeeklyFocusItems();
+  const acceptedFocus = weeklyFocusItems.map(({ event }) => event);
   const heldEvents = getHeldEvents();
   const urgencyEvents = getPullForwardCandidates();
   const user = getAuthUser();
@@ -1826,8 +1834,8 @@ function renderDashboard() {
     .join("");
 
   document.querySelector("#weekly-focus-list").innerHTML = acceptedFocus.length
-    ? acceptedFocus.map((event) => renderDashboardTaskCard(event, "accepted")).join("")
-    : '<p class="empty-copy">이번 주 수락한 작업이 아직 없습니다. 아래 후보에서 하나를 바로 수락해보세요.</p>';
+    ? weeklyFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
+    : '<p class="empty-copy">이번 주 핵심 작업이 비었습니다. 아래 후보에서 하나를 바로 수락하거나 다음 작업을 당겨오세요.</p>';
 
   document.querySelector("#fallback-list").innerHTML = weeklyFocus.fallback30
     .map((item) => `<li>${item}</li>`)
@@ -1912,12 +1920,22 @@ function renderDashboardTaskCard(event, mode) {
   const isPulled = Boolean(event.overrideDate);
   const plan = getEventPlan(event.id);
   const modeLabel =
-    mode === "accepted" ? "이번 주 수락" : mode === "hold" ? "보류 중" : delayed ? "지연 중" : "다음 후보";
+    mode === "accepted"
+      ? "직접 수락"
+      : mode === "current"
+        ? "이번 주 자동 표시"
+        : mode === "next"
+          ? "다음 우선순위"
+          : mode === "hold"
+            ? "보류 중"
+            : delayed
+              ? "지연 중"
+              : "다음 후보";
   const restoreButton = isPulled
     ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">원래 일정</button>`
     : "";
   const acceptButton =
-    mode === "accepted"
+    mode === "accepted" || mode === "current"
       ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${event.id}">보류</button>`
       : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${event.id}">수락</button>`;
 
@@ -2279,7 +2297,7 @@ function toggleCompleted(eventId, complete) {
 }
 
 function renderSummary() {
-  const albumEvents = state.events.filter((event) => event.kind !== "opportunity");
+  const albumEvents = getAlbumPlanningEvents();
   const completedCount = albumEvents.filter((event) => state.completed.has(event.id)).length;
   const progress = albumEvents.length ? Math.round((completedCount / albumEvents.length) * 100) : 0;
   const progressFill = document.querySelector("#progress-fill");
@@ -2291,7 +2309,7 @@ function renderSummary() {
   const currentPhase = getCurrentPhase(today);
   document.querySelector("#current-phase").textContent = currentPhase.label;
 
-  const incomplete = state.events
+  const incomplete = albumEvents
     .filter((event) => !state.completed.has(event.id))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const overdue = incomplete.filter((event) => parseDate(event.date) < today);
