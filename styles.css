@@ -1033,29 +1033,46 @@ input:focus-visible {
   gap: 12px;
 }
 
-.track-note-field {
+.track-choice-group {
   display: grid;
   gap: 7px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fcfdfc;
 }
 
-.track-note-field span {
+.track-choice-group span {
   font-size: 12px;
   font-weight: 700;
   color: var(--muted);
 }
 
-.track-note-field textarea {
-  width: 100%;
-  min-height: 94px;
-  padding: 11px 12px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  resize: vertical;
-  background: #fcfdfc;
-  color: var(--ink);
+.track-choice-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
-.track-note-field-wide {
+.track-choice-button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.track-choice-button.is-selected {
+  border-color: rgba(47, 125, 105, 0.28);
+  background: #eef8f2;
+  color: var(--success);
+}
+
+.track-choice-group-wide {
   grid-column: 1 / -1;
 }
 
