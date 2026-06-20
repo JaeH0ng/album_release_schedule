@@ -738,6 +738,8 @@ const state = {
   session: null,
   authReady: false,
   reviewSyncTimer: null,
+  isAdmin: false,
+  adminLoaded: false,
 };
 
 const phaseMap = new Map(phases.map((phase) => [phase.id, phase]));
@@ -1085,6 +1087,10 @@ function canUseRemoteReviewSync() {
   return Boolean(state.authClient && getAuthUser());
 }
 
+function canUseAdminMode() {
+  return Boolean(canUseRemoteReviewSync() && state.isAdmin);
+}
+
 function updateAuthChrome() {
   const user = getAuthUser();
   const authStatusText = document.querySelector("#auth-status-text");
@@ -1095,7 +1101,9 @@ function updateAuthChrome() {
 
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
-    authStatusDetail.textContent = "공모전 판단 상태가 Supabase로 동기화됨";
+    authStatusDetail.textContent = state.isAdmin
+      ? "공모전 판단 상태와 관리자 편집 권한이 활성화됨"
+      : "공모전 판단 상태가 Supabase로 동기화됨";
     authSubmit.hidden = true;
     authSignout.hidden = false;
     authEmail.hidden = true;
@@ -1110,6 +1118,53 @@ function updateAuthChrome() {
   authSubmit.hidden = false;
   authSignout.hidden = true;
   authEmail.hidden = false;
+}
+
+function updateAdminChrome() {
+  const panel = document.querySelector("#admin-panel");
+  const badge = document.querySelector("#admin-status-badge");
+  if (!panel || !badge) return;
+
+  if (!getAuthUser()) {
+    panel.hidden = true;
+    badge.textContent = "로그인 필요";
+    return;
+  }
+
+  if (canUseAdminMode()) {
+    panel.hidden = false;
+    badge.textContent = "관리자 편집 가능";
+    return;
+  }
+
+  panel.hidden = true;
+  badge.textContent = state.adminLoaded ? "권한 없음" : "관리자 확인 중";
+}
+
+async function loadAdminAccess() {
+  state.isAdmin = false;
+  state.adminLoaded = true;
+
+  if (!canUseRemoteReviewSync()) {
+    updateAdminChrome();
+    return;
+  }
+
+  const user = getAuthUser();
+  const { data, error } = await state.authClient
+    .from("admin_users")
+    .select("email")
+    .eq("email", user.email)
+    .maybeSingle();
+
+  if (error) {
+    console.error(error);
+    updateAdminChrome();
+    return;
+  }
+
+  state.isAdmin = Boolean(data);
+  updateAdminChrome();
 }
 
 async function loadRemoteOpportunityReviews() {
@@ -1212,9 +1267,13 @@ function startRemoteReviewPolling() {
 async function setAuthSession(session) {
   state.session = session;
   state.authReady = true;
+  state.adminLoaded = false;
+  state.isAdmin = false;
   updateAuthChrome();
+  updateAdminChrome();
 
   if (getAuthUser()) {
+    await loadAdminAccess();
     startRemoteReviewPolling();
     await loadRemoteOpportunityReviews();
     return;
@@ -1537,6 +1596,9 @@ function renderOpportunityCard(opportunity, options = {}) {
     : "최근 확인 기록 없음";
   const reviewLabel = formatOpportunityReview(review.status);
   const compactClass = options.compact ? " compact" : "";
+  const adminAction = canUseAdminMode()
+    ? '<button class="opportunity-action" type="button" data-fill-admin="true">관리자 편집</button>'
+    : "";
 
   return `
     <article class="${classes.join(" ")}${compactClass ? compactClass : ""}" data-opportunity-id="${opportunity.id}">
@@ -1571,6 +1633,7 @@ function renderOpportunityCard(opportunity, options = {}) {
         <button class="opportunity-action is-danger${review.status === "dismissed" ? " is-current" : ""}" type="button" data-action="dismissed">
           제외
         </button>
+        ${adminAction}
       </div>
       <div class="opportunity-links">
         <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
@@ -1585,6 +1648,10 @@ function bindOpportunityControls() {
     const opportunityId = card.dataset.opportunityId;
     card.querySelectorAll("[data-action]").forEach((button) => {
       button.addEventListener("click", () => setOpportunityReview(opportunityId, button.dataset.action));
+    });
+    card.querySelector("[data-fill-admin]")?.addEventListener("click", () => {
+      const opportunity = state.opportunities.find((item) => item.id === opportunityId);
+      if (opportunity) fillAdminOpportunityForm(opportunity);
     });
   });
 }
@@ -1607,6 +1674,89 @@ function renderOpportunities() {
     : '<p class="opportunity-empty">표시할 공모전 데이터가 아직 없습니다.</p>';
 
   bindOpportunityControls();
+  updateAdminChrome();
+}
+
+function readAdminOpportunityForm() {
+  return {
+    id: document.querySelector("#admin-id").value.trim(),
+    title: document.querySelector("#admin-title").value.trim(),
+    host: document.querySelector("#admin-host").value.trim(),
+    status: document.querySelector("#admin-status").value,
+    application_open: document.querySelector("#admin-open-date").value || null,
+    deadline: document.querySelector("#admin-deadline").value || null,
+    fit_label: document.querySelector("#admin-fit-label").value.trim(),
+    fit_score: ["아주 잘 맞음", "잘 맞음", "보통", "낮음"].includes(
+      document.querySelector("#admin-fit-label").value.trim()
+    )
+      ? 4
+      : 3,
+    summary: document.querySelector("#admin-summary").value.trim(),
+    preparation: document.querySelector("#admin-preparation").value.trim(),
+    official_url: document.querySelector("#admin-url").value.trim(),
+    source_note: document.querySelector("#admin-source-note").value.trim(),
+    sort_order: Number(document.querySelector("#admin-sort-order").value || 999),
+    last_checked_at: new Date().toISOString(),
+  };
+}
+
+function resetAdminOpportunityForm() {
+  document.querySelector("#admin-opportunity-form").reset();
+  document.querySelector("#admin-status").value = "open";
+  document.querySelector("#admin-sort-order").value = "";
+}
+
+function fillAdminOpportunityForm(opportunity) {
+  document.querySelector("#admin-id").value = opportunity.id;
+  document.querySelector("#admin-title").value = opportunity.title;
+  document.querySelector("#admin-host").value = opportunity.host;
+  document.querySelector("#admin-status").value = opportunity.status;
+  document.querySelector("#admin-open-date").value = opportunity.applicationOpen || "";
+  document.querySelector("#admin-deadline").value = opportunity.deadline || "";
+  document.querySelector("#admin-fit-label").value = opportunity.fitLabel;
+  document.querySelector("#admin-sort-order").value = opportunity.sortOrder || "";
+  document.querySelector("#admin-summary").value = opportunity.summary;
+  document.querySelector("#admin-preparation").value = opportunity.preparation;
+  document.querySelector("#admin-url").value = opportunity.officialUrl;
+  document.querySelector("#admin-source-note").value = opportunity.sourceNote || "";
+  setActiveView("opportunities");
+  document.querySelector("#admin-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function saveAdminOpportunity(event) {
+  event.preventDefault();
+  if (!canUseAdminMode()) return;
+
+  const payload = readAdminOpportunityForm();
+  const { error } = await state.authClient.from("singer_songwriter_opportunities").upsert(payload, {
+    onConflict: "id",
+  });
+
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "관리자 저장 실패";
+    return;
+  }
+
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${payload.title} 저장 완료`;
+}
+
+async function deleteAdminOpportunity() {
+  if (!canUseAdminMode()) return;
+  const id = document.querySelector("#admin-id").value.trim();
+  if (!id) return;
+
+  const { error } = await state.authClient.from("singer_songwriter_opportunities").delete().eq("id", id);
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "관리자 삭제 실패";
+    return;
+  }
+
+  resetAdminOpportunityForm();
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${id} 삭제 완료`;
 }
 
 function renderCalendar() {
@@ -1962,6 +2112,9 @@ document.querySelector("#save-checkin").addEventListener("click", saveWeeklyChec
 document.querySelector("#copy-checkin-prompt").addEventListener("click", copyCheckinPrompt);
 document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
+document.querySelector("#admin-opportunity-form").addEventListener("submit", saveAdminOpportunity);
+document.querySelector("#admin-reset").addEventListener("click", resetAdminOpportunityForm);
+document.querySelector("#admin-delete").addEventListener("click", deleteAdminOpportunity);
 ["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", () => {
     readWeeklyCheckinForm();

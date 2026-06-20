@@ -152,11 +152,20 @@ create table if not exists public.opportunity_reviews (
   primary key (user_id, opportunity_id)
 );
 
+create table if not exists public.admin_users (
+  email text primary key,
+  note text,
+  created_at timestamptz not null default timezone('utc'::text, now())
+);
+
 alter table public.singer_songwriter_opportunities enable row level security;
 alter table public.opportunity_reviews enable row level security;
+alter table public.admin_users enable row level security;
 
 grant select on public.singer_songwriter_opportunities to anon, authenticated;
+grant insert, update, delete on public.singer_songwriter_opportunities to authenticated;
 grant select, insert, update, delete on public.opportunity_reviews to authenticated;
+grant select on public.admin_users to authenticated;
 
 drop policy if exists "Public can read singer songwriter opportunities" on public.singer_songwriter_opportunities;
 create policy "Public can read singer songwriter opportunities"
@@ -164,6 +173,33 @@ on public.singer_songwriter_opportunities
 for select
 to anon, authenticated
 using (true);
+
+drop policy if exists "Admins can write singer songwriter opportunities" on public.singer_songwriter_opportunities;
+create policy "Admins can write singer songwriter opportunities"
+on public.singer_songwriter_opportunities
+for all
+to authenticated
+using (
+  exists (
+    select 1
+    from public.admin_users admin_user
+    where admin_user.email = auth.jwt() ->> 'email'
+  )
+)
+with check (
+  exists (
+    select 1
+    from public.admin_users admin_user
+    where admin_user.email = auth.jwt() ->> 'email'
+  )
+);
+
+drop policy if exists "Users can read own admin profile" on public.admin_users;
+create policy "Users can read own admin profile"
+on public.admin_users
+for select
+to authenticated
+using (email = auth.jwt() ->> 'email');
 
 drop policy if exists "Users can read own opportunity reviews" on public.opportunity_reviews;
 create policy "Users can read own opportunity reviews"
