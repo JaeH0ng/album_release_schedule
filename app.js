@@ -43,22 +43,20 @@ const phases = [
 ];
 
 const defaultTrackSteps = [
-  { id: "key", group: "판단", label: "키 테스트 완료" },
-  { id: "bpm", group: "판단", label: "BPM 후보 기록" },
-  { id: "structure", group: "판단", label: "현재 구조와 길이 메모" },
-  { id: "take", group: "녹음", label: "멈추지 않은 전체 1테이크 확보" },
-  { id: "comfort", group: "판단", label: "편한 구간과 불편한 구간 체크" },
-  { id: "arrangement", group: "실험", label: "얹어볼 악기 또는 질감 1개 테스트" },
-  { id: "sketch", group: "실험", label: "편곡 아이디어 또는 훅 메모 남기기" },
-  { id: "memo", group: "기록", label: "곡 문서에 파일 경로와 세션 메모 연결" },
-  { id: "next", group: "기록", label: "다음 주에 이어갈 것 1가지 정리" },
+  { id: "tune", group: "세션", label: "튜닝 + 현재 키 확인" },
+  { id: "key", group: "세션", label: "후렴·최고음으로 키 테스트" },
+  { id: "bpm", group: "세션", label: "메트로놈 BPM 후보 2개 비교" },
+  { id: "take", group: "세션", label: "멈추지 않은 전체 1테이크 확보" },
+  { id: "comfort", group: "세션", label: "바로 청취하며 불편한 구간 표시" },
+  { id: "structure", group: "마감", label: "키·카포·BPM·구조 곡 문서에 기록" },
+  { id: "arrangement", group: "마감", label: "얹어볼 악기·질감 1개 메모" },
+  { id: "memo", group: "마감", label: "파일명 정리 + 곡 문서·세션 노트 연결" },
+  { id: "next", group: "마감", label: "다음에 이어갈 것 1줄 기록" },
 ];
 
 const trackStepGroups = [
-  { id: "녹음", label: "녹음" },
-  { id: "판단", label: "판단" },
-  { id: "실험", label: "편곡 실험" },
-  { id: "기록", label: "기록" },
+  { id: "세션", label: "세션 (60분, 악기 앞에서)" },
+  { id: "마감", label: "마감 (세션 직후, 책상에서)" },
 ];
 
 const defaultTrackNotes = {
