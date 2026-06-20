@@ -88,18 +88,10 @@
         <div>
           <p class="sync-label">개인 동기화</p>
           <strong id="auth-status-text">로그인 전</strong>
-          <span id="auth-status-detail" class="sync-detail">공모전 판단 상태는 이 기기에만 저장됨</span>
+          <span id="auth-status-detail" class="sync-detail">Google로 로그인하면 폰과 PC에서 같은 작업 상태를 봅니다</span>
         </div>
         <form id="auth-form" class="auth-form">
-          <input
-            id="auth-email"
-            class="auth-input"
-            type="email"
-            inputmode="email"
-            autocomplete="email"
-            placeholder="이메일로 로그인 링크 받기"
-          />
-          <button id="auth-submit" class="sync-button" type="submit">링크 보내기</button>
+          <button id="auth-google" class="google-button" type="submit">Google로 로그인</button>
           <button id="auth-signout" class="text-button" type="button" hidden>로그아웃</button>
           <button id="install-app" class="sync-button" type="button" hidden>앱 설치</button>
         </form>
@@ -162,16 +154,26 @@
         <div id="dashboard-view" class="view-panel is-active" aria-labelledby="dashboard-title">
           <div class="panel-heading dashboard-heading">
             <div>
-              <p class="section-kicker">WEEKLY FOCUS</p>
-              <h2 id="dashboard-title">이번 주 집중 대시보드</h2>
+              <p class="section-kicker">TODAY BOARD</p>
+              <h2 id="dashboard-title">오늘 해야 할 일 보드</h2>
             </div>
           </div>
           <div class="dashboard-grid">
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="today-at-a-glance-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">AT A GLANCE</p>
+                  <h3 id="today-at-a-glance-title">오늘 한눈에 보기</h3>
+                </div>
+              </div>
+              <div id="today-overview" class="dashboard-overview"></div>
+            </section>
+
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">THIS WEEK</p>
-                  <h3 id="weekly-focus-title">이번 주 수락한 작업</h3>
+                  <p class="section-kicker">COMMITTED</p>
+                  <h3 id="weekly-focus-title">지금 잡고 있는 작업</h3>
                 </div>
                 <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
               </div>
@@ -192,7 +194,7 @@
               <div class="card-heading">
                 <div>
                   <p class="section-kicker">PULL FORWARD</p>
-                  <h3 id="overdue-title">이번 주 후보와 당겨올 작업</h3>
+                  <h3 id="overdue-title">다음으로 붙잡을 후보</h3>
                 </div>
               </div>
               <div id="urgency-list" class="urgency-list"></div>
