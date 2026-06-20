@@ -179,14 +179,15 @@
             </button>
           </div>
           <div class="dashboard-grid">
-            <section class="dashboard-card dashboard-card-wide app-home-card" aria-labelledby="app-home-title">
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">APP HOME</p>
-                  <h3 id="app-home-title">앱처럼 바로 쓰기</h3>
+                  <p class="section-kicker">TOP PRIORITY</p>
+                  <h3 id="weekly-focus-title">이번 주 핵심 작업</h3>
                 </div>
+                <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
               </div>
-              <div id="app-home-panel" class="app-home-panel"></div>
+              <div id="weekly-focus-list" class="focus-list"></div>
             </section>
 
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="today-at-a-glance-title">
@@ -197,17 +198,6 @@
                 </div>
               </div>
               <div id="today-overview" class="dashboard-overview"></div>
-            </section>
-
-            <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">COMMITTED</p>
-                  <h3 id="weekly-focus-title">지금 잡고 있는 작업</h3>
-                </div>
-                <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
-              </div>
-              <div id="weekly-focus-list" class="focus-list"></div>
             </section>
 
             <section class="dashboard-card dashboard-secondary-card" aria-labelledby="fallback-title">
@@ -230,6 +220,27 @@
               <div id="urgency-list" class="urgency-list"></div>
             </section>
 
+            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="opportunity-dashboard-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">SINGER-SONGWRITER CALLS</p>
+                  <h3 id="opportunity-dashboard-title">이번 주 확인할 공모전</h3>
+                </div>
+                <span id="opportunity-last-updated" class="card-chip">업데이트 전</span>
+              </div>
+              <div id="dashboard-opportunity-list" class="opportunity-list"></div>
+            </section>
+
+            <section class="dashboard-card dashboard-card-wide app-home-card dashboard-secondary-card" aria-labelledby="app-home-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">APP HOME</p>
+                  <h3 id="app-home-title">앱처럼 바로 쓰기</h3>
+                </div>
+              </div>
+              <div id="app-home-panel" class="app-home-panel"></div>
+            </section>
+
             <section class="dashboard-card dashboard-secondary-card" aria-labelledby="hold-title">
               <div class="card-heading">
                 <div>
@@ -248,17 +259,6 @@
                 </div>
               </div>
               <ul id="recent-done-list" class="compact-list"></ul>
-            </section>
-
-            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="opportunity-dashboard-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">SINGER-SONGWRITER CALLS</p>
-                  <h3 id="opportunity-dashboard-title">이번 주 확인할 공모전</h3>
-                </div>
-                <span id="opportunity-last-updated" class="card-chip">업데이트 전</span>
-              </div>
-              <div id="dashboard-opportunity-list" class="opportunity-list"></div>
             </section>
 
             <section class="dashboard-card dashboard-card-wide dashboard-secondary-card desktop-secondary-card" aria-labelledby="checkin-title">

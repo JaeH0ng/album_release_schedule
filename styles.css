@@ -1765,18 +1765,6 @@ footer {
     border-radius: 16px;
   }
 
-  .body-mobile .dashboard-grid > :nth-child(1) {
-    order: 2;
-  }
-
-  .body-mobile .dashboard-grid > :nth-child(2) {
-    order: 3;
-  }
-
-  .body-mobile .dashboard-grid > :nth-child(3) {
-    order: 1;
-  }
-
   .body-mobile .app-home-actions {
     display: none;
   }
