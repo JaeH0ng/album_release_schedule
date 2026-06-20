@@ -62,9 +62,15 @@ const trackStepGroups = [
 ];
 
 const defaultTrackNotes = {
-  completedThisWeek: "",
-  arrangementIdeas: "",
-  nextUp: "",
+  completedThisWeek: [],
+  arrangementIdeas: [],
+  nextUp: [],
+};
+
+const trackNoteOptions = {
+  completedThisWeek: ["키/BPM 잡음", "전체 1테이크", "구조 정리", "후렴만 재확인", "데모 완료"],
+  arrangementIdeas: ["패드", "코러스 기타", "리듬 퍼커션", "베이스 느낌", "아직 안 얹음"],
+  nextUp: ["전체 데모 닫기", "후렴 키 재확인", "악기 하나 더 얹기", "구조 다시 정리", "다음 곡으로 이동"],
 };
 
 const defaultTracks = [
@@ -1198,7 +1204,12 @@ function loadTrackNotesState() {
         trackNumber,
         {
           ...defaults,
-          ...(stored[trackNumber] || {}),
+          ...Object.fromEntries(
+            Object.entries(stored[trackNumber] || {}).map(([key, value]) => [
+              key,
+              Array.isArray(value) ? value : [],
+            ])
+          ),
         },
       ])
     );
@@ -1558,6 +1569,41 @@ function getTrackNotes(trackNumber) {
   return state.trackNotes[trackNumber] || { ...defaultTrackNotes };
 }
 
+function toggleTrackNoteChoice(trackNumber, noteKey, choice) {
+  const current = new Set(getTrackNotes(trackNumber)[noteKey] || []);
+  if (current.has(choice)) current.delete(choice);
+  else current.add(choice);
+  state.trackNotes[trackNumber][noteKey] = [...current];
+  saveTrackNotesState();
+  renderTracks();
+}
+
+function renderTrackChoiceGroup(trackNumber, noteKey, label, selectedChoices, wide = false) {
+  const selected = new Set(selectedChoices || []);
+  return `
+    <section class="track-choice-group${wide ? " track-choice-group-wide" : ""}">
+      <span>${label}</span>
+      <div class="track-choice-buttons">
+        ${trackNoteOptions[noteKey]
+          .map(
+            (choice) => `
+              <button
+                class="track-choice-button${selected.has(choice) ? " is-selected" : ""}"
+                type="button"
+                data-track-number="${trackNumber}"
+                data-note-key="${noteKey}"
+                data-track-choice="${choice}"
+              >
+                ${choice}
+              </button>
+            `
+          )
+          .join("")}
+      </div>
+    </section>
+  `;
+}
+
 function getTrackChecklistProgress(trackNumber) {
   const checklist = getTrackChecklist(trackNumber);
   const completed = defaultTrackSteps.filter((step) => checklist[step.id]).length;
@@ -1772,6 +1818,7 @@ function getRecentCompletedEvents() {
 }
 
 function populateWeeklyCheckinForm() {
+  if (!document.querySelector("#checkin-available")) return;
   document.querySelector("#checkin-available").value = state.weeklyCheckin.available;
   document.querySelector("#checkin-completed").value = state.weeklyCheckin.completed;
   document.querySelector("#checkin-mustdo").value = state.weeklyCheckin.mustdo;
@@ -1779,6 +1826,7 @@ function populateWeeklyCheckinForm() {
 }
 
 function readWeeklyCheckinForm() {
+  if (!document.querySelector("#checkin-available")) return;
   state.weeklyCheckin = {
     available: document.querySelector("#checkin-available").value.trim(),
     completed: document.querySelector("#checkin-completed").value.trim(),
@@ -1793,16 +1841,20 @@ function buildCheckinPrompt() {
 }
 
 function updateCheckinPromptPreview() {
-  document.querySelector("#checkin-prompt-preview").textContent = buildCheckinPrompt();
+  const preview = document.querySelector("#checkin-prompt-preview");
+  if (!preview) return;
+  preview.textContent = buildCheckinPrompt();
 }
 
 function saveWeeklyCheckin() {
+  if (!document.querySelector("#checkin-available")) return;
   readWeeklyCheckinForm();
   saveWeeklyCheckinState();
   updateCheckinPromptPreview();
 }
 
 async function copyCheckinPrompt() {
+  if (!document.querySelector("#checkin-available")) return;
   readWeeklyCheckinForm();
   updateCheckinPromptPreview();
 
@@ -2608,18 +2660,9 @@ function renderTracks() {
               .join("")}
           </div>
           <div class="track-note-grid">
-            <label class="track-note-field">
-              <span>이번 주에 한 것</span>
-              <textarea data-track-note="completedThisWeek" data-track-number="${track.number}" rows="3" placeholder="예: 1절 보컬+통기타 녹음, 후렴 키 테스트">${notes.completedThisWeek}</textarea>
-            </label>
-            <label class="track-note-field">
-              <span>얹어본 악기 / 편곡 아이디어</span>
-              <textarea data-track-note="arrangementIdeas" data-track-number="${track.number}" rows="3" placeholder="예: 패드 한 겹, 드럼은 브러시 느낌, 후렴 코러스 기타">${notes.arrangementIdeas}</textarea>
-            </label>
-            <label class="track-note-field track-note-field-wide">
-              <span>다음 주에 이어갈 것</span>
-              <textarea data-track-note="nextUp" data-track-number="${track.number}" rows="3" placeholder="예: 2절 템포 다시 비교, 브릿지 악기 한 번 더 얹어보기">${notes.nextUp}</textarea>
-            </label>
+            ${renderTrackChoiceGroup(track.number, "completedThisWeek", "이번 주에 한 것", notes.completedThisWeek)}
+            ${renderTrackChoiceGroup(track.number, "arrangementIdeas", "얹어볼 악기 / 편곡 방향", notes.arrangementIdeas)}
+            ${renderTrackChoiceGroup(track.number, "nextUp", "다음에 할 것", notes.nextUp, true)}
           </div>
           <div class="track-links">
             <a href="${track.document}" target="_blank">곡 문서 열기</a>
@@ -2642,12 +2685,10 @@ function renderTracks() {
     });
   });
 
-  document.querySelectorAll("[data-track-note]").forEach((field) => {
-    field.addEventListener("input", () => {
-      const trackNumber = field.dataset.trackNumber;
-      const noteKey = field.dataset.trackNote;
-      state.trackNotes[trackNumber][noteKey] = field.value.trimStart();
-      saveTrackNotesState();
+  document.querySelectorAll("[data-track-choice]").forEach((button) => {
+    button.addEventListener("click", () => {
+      toggleTrackNoteChoice(button.dataset.trackNumber, button.dataset.noteKey, button.dataset.trackChoice);
+      renderDashboard();
     });
   });
 }
@@ -2740,8 +2781,8 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWeek);
 document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
-document.querySelector("#save-checkin").addEventListener("click", saveWeeklyCheckin);
-document.querySelector("#copy-checkin-prompt").addEventListener("click", copyCheckinPrompt);
+document.querySelector("#save-checkin")?.addEventListener("click", saveWeeklyCheckin);
+document.querySelector("#copy-checkin-prompt")?.addEventListener("click", copyCheckinPrompt);
 document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
 document.querySelector("#install-app").addEventListener("click", promptInstallApp);
@@ -2761,7 +2802,7 @@ document.querySelectorAll("[data-mobile-jump]").forEach((button) => {
   });
 });
 ["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
-  document.querySelector(selector).addEventListener("input", () => {
+  document.querySelector(selector)?.addEventListener("input", () => {
     readWeeklyCheckinForm();
     updateCheckinPromptPreview();
   });
