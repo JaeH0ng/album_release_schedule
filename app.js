@@ -1,6 +1,7 @@
 const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
+const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -29,6 +30,7 @@ const phases = [
   { id: "recording", label: "본녹음", color: "#b65043" },
   { id: "post", label: "편집·믹스·마스터", color: "#725f9e" },
   { id: "delivery", label: "유통 준비", color: "#4f626c" },
+  { id: "opportunity", label: "공모전", color: "#bc5f2f" },
   { id: "release", label: "발매", color: "#1f2522" },
 ];
 
@@ -657,6 +659,61 @@ const weeklyFocus = {
   ],
 };
 
+const defaultOpportunities = [
+  {
+    id: "yjh-2026",
+    title: "제37회 유재하음악경연대회",
+    host: "유재하음악장학회",
+    applicationOpen: "2026-06-12",
+    deadline: "2026-07-03",
+    status: "open",
+    fitLabel: "아주 잘 맞음",
+    fitScore: 5,
+    summary:
+      "모든 장르의 싱어송라이터를 대상으로 하는 대표 자작곡 경연. 미발표 창작곡 mp3와 실연 영상이 필요하다.",
+    preparation:
+      "대표 자작곡 1곡 선정, mp3 정리, 라이브 영상 링크 준비, 곡 소개 문장 초안 작성",
+    officialUrl: "https://yjh.or.kr/application",
+    sourceNote: "유재하음악장학회 공식 공고 확인",
+    lastCheckedAt: "2026-06-20T10:30:00+09:00",
+    sortOrder: 10,
+  },
+  {
+    id: "ebs-hellorookie-watch",
+    title: "EBS 헬로루키",
+    host: "EBS 스페이스 공감",
+    applicationOpen: null,
+    deadline: null,
+    status: "watch",
+    fitLabel: "잘 맞음",
+    fitScore: 4,
+    summary:
+      "신인 창작 뮤지션 발굴 프로젝트. 자작곡 기반 아티스트에게 적합하지만 회차별 공고 시점 확인이 필요하다.",
+    preparation: "라이브 영상과 대표곡 링크를 바로 제출할 수 있게 정리해두기",
+    officialUrl: "https://about.ebs.co.kr/kor/pr/release?boardId=31&boardTypeId=1&cmd=view&no=1&pageNo=1&postId=30004974029",
+    sourceNote: "EBS 공식 보도자료 기준, 다음 회차 공고 모니터링",
+    lastCheckedAt: "2026-06-20T10:30:00+09:00",
+    sortOrder: 20,
+  },
+  {
+    id: "hiddenstage-2026",
+    title: "2026 히든스테이지",
+    host: "히든스테이지",
+    applicationOpen: "2026-03-16",
+    deadline: "2026-04-24",
+    status: "closed",
+    fitLabel: "잘 맞음",
+    fitScore: 4,
+    summary:
+      "싱어송라이터 성격과는 잘 맞지만 올해 모집은 종료. 다음 시즌 재오픈 여부를 추적하기 좋은 항목이다.",
+    preparation: "내년 재오픈 전에 대표곡과 라이브 촬영본 업데이트",
+    officialUrl: "https://hiddenstage.co.kr/",
+    sourceNote: "공식 사이트 기준 2026 모집 종료",
+    lastCheckedAt: "2026-06-20T10:30:00+09:00",
+    sortOrder: 30,
+  },
+];
+
 const completionState = loadCompletionState();
 
 const state = {
@@ -666,8 +723,11 @@ const state = {
   completedMeta: completionState.completedMeta,
   trackChecklist: loadTrackChecklistState(),
   weeklyCheckin: loadWeeklyCheckinState(),
-  events: sortEvents(defaultEvents),
+  opportunityReview: loadOpportunityReviewState(),
+  baseEvents: sortEvents(defaultEvents),
+  events: [],
   tracks: sortTracks(defaultTracks),
+  opportunities: sortOpportunities(defaultOpportunities),
   eventMap: new Map(),
   syncStatus: "idle",
   syncDetail: "로컬 일정 사용 중",
@@ -676,7 +736,7 @@ const state = {
 const phaseMap = new Map(phases.map((phase) => [phase.id, phase]));
 const today = new Date();
 today.setHours(12, 0, 0, 0);
-state.eventMap = new Map(state.events.map((event) => [event.id, event]));
+rebuildEventState();
 
 function parseDate(value) {
   return new Date(`${value}T12:00:00`);
@@ -735,9 +795,33 @@ function sortTracks(items) {
   return [...items].sort((left, right) => left.number.localeCompare(right.number, "en"));
 }
 
+function sortOpportunities(items) {
+  const statusRank = { open: 0, watch: 1, closed: 2 };
+  return [...items].sort((left, right) => {
+    const sortGap = (left.sortOrder || 9999) - (right.sortOrder || 9999);
+    if (sortGap !== 0) return sortGap;
+    const statusGap = (statusRank[left.status] ?? 9) - (statusRank[right.status] ?? 9);
+    if (statusGap !== 0) return statusGap;
+    const leftDate = left.deadline || left.applicationOpen || "9999-12-31";
+    const rightDate = right.deadline || right.applicationOpen || "9999-12-31";
+    return parseDate(leftDate) - parseDate(rightDate);
+  });
+}
+
 function setScheduleData({ events = state.events, tracks = state.tracks }) {
-  state.events = sortEvents(events);
+  state.baseEvents = sortEvents(events);
   state.tracks = sortTracks(tracks);
+  rebuildEventState();
+}
+
+function setOpportunityData(opportunities = state.opportunities) {
+  state.opportunities = sortOpportunities(opportunities);
+  rebuildEventState();
+}
+
+function rebuildEventState() {
+  const acceptedEvents = buildAcceptedOpportunityEvents();
+  state.events = sortEvents([...state.baseEvents, ...acceptedEvents]);
   state.eventMap = new Map(state.events.map((event) => [event.id, event]));
 }
 
@@ -802,6 +886,7 @@ function normalizeEventRow(row) {
     document: row.document || null,
     lyrics: row.lyrics || null,
     milestone: Boolean(row.milestone),
+    kind: row.kind || "album",
   };
 }
 
@@ -813,6 +898,25 @@ function normalizeTrackRow(row) {
     eventId: row.event_id,
     document: row.document,
     lyrics: row.lyrics,
+  };
+}
+
+function normalizeOpportunityRow(row) {
+  return {
+    id: row.id,
+    title: row.title,
+    host: row.host,
+    applicationOpen: row.application_open || null,
+    deadline: row.deadline || null,
+    status: row.status || "watch",
+    fitLabel: row.fit_label || "확인 필요",
+    fitScore: Number(row.fit_score || 0),
+    summary: row.summary || "",
+    preparation: row.preparation || "",
+    officialUrl: row.official_url,
+    sourceNote: row.source_note || "",
+    lastCheckedAt: row.last_checked_at || null,
+    sortOrder: row.sort_order || 9999,
   };
 }
 
@@ -841,7 +945,7 @@ async function refreshSupabaseData() {
   setSyncStatus("loading", "Supabase 일정 확인 중", "게시된 변경 사항을 가져오는 중");
 
   try {
-    const [eventRows, trackRows] = await Promise.all([
+    const [eventRows, trackRows, opportunityRows] = await Promise.all([
       fetchSupabaseTable(
         "album_events",
         "id,date,end,title,phase,duration,result,detail,track,document,lyrics,milestone,sort_order",
@@ -852,13 +956,21 @@ async function refreshSupabaseData() {
         "number,title,due,event_id,document,lyrics,sort_order",
         "sort_order.asc.nullslast,number.asc"
       ),
+      fetchSupabaseTable(
+        "singer_songwriter_opportunities",
+        "id,title,host,application_open,deadline,status,fit_label,fit_score,summary,preparation,official_url,source_note,last_checked_at,sort_order",
+        "sort_order.asc.nullslast,deadline.asc.nullslast,title.asc"
+      ),
     ]);
 
-    if (eventRows.length > 0 || trackRows.length > 0) {
+    if (eventRows.length > 0 || trackRows.length > 0 || opportunityRows.length > 0) {
       setScheduleData({
         events: eventRows.length > 0 ? eventRows.map(normalizeEventRow) : defaultEvents,
         tracks: trackRows.length > 0 ? trackRows.map(normalizeTrackRow) : defaultTracks,
       });
+      setOpportunityData(
+        opportunityRows.length > 0 ? opportunityRows.map(normalizeOpportunityRow) : defaultOpportunities
+      );
       updateChrome();
       renderAll();
       setSyncStatus("ready", "Supabase 게시 일정 사용 중", `${formatSyncTimestamp(new Date())} 동기화 완료`);
@@ -939,6 +1051,23 @@ function saveTrackChecklistState() {
   }
 }
 
+function loadOpportunityReviewState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(OPPORTUNITY_REVIEW_KEY) || "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveOpportunityReviewState() {
+  try {
+    localStorage.setItem(OPPORTUNITY_REVIEW_KEY, JSON.stringify(state.opportunityReview));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
 function loadWeeklyCheckinState() {
   const defaults = {
     available: "",
@@ -970,6 +1099,70 @@ function getTrackChecklistProgress(trackNumber) {
   const checklist = getTrackChecklist(trackNumber);
   const completed = defaultTrackSteps.filter((step) => checklist[step.id]).length;
   return { completed, total: defaultTrackSteps.length };
+}
+
+function getOpportunityReview(opportunityId) {
+  return state.opportunityReview[opportunityId] || { status: "new", updatedAt: null };
+}
+
+function getAcceptedOpportunities() {
+  return state.opportunities.filter((opportunity) => getOpportunityReview(opportunity.id).status === "accepted");
+}
+
+function buildAcceptedOpportunityEvents() {
+  return getAcceptedOpportunities()
+    .filter((opportunity) => opportunity.deadline || opportunity.applicationOpen)
+    .map((opportunity) => ({
+      id: `opportunity-${opportunity.id}`,
+      date: opportunity.deadline || opportunity.applicationOpen,
+      end: null,
+      title: `${opportunity.title} 마감`,
+      phase: "opportunity",
+      duration: "공모전 준비",
+      result: "제출 여부 확정 또는 제출 완료",
+      detail: `${opportunity.host} · ${opportunity.summary}`,
+      track: null,
+      document: opportunity.officialUrl,
+      lyrics: null,
+      milestone: true,
+      opportunityId: opportunity.id,
+      kind: "opportunity",
+    }));
+}
+
+function setOpportunityReview(opportunityId, status) {
+  state.opportunityReview[opportunityId] = {
+    status,
+    updatedAt: new Date().toISOString(),
+  };
+  saveOpportunityReviewState();
+  rebuildEventState();
+  renderAll();
+}
+
+function formatOpportunityDateLabel(opportunity) {
+  if (opportunity.deadline) return `마감 ${formatShortDate(opportunity.deadline)}`;
+  if (opportunity.applicationOpen) return `확인일 ${formatShortDate(opportunity.applicationOpen)}`;
+  return "상시 확인";
+}
+
+function formatOpportunityStatus(status) {
+  if (status === "open") return "접수 중";
+  if (status === "closed") return "마감";
+  return "모니터링";
+}
+
+function getOpportunityStatusClass(status) {
+  if (status === "closed") return "is-closed";
+  if (status === "watch") return "is-watch";
+  return "";
+}
+
+function formatOpportunityReview(reviewStatus) {
+  if (reviewStatus === "accepted") return "캘린더 반영";
+  if (reviewStatus === "hold") return "보류";
+  if (reviewStatus === "dismissed") return "제외";
+  return "미정";
 }
 
 function getIncompleteEvents() {
@@ -1123,8 +1316,109 @@ function renderDashboard() {
         .join("")
     : '<li>아직 완료한 작업이 없습니다. 오늘 끝낸 작업 하나부터 체크해보세요.</li>';
 
+  const spotlight = state.opportunities.filter((opportunity) => opportunity.status !== "closed").slice(0, 3);
+  document.querySelector("#dashboard-opportunity-list").innerHTML = spotlight.length
+    ? spotlight.map((opportunity) => renderOpportunityCard(opportunity, { compact: true })).join("")
+    : '<p class="opportunity-empty">이번 주 표시할 공모전이 아직 없습니다.</p>';
+
+  const latestCheckedAt = state.opportunities
+    .map((opportunity) => opportunity.lastCheckedAt)
+    .filter(Boolean)
+    .sort()
+    .at(-1);
+  document.querySelector("#opportunity-last-updated").textContent = latestCheckedAt
+    ? `${formatSyncTimestamp(new Date(latestCheckedAt))} 확인`
+    : "업데이트 전";
+
   populateWeeklyCheckinForm();
   updateCheckinPromptPreview();
+}
+
+function renderOpportunityCard(opportunity, options = {}) {
+  const review = getOpportunityReview(opportunity.id);
+  const classes = ["opportunity-card"];
+  if (review.status === "accepted") classes.push("is-accepted");
+  if (review.status === "dismissed") classes.push("is-dismissed");
+  const statusClasses = ["opportunity-status", getOpportunityStatusClass(opportunity.status)]
+    .filter(Boolean)
+    .join(" ");
+  const acceptedBadge =
+    review.status === "accepted" ? '<span class="opportunity-status is-accepted">캘린더 반영됨</span>' : "";
+  const checkedAt = opportunity.lastCheckedAt
+    ? `${formatSyncTimestamp(new Date(opportunity.lastCheckedAt))} 기준`
+    : "최근 확인 기록 없음";
+  const reviewLabel = formatOpportunityReview(review.status);
+  const compactClass = options.compact ? " compact" : "";
+
+  return `
+    <article class="${classes.join(" ")}${compactClass ? compactClass : ""}" data-opportunity-id="${opportunity.id}">
+      <div class="opportunity-card-top">
+        <div>
+          <h4>${opportunity.title}</h4>
+          <p>${opportunity.host}</p>
+        </div>
+        <div class="opportunity-meta">
+          <span class="${statusClasses}">${formatOpportunityStatus(opportunity.status)}</span>
+          ${acceptedBadge}
+        </div>
+      </div>
+      <div class="opportunity-body">
+        <p>${opportunity.summary}</p>
+      </div>
+      <div class="opportunity-meta">
+        <span class="meta-pill">${formatOpportunityDateLabel(opportunity)}</span>
+        <span class="meta-pill">적합도 ${opportunity.fitLabel}</span>
+        <span class="meta-pill">현재 판단 ${reviewLabel}</span>
+      </div>
+      <div class="opportunity-meta">
+        <span class="meta-pill">준비: ${opportunity.preparation}</span>
+      </div>
+      <div class="opportunity-actions">
+        <button class="opportunity-action is-primary${review.status === "accepted" ? " is-current" : ""}" type="button" data-action="accepted">
+          수락 후 캘린더 추가
+        </button>
+        <button class="opportunity-action is-secondary${review.status === "hold" ? " is-current" : ""}" type="button" data-action="hold">
+          보류
+        </button>
+        <button class="opportunity-action is-danger${review.status === "dismissed" ? " is-current" : ""}" type="button" data-action="dismissed">
+          제외
+        </button>
+      </div>
+      <div class="opportunity-links">
+        <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
+        <span class="summary-label">${opportunity.sourceNote} · ${checkedAt}</span>
+      </div>
+    </article>
+  `;
+}
+
+function bindOpportunityControls() {
+  document.querySelectorAll("[data-opportunity-id]").forEach((card) => {
+    const opportunityId = card.dataset.opportunityId;
+    card.querySelectorAll("[data-action]").forEach((button) => {
+      button.addEventListener("click", () => setOpportunityReview(opportunityId, button.dataset.action));
+    });
+  });
+}
+
+function renderOpportunities() {
+  const openCount = state.opportunities.filter((opportunity) => opportunity.status === "open").length;
+  const spotlightCount = state.opportunities.filter((opportunity) => opportunity.status !== "closed").slice(0, 3).length;
+  const accepted = getAcceptedOpportunities();
+
+  document.querySelector("#opportunity-open-count").textContent = String(openCount);
+  document.querySelector("#opportunity-spotlight-count").textContent = String(spotlightCount);
+  document.querySelector("#opportunity-accepted-count").textContent = String(accepted.length);
+
+  document.querySelector("#accepted-opportunity-list").innerHTML = accepted.length
+    ? accepted.map((opportunity) => renderOpportunityCard(opportunity)).join("")
+    : '<p class="opportunity-empty">아직 캘린더에 넣은 공모전이 없습니다. 카드에서 수락을 누르면 바로 일정에 합쳐집니다.</p>';
+
+  document.querySelector("#opportunity-list").innerHTML = state.opportunities.length
+    ? state.opportunities.map((opportunity) => renderOpportunityCard(opportunity)).join("")
+    : '<p class="opportunity-empty">표시할 공모전 데이터가 아직 없습니다.</p>';
+
+  bindOpportunityControls();
 }
 
 function renderCalendar() {
@@ -1253,8 +1547,9 @@ function toggleCompleted(eventId, complete) {
 }
 
 function renderSummary() {
-  const completedCount = state.events.filter((event) => state.completed.has(event.id)).length;
-  const progress = state.events.length ? Math.round((completedCount / state.events.length) * 100) : 0;
+  const albumEvents = state.events.filter((event) => event.kind !== "opportunity");
+  const completedCount = albumEvents.filter((event) => state.completed.has(event.id)).length;
+  const progress = albumEvents.length ? Math.round((completedCount / albumEvents.length) * 100) : 0;
   const progressFill = document.querySelector("#progress-fill");
   const progressTrack = document.querySelector(".progress-track");
   document.querySelector("#progress-percent").textContent = `${progress}%`;
@@ -1460,6 +1755,7 @@ function drawWaveform(progress) {
 function renderAll() {
   updateChrome();
   renderDashboard();
+  renderOpportunities();
   renderPhaseFilters();
   renderCalendar();
   renderRoadmap();

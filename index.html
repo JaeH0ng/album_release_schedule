@@ -88,6 +88,9 @@
       <button class="tab-button is-active" type="button" data-view="dashboard" aria-selected="true">
         이번 주 집중
       </button>
+      <button class="tab-button" type="button" data-view="opportunities" aria-selected="false">
+        공모전
+      </button>
       <button class="tab-button" type="button" data-view="calendar" aria-selected="false">
         주차별 캘린더
       </button>
@@ -183,6 +186,17 @@
               <ul id="recent-done-list" class="compact-list"></ul>
             </section>
 
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="opportunity-dashboard-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">SINGER-SONGWRITER CALLS</p>
+                  <h3 id="opportunity-dashboard-title">이번 주 확인할 공모전</h3>
+                </div>
+                <span id="opportunity-last-updated" class="card-chip">업데이트 전</span>
+              </div>
+              <div id="dashboard-opportunity-list" class="opportunity-list"></div>
+            </section>
+
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="checkin-title">
               <div class="card-heading">
                 <div>
@@ -224,7 +238,7 @@
           </div>
         </div>
 
-        <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
+          <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">2026.06.15 - 2026.12.06</p>
@@ -237,7 +251,54 @@
             </div>
           </div>
           <div id="week-list" class="week-list"></div>
-        </div>
+          </div>
+
+          <div id="opportunities-view" class="view-panel" aria-labelledby="opportunities-title" hidden>
+            <div class="panel-heading">
+              <div>
+                <p class="section-kicker">WEEKLY SEARCH BOARD</p>
+                <h2 id="opportunities-title">싱어송라이터 공모전 보드</h2>
+              </div>
+              <div class="calendar-legend" aria-label="공모전 상태">
+                <span><i class="legend-dot due"></i>접수 중</span>
+                <span><i class="legend-dot done"></i>수락 후 캘린더 반영</span>
+              </div>
+            </div>
+            <section class="opportunity-summary-grid" aria-label="공모전 요약">
+              <article class="summary-mini-card">
+                <span class="summary-label">접수 중</span>
+                <strong id="opportunity-open-count">0</strong>
+              </article>
+              <article class="summary-mini-card">
+                <span class="summary-label">이번 주 확인</span>
+                <strong id="opportunity-spotlight-count">0</strong>
+              </article>
+              <article class="summary-mini-card">
+                <span class="summary-label">캘린더 반영</span>
+                <strong id="opportunity-accepted-count">0</strong>
+              </article>
+            </section>
+            <section class="opportunity-board">
+              <div class="opportunity-board-section">
+                <div class="card-heading">
+                  <div>
+                    <p class="section-kicker">ACCEPTED</p>
+                    <h3>캘린더에 넣은 공모전</h3>
+                  </div>
+                </div>
+                <div id="accepted-opportunity-list" class="opportunity-list"></div>
+              </div>
+              <div class="opportunity-board-section">
+                <div class="card-heading">
+                  <div>
+                    <p class="section-kicker">ALL CANDIDATES</p>
+                    <h3>매주 갱신되는 후보</h3>
+                  </div>
+                </div>
+                <div id="opportunity-list" class="opportunity-list"></div>
+              </div>
+            </section>
+          </div>
 
         <div id="roadmap-view" class="view-panel" aria-labelledby="roadmap-title" hidden>
           <div class="panel-heading">
