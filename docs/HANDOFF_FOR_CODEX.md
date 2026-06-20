@@ -17,6 +17,25 @@
 
 ## 변경 로그
 
+### 2026-06-20 — 핸드오프 자동 갱신용 Claude Stop 훅 추가
+
+**작업자:** Claude (Claude Code, macOS)
+
+**무엇을 / 왜**
+- "Claude로 작업을 끝낼 때마다 이 핸드오프 로그를 자동으로 갱신"하도록 고정. Claude Code의 **Stop 훅**으로 구현했다.
+- 동작: 세션 종료(Stop) 시 작업 트리를 검사해, **문서화 대상(코드/문서) 변경이 남아 있고 `HANDOFF_FOR_CODEX.md`는 아직 안 건드린 경우에만** 한 번 차단하며 "핸드오프 항목을 추가하라"고 Claude에게 알린다. 핸드오프 문서를 건드리는 순간 조건이 풀려(자가-해제) 더는 막지 않는다. `node_modules`/`dist`/`.claude/`와 무변경 대화 turn에서는 발동하지 않는다.
+
+**바꾼/추가한 파일**
+- `.claude/settings.json` — Stop 훅 등록 (`bash "${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/handoff-reminder.sh"`).
+- `.claude/hooks/handoff-reminder.sh` — 위 판정 로직(git porcelain 기반, `jq`로 JSON 출력).
+- `.gitignore` — `node_modules/` 추가(가십 산출물 무시).
+
+**Codex가 알아야 할 점**
+- 이 훅은 **Claude 전용**이다. Codex는 `.claude/` 훅을 실행하지 않으므로 Codex 작업 흐름에는 영향이 없다. 단, **Codex로 작업한 변경도 이 핸드오프 로그에 같은 형식으로 직접 남겨야** Claude/Codex가 서로의 변경을 추적할 수 있다.
+- 훅은 강제가 아니라 "한 번 알림" 수준이며, 변경이 사소하면 기록 없이 종료해도 된다.
+
+---
+
 ### 2026-06-20 — 판단용 데모 체크리스트를 `세션`/`마감` 2국면으로 재구성
 
 **작업자:** Claude (Claude Code, macOS)

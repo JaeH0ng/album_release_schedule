@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/handoff-reminder.sh\"",
+            "timeout": 10,
+            "statusMessage": "핸드오프 로그 갱신 여부 확인 중"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -3,4 +3,5 @@
 .env.*
 !.env.example
 dist/
+node_modules/
 supabase/.temp/
