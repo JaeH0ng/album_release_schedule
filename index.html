@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-build-version="20260620160507">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,10 +12,10 @@
       content="2026년 12월 정규 앨범 발매를 위한 주차별 제작 캘린더"
     />
     <title>앨범 제작 캘린더</title>
-    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="apple-touch-icon" href="assets/icon.svg" />
-    <link rel="stylesheet" href="styles.css" />
+    <link rel="icon" href="assets/icon.svg?v=20260620160507" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260620160507" />
+    <link rel="apple-touch-icon" href="assets/icon.svg?v=20260620160507" />
+    <link rel="stylesheet" href="styles.css?v=20260620160507" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">일정으로 바로가기</a>
@@ -274,11 +274,11 @@
           </div>
         </div>
 
-          <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
+        <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">2026.06.15 - 2026.12.06</p>
-              <h2 id="calendar-title">주차별 작업 캘린더</h2>
+              <h2 id="calendar-title">월별 작업 캘린더</h2>
             </div>
             <div class="calendar-legend" aria-label="상태 범례">
               <span><i class="legend-dot due"></i>작업</span>
@@ -286,132 +286,73 @@
               <span><i class="legend-dot done"></i>완료</span>
             </div>
           </div>
-          <section class="calendar-overview-board" aria-labelledby="calendar-overview-title">
-            <div class="card-heading">
-              <div>
-                <p class="section-kicker">FULL MAP</p>
-                <h3 id="calendar-overview-title">전체 일정 한눈에 보기</h3>
-              </div>
-            </div>
-            <div id="calendar-overview" class="calendar-overview"></div>
-          </section>
-          <div id="week-list" class="week-list"></div>
-          </div>
+          <div id="month-list" class="month-list"></div>
+        </div>
 
-          <div id="opportunities-view" class="view-panel" aria-labelledby="opportunities-title" hidden>
-            <div class="panel-heading">
-              <div>
-                <p class="section-kicker">WEEKLY SEARCH BOARD</p>
-                <h2 id="opportunities-title">싱어송라이터 공모전 보드</h2>
-              </div>
-              <div class="calendar-legend" aria-label="공모전 상태">
-                <span><i class="legend-dot due"></i>접수 중</span>
-                <span><i class="legend-dot done"></i>수락 후 캘린더 반영</span>
-              </div>
+        <div id="opportunities-view" class="view-panel" aria-labelledby="opportunities-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">WEEKLY SEARCH BOARD</p>
+              <h2 id="opportunities-title">싱어송라이터 공모전 보드</h2>
             </div>
-            <section class="opportunity-summary-grid" aria-label="공모전 요약">
-              <article class="summary-mini-card">
-                <span class="summary-label">접수 중</span>
-                <strong id="opportunity-open-count">0</strong>
-              </article>
-              <article class="summary-mini-card">
-                <span class="summary-label">이번 주 확인</span>
-                <strong id="opportunity-spotlight-count">0</strong>
-              </article>
-              <article class="summary-mini-card">
-                <span class="summary-label">캘린더 반영</span>
-                <strong id="opportunity-accepted-count">0</strong>
-              </article>
-            </section>
-            <section class="opportunity-board">
-              <div id="admin-panel" class="opportunity-board-section" hidden>
-                <div class="card-heading">
-                  <div>
-                    <p class="section-kicker">ADMIN MODE</p>
-                    <h3>공모전 관리자 패널</h3>
-                  </div>
-                  <span id="admin-status-badge" class="card-chip">관리자 확인 전</span>
-                </div>
-                <form id="admin-opportunity-form" class="admin-form">
-                  <label class="checkin-field">
-                    <span>ID</span>
-                    <input id="admin-id" class="auth-input" type="text" placeholder="예: yjh-2026" required />
-                  </label>
-                  <label class="checkin-field">
-                    <span>공모전명</span>
-                    <input id="admin-title" class="auth-input" type="text" placeholder="예: 제37회 유재하음악경연대회" required />
-                  </label>
-                  <label class="checkin-field">
-                    <span>주최</span>
-                    <input id="admin-host" class="auth-input" type="text" placeholder="예: 유재하음악장학회" required />
-                  </label>
-                  <label class="checkin-field">
-                    <span>상태</span>
-                    <select id="admin-status" class="admin-select">
-                      <option value="open">open</option>
-                      <option value="watch">watch</option>
-                      <option value="closed">closed</option>
-                    </select>
-                  </label>
-                  <label class="checkin-field">
-                    <span>접수 시작일</span>
-                    <input id="admin-open-date" class="auth-input" type="date" />
-                  </label>
-                  <label class="checkin-field">
-                    <span>마감일</span>
-                    <input id="admin-deadline" class="auth-input" type="date" />
-                  </label>
-                  <label class="checkin-field">
-                    <span>적합도 라벨</span>
-                    <input id="admin-fit-label" class="auth-input" type="text" placeholder="예: 아주 잘 맞음" required />
-                  </label>
-                  <label class="checkin-field">
-                    <span>정렬 순서</span>
-                    <input id="admin-sort-order" class="auth-input" type="number" placeholder="10" />
-                  </label>
-                  <label class="checkin-field admin-field-wide">
-                    <span>한 줄 요약</span>
-                    <textarea id="admin-summary" rows="3" placeholder="공고 요약" required></textarea>
-                  </label>
-                  <label class="checkin-field admin-field-wide">
-                    <span>준비 메모</span>
-                    <textarea id="admin-preparation" rows="3" placeholder="준비해야 할 것" required></textarea>
-                  </label>
-                  <label class="checkin-field admin-field-wide">
-                    <span>공식 URL</span>
-                    <input id="admin-url" class="auth-input" type="url" placeholder="https://..." required />
-                  </label>
-                  <label class="checkin-field admin-field-wide">
-                    <span>출처 메모</span>
-                    <input id="admin-source-note" class="auth-input" type="text" placeholder="예: 공식 공고 확인" />
-                  </label>
-                  <div class="admin-actions">
-                    <button id="admin-save" class="sync-button" type="submit">저장</button>
-                    <button id="admin-reset" class="opportunity-action" type="button">새 항목 작성</button>
-                    <button id="admin-delete" class="opportunity-action is-danger" type="button">삭제</button>
-                  </div>
-                </form>
-              </div>
-              <div class="opportunity-board-section">
-                <div class="card-heading">
-                  <div>
-                    <p class="section-kicker">ACCEPTED</p>
-                    <h3>캘린더에 넣은 공모전</h3>
-                  </div>
-                </div>
-                <div id="accepted-opportunity-list" class="opportunity-list"></div>
-              </div>
-              <div class="opportunity-board-section">
-                <div class="card-heading">
-                  <div>
-                    <p class="section-kicker">ALL CANDIDATES</p>
-                    <h3>매주 갱신되는 후보</h3>
-                  </div>
-                </div>
-                <div id="opportunity-list" class="opportunity-list"></div>
-              </div>
-            </section>
+            <div class="calendar-legend" aria-label="공모전 상태">
+              <span><i class="legend-dot due"></i>후보</span>
+              <span><i class="legend-dot done"></i>캘린더 반영</span>
+            </div>
           </div>
+          <section class="opportunity-summary-grid" aria-label="공모전 요약">
+            <article class="summary-mini-card">
+              <span class="summary-label">지금 검토할 후보</span>
+              <strong id="opportunity-open-count">0</strong>
+            </article>
+            <article class="summary-mini-card">
+              <span class="summary-label">보류</span>
+              <strong id="opportunity-hold-count">0</strong>
+            </article>
+            <article class="summary-mini-card">
+              <span class="summary-label">캘린더 반영</span>
+              <strong id="opportunity-accepted-count">0</strong>
+            </article>
+          </section>
+          <section class="opportunity-board">
+            <div class="opportunity-board-section">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">ACCEPTED</p>
+                  <h3>캘린더에 넣은 공모전</h3>
+                </div>
+              </div>
+              <div id="accepted-opportunity-list" class="opportunity-list"></div>
+            </div>
+            <div class="opportunity-board-section">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">ON HOLD</p>
+                  <h3>보류 중인 공모전</h3>
+                </div>
+              </div>
+              <div id="held-opportunity-list" class="opportunity-list"></div>
+            </div>
+            <div class="opportunity-board-section">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">ALL CANDIDATES</p>
+                  <h3>지금 검토할 후보</h3>
+                </div>
+              </div>
+              <div id="opportunity-list" class="opportunity-list"></div>
+            </div>
+            <div class="opportunity-board-section">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">DISMISSED</p>
+                  <h3>이번엔 넘긴 공모전</h3>
+                </div>
+              </div>
+              <div id="dismissed-opportunity-list" class="opportunity-list"></div>
+            </div>
+          </section>
+        </div>
 
         <div id="roadmap-view" class="view-panel" aria-labelledby="roadmap-title" hidden>
           <div class="panel-heading">
@@ -427,9 +368,10 @@
           <div class="panel-heading">
             <div>
               <p class="section-kicker">10 CANDIDATE TRACKS</p>
-              <h2 id="tracks-title">곡별 데모 현황, 실험 로그와 체크리스트</h2>
+              <h2 id="tracks-title">곡별 데모 진행 보드</h2>
             </div>
           </div>
+          <div id="track-summary-board" class="track-summary-board"></div>
           <div class="track-table-wrap">
             <table class="track-table">
               <thead>
@@ -466,6 +408,6 @@
       <div id="dialog-links" class="dialog-links"></div>
     </dialog>
 
-    <script type="module" src="app.js"></script>
+    <script type="module" src="app.js?v=20260620160507"></script>
   </body>
 </html>
