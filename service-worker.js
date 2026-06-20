@@ -6,6 +6,7 @@ const APP_SHELL = [
   "./app.js",
   "./manifest.webmanifest",
   "./assets/icon.svg",
+  "./pwa-reset.html",
 ];
 const NETWORK_FIRST_ASSETS = new Set([
   `${self.location.origin}/album_release_schedule/`,
@@ -14,6 +15,7 @@ const NETWORK_FIRST_ASSETS = new Set([
   `${self.location.origin}/album_release_schedule/app.js`,
   `${self.location.origin}/album_release_schedule/manifest.webmanifest`,
   `${self.location.origin}/album_release_schedule/service-worker.js`,
+  `${self.location.origin}/album_release_schedule/pwa-reset.html`,
 ]);
 
 function shouldUseNetworkFirst(request) {
