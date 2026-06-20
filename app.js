@@ -2,6 +2,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
+const TRACK_NOTES_KEY = "album-release-track-notes-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
@@ -42,12 +43,29 @@ const phases = [
 ];
 
 const defaultTrackSteps = [
-  { id: "key", label: "키 테스트 완료" },
-  { id: "bpm", label: "BPM 후보 기록" },
-  { id: "take", label: "멈추지 않은 전체 1테이크 확보" },
-  { id: "memo", label: "편한 구간과 불편한 구간 메모" },
-  { id: "next", label: "다음 테스트 1가지 정리" },
+  { id: "key", group: "판단", label: "키 테스트 완료" },
+  { id: "bpm", group: "판단", label: "BPM 후보 기록" },
+  { id: "structure", group: "판단", label: "현재 구조와 길이 메모" },
+  { id: "take", group: "녹음", label: "멈추지 않은 전체 1테이크 확보" },
+  { id: "comfort", group: "판단", label: "편한 구간과 불편한 구간 체크" },
+  { id: "arrangement", group: "실험", label: "얹어볼 악기 또는 질감 1개 테스트" },
+  { id: "sketch", group: "실험", label: "편곡 아이디어 또는 훅 메모 남기기" },
+  { id: "memo", group: "기록", label: "곡 문서에 파일 경로와 세션 메모 연결" },
+  { id: "next", group: "기록", label: "다음 주에 이어갈 것 1가지 정리" },
 ];
+
+const trackStepGroups = [
+  { id: "녹음", label: "녹음" },
+  { id: "판단", label: "판단" },
+  { id: "실험", label: "편곡 실험" },
+  { id: "기록", label: "기록" },
+];
+
+const defaultTrackNotes = {
+  completedThisWeek: "",
+  arrangementIdeas: "",
+  nextUp: "",
+};
 
 const defaultTracks = [
   {
@@ -133,7 +151,8 @@ const defaultTracks = [
 ];
 
 const demoDetail =
-  "처음부터 끝까지 이어지는 통기타+보컬 파일을 남긴다. 연주 실수보다 키, BPM과 구조를 판단할 수 있는지가 중요하다.";
+  "통기타+보컬 전체 파일을 중심으로 남기되, 필요하면 짧은 악기 오버더빙이나 편곡 스케치를 함께 테스트한다. 연주 완성도보다 키, BPM, 구조와 다음 편곡 방향을 판단할 수 있는지가 중요하다.";
+const demoResult = "전체 1테이크, 임시 키/BPM, 편곡 아이디어 메모";
 
 const defaultEvents = [
   {
@@ -153,7 +172,7 @@ const defaultEvents = [
     title: "good night 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "good night",
     document: "tracks/10_good-night/README.md",
@@ -166,7 +185,7 @@ const defaultEvents = [
     title: "Psyche 데모",
     phase: "demo",
     duration: "60~90분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "Psyche",
     document: "tracks/01_psyche/README.md",
@@ -178,7 +197,7 @@ const defaultEvents = [
     title: "괜한 말 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "괜한 말",
     document: "tracks/02_gwaenhan-mal/README.md",
@@ -190,7 +209,7 @@ const defaultEvents = [
     title: "날 좀 봐줘요, 좀 봐줘요 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "날 좀 봐줘요, 좀 봐줘요",
     document: "tracks/03_look-at-me/README.md",
@@ -202,7 +221,7 @@ const defaultEvents = [
     title: "누군가의 데모",
     phase: "demo",
     duration: "60~90분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "누군가의",
     document: "tracks/04_nugungaui/README.md",
@@ -214,7 +233,7 @@ const defaultEvents = [
     title: "대동제 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "대동제",
     document: "tracks/05_daedongje/README.md",
@@ -226,7 +245,7 @@ const defaultEvents = [
     title: "또다시 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "또다시",
     document: "tracks/06_ttodasi/README.md",
@@ -238,7 +257,7 @@ const defaultEvents = [
     title: "새벽 두 시 데모",
     phase: "demo",
     duration: "60~90분",
-    result: "전체 1테이크와 대체 가사 판단 메모",
+    result: "전체 1테이크, 대체 가사 판단과 질감 스케치 메모",
     detail: demoDetail,
     track: "새벽 두 시",
     document: "tracks/07_2am/README.md",
@@ -250,7 +269,7 @@ const defaultEvents = [
     title: "소란스러운 밤 데모",
     phase: "demo",
     duration: "60~90분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "소란스러운 밤",
     document: "tracks/08_noisy-night/README.md",
@@ -262,7 +281,7 @@ const defaultEvents = [
     title: "스물 여덟 데모",
     phase: "demo",
     duration: "60분",
-    result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
+    result: demoResult,
     detail: demoDetail,
     track: "스물 여덟",
     document: "tracks/09_twenty-eight/README.md",
@@ -644,8 +663,8 @@ const weeklyFocus = {
   period: "2026-06-18 ~ 2026-06-21",
   mustFinish: [
     {
-      title: "good night 판단용 데모 1개 닫기",
-      detail: "전체 1테이크와 임시 키/BPM, 구조 메모까지 남기면 이번 주 핵심 목표 달성이다.",
+    title: "good night 판단용 데모 1개 닫기",
+      detail: "전체 1테이크와 임시 키/BPM, 구조 메모를 남기고, 가능하면 얹어볼 악기나 질감도 1개만 짧게 시험한다.",
       meta: ["고정 마감 6월 21일", "60분 메인 블록"],
     },
     {
@@ -653,12 +672,17 @@ const weeklyFocus = {
       detail: "다음 곡들에서 다시 헤매지 않도록 저장 경로, 파일명, 기타/보컬 입력을 먼저 잠근다.",
       meta: ["선행 작업", "6월 20일까지"],
     },
+    {
+      title: "편곡 스케치 메모 한 줄씩 남기기",
+      detail: "이번 주 데모가 끝날 때마다 드럼, 패드, 코러스 기타처럼 다음에 얹어볼 것 한 가지씩만 적어둔다.",
+      meta: ["부담 없이", "다음 주 연결"],
+    },
   ],
   fallback30: [
     "최고음 구간으로 키 확인 5분",
     "임시 BPM 하나 선택 5분",
     "멈추지 않고 전체 1테이크 15분",
-    "파일명 정리와 한 줄 메모 5분",
+    "파일명 정리 또는 편곡 아이디어 한 줄 메모 5분",
   ],
   codexPrompts: [
     "오늘 확보 가능한 시간과 곡 이름을 보내면 세션 계획을 다시 짜달라고 하기",
@@ -730,6 +754,7 @@ const state = {
   completedMeta: completionState.completedMeta,
   eventPlan: loadEventPlanState(),
   trackChecklist: loadTrackChecklistState(),
+  trackNotes: loadTrackNotesState(),
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
   mobileCompact: loadMobileCompactState(),
@@ -1121,6 +1146,10 @@ function saveMobileUtilityState() {
   }
 }
 
+function buildDefaultTrackNotes() {
+  return Object.fromEntries(defaultTracks.map((track) => [track.number, { ...defaultTrackNotes }]));
+}
+
 function buildDefaultTrackChecklist() {
   return Object.fromEntries(
     defaultTracks.map((track) => [
@@ -1153,6 +1182,34 @@ function loadTrackChecklistState() {
 function saveTrackChecklistState() {
   try {
     localStorage.setItem(TRACK_CHECKLIST_KEY, JSON.stringify(state.trackChecklist));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+function loadTrackNotesState() {
+  const base = buildDefaultTrackNotes();
+  try {
+    const stored = JSON.parse(localStorage.getItem(TRACK_NOTES_KEY) || "{}");
+    if (!stored || typeof stored !== "object") return base;
+
+    return Object.fromEntries(
+      Object.entries(base).map(([trackNumber, defaults]) => [
+        trackNumber,
+        {
+          ...defaults,
+          ...(stored[trackNumber] || {}),
+        },
+      ])
+    );
+  } catch {
+    return base;
+  }
+}
+
+function saveTrackNotesState() {
+  try {
+    localStorage.setItem(TRACK_NOTES_KEY, JSON.stringify(state.trackNotes));
   } catch {
     // Ignore storage errors for local previews.
   }
@@ -1497,10 +1554,22 @@ function getTrackChecklist(trackNumber) {
   return state.trackChecklist[trackNumber] || {};
 }
 
+function getTrackNotes(trackNumber) {
+  return state.trackNotes[trackNumber] || { ...defaultTrackNotes };
+}
+
 function getTrackChecklistProgress(trackNumber) {
   const checklist = getTrackChecklist(trackNumber);
   const completed = defaultTrackSteps.filter((step) => checklist[step.id]).length;
   return { completed, total: defaultTrackSteps.length };
+}
+
+function getTrackStatus(trackNumber, eventId) {
+  if (state.completed.has(eventId)) return { label: "완료", className: "is-complete" };
+  const { completed, total } = getTrackChecklistProgress(trackNumber);
+  if (completed === 0) return { label: "대기", className: "" };
+  if (completed >= total - 2) return { label: "검토", className: "is-review" };
+  return { label: "진행", className: "is-active" };
 }
 
 function getOpportunityReview(opportunityId) {
@@ -2372,13 +2441,17 @@ function renderTracks() {
   const body = document.querySelector("#track-table-body");
   body.innerHTML = state.tracks
     .map((track) => {
-      const complete = state.completed.has(track.eventId);
+      const status = getTrackStatus(track.number, track.eventId);
+      const progress = getTrackChecklistProgress(track.number);
       return `
         <tr>
           <td class="track-number" data-label="번호">${track.number}</td>
           <td class="track-name" data-label="곡">${track.title}</td>
           <td data-label="데모 마감">${formatShortDate(track.due)}</td>
-          <td data-label="상태"><span class="status-pill${complete ? " is-complete" : ""}">${complete ? "완료" : "대기"}</span></td>
+          <td data-label="상태">
+            <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
+            <span class="table-progress-copy">${progress.completed}/${progress.total}</span>
+          </td>
           <td data-label="문서">
             <div class="document-links">
               <a href="${track.document}" target="_blank">작업</a>
@@ -2395,6 +2468,14 @@ function renderTracks() {
       const checklist = getTrackChecklist(track.number);
       const progress = getTrackChecklistProgress(track.number);
       const event = findEvent(track.eventId);
+      const notes = getTrackNotes(track.number);
+      const status = getTrackStatus(track.number, track.eventId);
+      const groupedSteps = trackStepGroups
+        .map((group) => ({
+          ...group,
+          steps: defaultTrackSteps.filter((step) => step.group === group.id),
+        }))
+        .filter((group) => group.steps.length > 0);
 
       return `
         <article class="track-detail-card">
@@ -2403,19 +2484,45 @@ function renderTracks() {
               <h3>${track.number}. ${track.title}</h3>
               <p>${event?.detail || "이번 곡의 데모 준비를 진행합니다."}</p>
             </div>
-            <span class="card-chip">${progress.completed}/${progress.total} 체크</span>
+            <div class="track-card-meta">
+              <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
+              <span class="card-chip">${progress.completed}/${progress.total} 체크</span>
+            </div>
           </div>
           <div class="track-checklist" data-track-number="${track.number}">
-            ${defaultTrackSteps
+            ${groupedSteps
               .map(
-                (step) => `
-                  <label>
-                    <input type="checkbox" data-step-id="${step.id}" ${checklist[step.id] ? "checked" : ""} />
-                    <span>${step.label}</span>
-                  </label>
+                (group) => `
+                  <section class="track-step-group">
+                    <h4>${group.label}</h4>
+                    ${group.steps
+                      .map(
+                        (step) => `
+                          <label>
+                            <input type="checkbox" data-step-id="${step.id}" ${checklist[step.id] ? "checked" : ""} />
+                            <span>${step.label}</span>
+                          </label>
+                        `
+                      )
+                      .join("")}
+                  </section>
                 `
               )
               .join("")}
+          </div>
+          <div class="track-note-grid">
+            <label class="track-note-field">
+              <span>이번 주에 한 것</span>
+              <textarea data-track-note="completedThisWeek" data-track-number="${track.number}" rows="3" placeholder="예: 1절 보컬+통기타 녹음, 후렴 키 테스트">${notes.completedThisWeek}</textarea>
+            </label>
+            <label class="track-note-field">
+              <span>얹어본 악기 / 편곡 아이디어</span>
+              <textarea data-track-note="arrangementIdeas" data-track-number="${track.number}" rows="3" placeholder="예: 패드 한 겹, 드럼은 브러시 느낌, 후렴 코러스 기타">${notes.arrangementIdeas}</textarea>
+            </label>
+            <label class="track-note-field track-note-field-wide">
+              <span>다음 주에 이어갈 것</span>
+              <textarea data-track-note="nextUp" data-track-number="${track.number}" rows="3" placeholder="예: 2절 템포 다시 비교, 브릿지 악기 한 번 더 얹어보기">${notes.nextUp}</textarea>
+            </label>
           </div>
           <div class="track-links">
             <a href="${track.document}" target="_blank">곡 문서 열기</a>
@@ -2435,6 +2542,15 @@ function renderTracks() {
         renderTracks();
         renderDashboard();
       });
+    });
+  });
+
+  document.querySelectorAll("[data-track-note]").forEach((field) => {
+    field.addEventListener("input", () => {
+      const trackNumber = field.dataset.trackNumber;
+      const noteKey = field.dataset.trackNote;
+      state.trackNotes[trackNumber][noteKey] = field.value.trimStart();
+      saveTrackNotesState();
     });
   });
 }
