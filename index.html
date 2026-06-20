@@ -85,7 +85,10 @@
     </section>
 
     <nav class="view-tabs" aria-label="일정 보기 방식">
-      <button class="tab-button is-active" type="button" data-view="calendar" aria-selected="true">
+      <button class="tab-button is-active" type="button" data-view="dashboard" aria-selected="true">
+        이번 주 집중
+      </button>
+      <button class="tab-button" type="button" data-view="calendar" aria-selected="false">
         주차별 캘린더
       </button>
       <button class="tab-button" type="button" data-view="roadmap" aria-selected="false">
@@ -131,7 +134,97 @@
       </aside>
 
       <section class="content-panel">
-        <div id="calendar-view" class="view-panel is-active" aria-labelledby="calendar-title">
+        <div id="dashboard-view" class="view-panel is-active" aria-labelledby="dashboard-title">
+          <div class="panel-heading dashboard-heading">
+            <div>
+              <p class="section-kicker">WEEKLY FOCUS</p>
+              <h2 id="dashboard-title">이번 주 집중 대시보드</h2>
+            </div>
+          </div>
+          <div class="dashboard-grid">
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">THIS WEEK</p>
+                  <h3 id="weekly-focus-title">이번 주 반드시 끝낼 것</h3>
+                </div>
+                <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
+              </div>
+              <div id="weekly-focus-list" class="focus-list"></div>
+            </section>
+
+            <section class="dashboard-card" aria-labelledby="fallback-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">FALLBACK</p>
+                  <h3 id="fallback-title">30분만 가능할 때</h3>
+                </div>
+              </div>
+              <ul id="fallback-list" class="compact-list"></ul>
+            </section>
+
+            <section class="dashboard-card" aria-labelledby="overdue-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">WATCH OUT</p>
+                  <h3 id="overdue-title">지연 중이거나 가까운 작업</h3>
+                </div>
+              </div>
+              <div id="urgency-list" class="urgency-list"></div>
+            </section>
+
+            <section class="dashboard-card" aria-labelledby="done-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">MOMENTUM</p>
+                  <h3 id="done-title">최근 끝낸 것</h3>
+                </div>
+              </div>
+              <ul id="recent-done-list" class="compact-list"></ul>
+            </section>
+
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="checkin-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">CHECK-IN</p>
+                  <h3 id="checkin-title">주간 체크인</h3>
+                </div>
+                <button id="save-checkin" class="sync-button" type="button">저장</button>
+              </div>
+              <div class="checkin-grid">
+                <label class="checkin-field">
+                  <span>이번 주 가능한 시간</span>
+                  <textarea id="checkin-available" rows="3" placeholder="예: 수요일 밤 1시간, 토요일 오후 90분"></textarea>
+                </label>
+                <label class="checkin-field">
+                  <span>완료한 작업</span>
+                  <textarea id="checkin-completed" rows="3" placeholder="예: good night 키 테스트, 템플릿 저장"></textarea>
+                </label>
+                <label class="checkin-field">
+                  <span>꼭 해야 하는 작업</span>
+                  <textarea id="checkin-mustdo" rows="3" placeholder="예: good night 전체 1테이크"></textarea>
+                </label>
+                <label class="checkin-field">
+                  <span>막힌 부분</span>
+                  <textarea id="checkin-blockers" rows="3" placeholder="예: 녹음 시간 애매함, 최고음 구간 불안"></textarea>
+                </label>
+              </div>
+            </section>
+
+            <section class="dashboard-card dashboard-card-wide" aria-labelledby="codex-prompt-title">
+              <div class="card-heading">
+                <div>
+                  <p class="section-kicker">SEND TO CODEX</p>
+                  <h3 id="codex-prompt-title">코덱스에게 이렇게 보내기</h3>
+                </div>
+                <button id="copy-checkin-prompt" class="sync-button" type="button">복사</button>
+              </div>
+              <pre id="checkin-prompt-preview" class="prompt-preview"></pre>
+            </section>
+          </div>
+        </div>
+
+        <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">2026.06.15 - 2026.12.06</p>
@@ -160,7 +253,7 @@
           <div class="panel-heading">
             <div>
               <p class="section-kicker">10 CANDIDATE TRACKS</p>
-              <h2 id="tracks-title">곡별 데모 현황</h2>
+              <h2 id="tracks-title">곡별 데모 현황과 체크리스트</h2>
             </div>
           </div>
           <div class="track-table-wrap">
@@ -177,6 +270,7 @@
               <tbody id="track-table-body"></tbody>
             </table>
           </div>
+          <div id="track-detail-list" class="track-detail-list"></div>
         </div>
       </section>
     </main>

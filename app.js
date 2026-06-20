@@ -1,4 +1,6 @@
 const STORAGE_KEY = "album-release-completed-tasks-v1";
+const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
+const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -28,6 +30,14 @@ const phases = [
   { id: "post", label: "편집·믹스·마스터", color: "#725f9e" },
   { id: "delivery", label: "유통 준비", color: "#4f626c" },
   { id: "release", label: "발매", color: "#1f2522" },
+];
+
+const defaultTrackSteps = [
+  { id: "key", label: "키 테스트 완료" },
+  { id: "bpm", label: "BPM 후보 기록" },
+  { id: "take", label: "멈추지 않은 전체 1테이크 확보" },
+  { id: "memo", label: "편한 구간과 불편한 구간 메모" },
+  { id: "next", label: "다음 테스트 1가지 정리" },
 ];
 
 const defaultTracks = [
@@ -621,10 +631,41 @@ const roadmap = [
   },
 ];
 
+const weeklyFocus = {
+  period: "2026-06-18 ~ 2026-06-21",
+  mustFinish: [
+    {
+      title: "good night 판단용 데모 1개 닫기",
+      detail: "전체 1테이크와 임시 키/BPM, 구조 메모까지 남기면 이번 주 핵심 목표 달성이다.",
+      meta: ["고정 마감 6월 21일", "60분 메인 블록"],
+    },
+    {
+      title: "녹음 템플릿과 입력 레벨 고정",
+      detail: "다음 곡들에서 다시 헤매지 않도록 저장 경로, 파일명, 기타/보컬 입력을 먼저 잠근다.",
+      meta: ["선행 작업", "6월 20일까지"],
+    },
+  ],
+  fallback30: [
+    "최고음 구간으로 키 확인 5분",
+    "임시 BPM 하나 선택 5분",
+    "멈추지 않고 전체 1테이크 15분",
+    "파일명 정리와 한 줄 메모 5분",
+  ],
+  codexPrompts: [
+    "오늘 확보 가능한 시간과 곡 이름을 보내면 세션 계획을 다시 짜달라고 하기",
+    "녹음 후 결과와 파일 경로를 보내고 다음 행동 한 가지만 정리해달라고 하기",
+  ],
+};
+
+const completionState = loadCompletionState();
+
 const state = {
   activePhase: "all",
-  activeView: "calendar",
-  completed: loadCompletedTasks(),
+  activeView: "dashboard",
+  completed: completionState.completed,
+  completedMeta: completionState.completedMeta,
+  trackChecklist: loadTrackChecklistState(),
+  weeklyCheckin: loadWeeklyCheckinState(),
   events: sortEvents(defaultEvents),
   tracks: sortTracks(defaultTracks),
   eventMap: new Map(),
@@ -831,20 +872,171 @@ async function refreshSupabaseData() {
   }
 }
 
-function loadCompletedTasks() {
+function loadCompletionState() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return new Set(Array.isArray(stored) ? stored : []);
+    if (Array.isArray(stored)) {
+      const meta = Object.fromEntries(stored.map((id) => [id, { completedAt: null }]));
+      return { completed: new Set(stored), completedMeta: new Map(Object.entries(meta)) };
+    }
+
+    const ids = Array.isArray(stored.ids) ? stored.ids : [];
+    const meta = stored.meta && typeof stored.meta === "object" ? stored.meta : {};
+    return { completed: new Set(ids), completedMeta: new Map(Object.entries(meta)) };
   } catch {
-    return new Set();
+    return { completed: new Set(), completedMeta: new Map() };
   }
 }
 
 function saveCompletedTasks() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...state.completed]));
+    localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify({
+        ids: [...state.completed],
+        meta: Object.fromEntries(state.completedMeta),
+      })
+    );
   } catch {
     // The calendar still works when a browser blocks storage for local files.
+  }
+}
+
+function buildDefaultTrackChecklist() {
+  return Object.fromEntries(
+    defaultTracks.map((track) => [
+      track.number,
+      Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false])),
+    ])
+  );
+}
+
+function loadTrackChecklistState() {
+  const base = buildDefaultTrackChecklist();
+  try {
+    const stored = JSON.parse(localStorage.getItem(TRACK_CHECKLIST_KEY) || "{}");
+    if (!stored || typeof stored !== "object") return base;
+
+    return Object.fromEntries(
+      Object.entries(base).map(([trackNumber, defaults]) => [
+        trackNumber,
+        {
+          ...defaults,
+          ...(stored[trackNumber] || {}),
+        },
+      ])
+    );
+  } catch {
+    return base;
+  }
+}
+
+function saveTrackChecklistState() {
+  try {
+    localStorage.setItem(TRACK_CHECKLIST_KEY, JSON.stringify(state.trackChecklist));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+function loadWeeklyCheckinState() {
+  const defaults = {
+    available: "",
+    completed: "",
+    mustdo: "",
+    blockers: "",
+  };
+  try {
+    const stored = JSON.parse(localStorage.getItem(WEEKLY_CHECKIN_KEY) || "{}");
+    return { ...defaults, ...(stored || {}) };
+  } catch {
+    return defaults;
+  }
+}
+
+function saveWeeklyCheckinState() {
+  try {
+    localStorage.setItem(WEEKLY_CHECKIN_KEY, JSON.stringify(state.weeklyCheckin));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+function getTrackChecklist(trackNumber) {
+  return state.trackChecklist[trackNumber] || {};
+}
+
+function getTrackChecklistProgress(trackNumber) {
+  const checklist = getTrackChecklist(trackNumber);
+  const completed = defaultTrackSteps.filter((step) => checklist[step.id]).length;
+  return { completed, total: defaultTrackSteps.length };
+}
+
+function getIncompleteEvents() {
+  return state.events
+    .filter((event) => !state.completed.has(event.id))
+    .sort((left, right) => parseDate(left.date) - parseDate(right.date));
+}
+
+function getUrgencyEvents() {
+  const incomplete = getIncompleteEvents();
+  const overdue = incomplete.filter((event) => parseDate(event.date) < today);
+  const upcoming = incomplete.filter((event) => parseDate(event.date) >= today).slice(0, 3);
+  return [...overdue.slice(0, 2), ...upcoming].slice(0, 4);
+}
+
+function getRecentCompletedEvents() {
+  return [...state.completedMeta.entries()]
+    .filter(([, value]) => value?.completedAt)
+    .sort((left, right) => new Date(right[1].completedAt) - new Date(left[1].completedAt))
+    .slice(0, 4)
+    .map(([eventId]) => findEvent(eventId))
+    .filter(Boolean);
+}
+
+function populateWeeklyCheckinForm() {
+  document.querySelector("#checkin-available").value = state.weeklyCheckin.available;
+  document.querySelector("#checkin-completed").value = state.weeklyCheckin.completed;
+  document.querySelector("#checkin-mustdo").value = state.weeklyCheckin.mustdo;
+  document.querySelector("#checkin-blockers").value = state.weeklyCheckin.blockers;
+}
+
+function readWeeklyCheckinForm() {
+  state.weeklyCheckin = {
+    available: document.querySelector("#checkin-available").value.trim(),
+    completed: document.querySelector("#checkin-completed").value.trim(),
+    mustdo: document.querySelector("#checkin-mustdo").value.trim(),
+    blockers: document.querySelector("#checkin-blockers").value.trim(),
+  };
+}
+
+function buildCheckinPrompt() {
+  const values = state.weeklyCheckin;
+  return `이번 주 가능한 시간:\n${values.available || "(아직 미입력)"}\n\n완료한 작업:\n${values.completed || "(아직 미입력)"}\n\n꼭 해야 하는 작업:\n${values.mustdo || "(아직 미입력)"}\n\n막힌 부분:\n${values.blockers || "(아직 미입력)"}`;
+}
+
+function updateCheckinPromptPreview() {
+  document.querySelector("#checkin-prompt-preview").textContent = buildCheckinPrompt();
+}
+
+function saveWeeklyCheckin() {
+  readWeeklyCheckinForm();
+  saveWeeklyCheckinState();
+  updateCheckinPromptPreview();
+}
+
+async function copyCheckinPrompt() {
+  readWeeklyCheckinForm();
+  updateCheckinPromptPreview();
+
+  try {
+    await navigator.clipboard.writeText(buildCheckinPrompt());
+    document.querySelector("#copy-checkin-prompt").textContent = "복사됨";
+    window.setTimeout(() => {
+      document.querySelector("#copy-checkin-prompt").textContent = "복사";
+    }, 1200);
+  } catch {
+    document.querySelector("#copy-checkin-prompt").textContent = "직접 복사";
   }
 }
 
@@ -882,6 +1074,57 @@ function renderPhaseFilters() {
       renderCalendar();
     });
   });
+}
+
+function renderDashboard() {
+  document.querySelector("#weekly-period").textContent = weeklyFocus.period.replaceAll("-", ".").replaceAll("~", "-");
+
+  document.querySelector("#weekly-focus-list").innerHTML = weeklyFocus.mustFinish
+    .map(
+      (item) => `
+        <article class="focus-item">
+          <strong>${item.title}</strong>
+          <p>${item.detail}</p>
+          <div class="focus-meta">
+            ${item.meta.map((meta) => `<span class="meta-pill">${meta}</span>`).join("")}
+          </div>
+        </article>
+      `
+    )
+    .join("");
+
+  document.querySelector("#fallback-list").innerHTML = weeklyFocus.fallback30
+    .map((item) => `<li>${item}</li>`)
+    .join("");
+
+  const urgencyEvents = getUrgencyEvents();
+  document.querySelector("#urgency-list").innerHTML = urgencyEvents.length
+    ? urgencyEvents
+        .map((event) => {
+          const delayed = parseDate(event.date) < today;
+          return `
+            <article class="urgency-item">
+              <strong>${event.title}</strong>
+              <p>${event.detail}</p>
+              <div class="urgency-meta">
+                <span class="meta-pill">${delayed ? "지연 중" : "가까운 마감"}</span>
+                <span class="meta-pill">${formatDateRange(event)}</span>
+              </div>
+            </article>
+          `;
+        })
+        .join("")
+    : '<p class="empty-copy">지금은 급한 미완료 작업이 없습니다.</p>';
+
+  const recentDone = getRecentCompletedEvents();
+  document.querySelector("#recent-done-list").innerHTML = recentDone.length
+    ? recentDone
+        .map((event) => `<li>${event.title} · ${formatShortDate(event.date)}</li>`)
+        .join("")
+    : '<li>아직 완료한 작업이 없습니다. 오늘 끝낸 작업 하나부터 체크해보세요.</li>';
+
+  populateWeeklyCheckinForm();
+  updateCheckinPromptPreview();
 }
 
 function renderCalendar() {
@@ -994,9 +1237,15 @@ function bindEventControls() {
 }
 
 function toggleCompleted(eventId, complete) {
-  if (complete) state.completed.add(eventId);
-  else state.completed.delete(eventId);
+  if (complete) {
+    state.completed.add(eventId);
+    state.completedMeta.set(eventId, { completedAt: new Date().toISOString() });
+  } else {
+    state.completed.delete(eventId);
+    state.completedMeta.delete(eventId);
+  }
   saveCompletedTasks();
+  renderDashboard();
   renderSummary();
   renderCalendar();
   renderRoadmap();
@@ -1089,6 +1338,54 @@ function renderTracks() {
       `;
     })
     .join("");
+
+  document.querySelector("#track-detail-list").innerHTML = state.tracks
+    .map((track) => {
+      const checklist = getTrackChecklist(track.number);
+      const progress = getTrackChecklistProgress(track.number);
+      const event = findEvent(track.eventId);
+
+      return `
+        <article class="track-detail-card">
+          <div class="track-detail-top">
+            <div>
+              <h3>${track.number}. ${track.title}</h3>
+              <p>${event?.detail || "이번 곡의 데모 준비를 진행합니다."}</p>
+            </div>
+            <span class="card-chip">${progress.completed}/${progress.total} 체크</span>
+          </div>
+          <div class="track-checklist" data-track-number="${track.number}">
+            ${defaultTrackSteps
+              .map(
+                (step) => `
+                  <label>
+                    <input type="checkbox" data-step-id="${step.id}" ${checklist[step.id] ? "checked" : ""} />
+                    <span>${step.label}</span>
+                  </label>
+                `
+              )
+              .join("")}
+          </div>
+          <div class="track-links">
+            <a href="${track.document}" target="_blank">곡 문서 열기</a>
+            <a href="${track.lyrics}" target="_blank">가사 열기</a>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  document.querySelectorAll(".track-checklist").forEach((container) => {
+    const trackNumber = container.dataset.trackNumber;
+    container.querySelectorAll("input").forEach((input) => {
+      input.addEventListener("change", () => {
+        state.trackChecklist[trackNumber][input.dataset.stepId] = input.checked;
+        saveTrackChecklistState();
+        renderTracks();
+        renderDashboard();
+      });
+    });
+  });
 }
 
 function openTaskDialog(event) {
@@ -1162,6 +1459,7 @@ function drawWaveform(progress) {
 
 function renderAll() {
   updateChrome();
+  renderDashboard();
   renderPhaseFilters();
   renderCalendar();
   renderRoadmap();
@@ -1175,6 +1473,14 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWeek);
 document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
+document.querySelector("#save-checkin").addEventListener("click", saveWeeklyCheckin);
+document.querySelector("#copy-checkin-prompt").addEventListener("click", copyCheckinPrompt);
+["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
+  document.querySelector(selector).addEventListener("input", () => {
+    readWeeklyCheckinForm();
+    updateCheckinPromptPreview();
+  });
+});
 document.querySelector("#close-dialog").addEventListener("click", () => document.querySelector("#task-dialog").close());
 document.querySelector("#task-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
