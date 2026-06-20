@@ -100,18 +100,18 @@
 
     <nav class="view-tabs" aria-label="일정 보기 방식">
       <button class="tab-button is-active" type="button" data-view="dashboard" aria-selected="true">
-        이번 주 집중
+        오늘
       </button>
       <button class="tab-button" type="button" data-view="opportunities" aria-selected="false">
         공모전
       </button>
       <button class="tab-button" type="button" data-view="calendar" aria-selected="false">
-        주차별 캘린더
+        달력
       </button>
-      <button class="tab-button" type="button" data-view="roadmap" aria-selected="false">
+      <button class="tab-button desktop-only-tab" type="button" data-view="roadmap" aria-selected="false">
         전체 제작 일정
       </button>
-      <button class="tab-button" type="button" data-view="tracks" aria-selected="false">
+      <button class="tab-button desktop-only-tab" type="button" data-view="tracks" aria-selected="false">
         곡별 현황
       </button>
     </nav>
@@ -244,7 +244,7 @@
               <div id="dashboard-opportunity-list" class="opportunity-list"></div>
             </section>
 
-            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="checkin-title">
+            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card desktop-secondary-card" aria-labelledby="checkin-title">
               <div class="card-heading">
                 <div>
                   <p class="section-kicker">CHECK-IN</p>
@@ -272,7 +272,7 @@
               </div>
             </section>
 
-            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="codex-prompt-title">
+            <section class="dashboard-card dashboard-card-wide dashboard-secondary-card desktop-secondary-card" aria-labelledby="codex-prompt-title">
               <div class="card-heading">
                 <div>
                   <p class="section-kicker">SEND TO CODEX</p>
