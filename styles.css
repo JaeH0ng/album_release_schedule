@@ -833,6 +833,13 @@ input:focus-visible {
   gap: 12px;
 }
 
+.track-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .opportunity-summary-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -994,6 +1001,20 @@ input:focus-visible {
   gap: 8px;
 }
 
+.track-step-group {
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fcfdfc;
+  display: grid;
+  gap: 8px;
+}
+
+.track-step-group h4 {
+  margin: 0;
+  font-size: 12px;
+}
+
 .track-checklist label {
   display: flex;
   align-items: flex-start;
@@ -1004,6 +1025,38 @@ input:focus-visible {
 .track-checklist input {
   margin-top: 2px;
   accent-color: var(--demo);
+}
+
+.track-note-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.track-note-field {
+  display: grid;
+  gap: 7px;
+}
+
+.track-note-field span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.track-note-field textarea {
+  width: 100%;
+  min-height: 94px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  resize: vertical;
+  background: #fcfdfc;
+  color: var(--ink);
+}
+
+.track-note-field-wide {
+  grid-column: 1 / -1;
 }
 
 .track-links {
@@ -1380,6 +1433,12 @@ input:focus-visible {
   font-weight: 800;
 }
 
+.table-progress-copy {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .status-pill {
   display: inline-flex;
   align-items: center;
@@ -1396,6 +1455,18 @@ input:focus-visible {
   border-color: #a9c8b6;
   background: #eef6f1;
   color: var(--success);
+}
+
+.status-pill.is-active {
+  border-color: rgba(47, 125, 105, 0.22);
+  background: #eef8f2;
+  color: var(--demo);
+}
+
+.status-pill.is-review {
+  border-color: rgba(181, 132, 24, 0.24);
+  background: #fcf6e8;
+  color: var(--structure);
 }
 
 .document-links {
@@ -1545,7 +1616,8 @@ footer {
   .opportunity-summary-grid,
   .admin-form,
   .dashboard-overview,
-  .app-home-panel {
+  .app-home-panel,
+  .track-note-grid {
     grid-template-columns: 1fr;
   }
 
