@@ -1,3 +1,5 @@
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
@@ -14,6 +16,7 @@ const SUPABASE_HEADERS = {
   Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
   Accept: "application/json",
 };
+const AUTH_REDIRECT_URL = typeof window !== "undefined" ? window.location.href.split("#")[0] : "";
 const PHASE_BOUNDARIES = [
   { phase: "demo", eventId: "demo-buffer", field: "end" },
   { phase: "structure", eventId: "structure-lock", field: "end" },
@@ -731,6 +734,10 @@ const state = {
   eventMap: new Map(),
   syncStatus: "idle",
   syncDetail: "로컬 일정 사용 중",
+  authClient: null,
+  session: null,
+  authReady: false,
+  reviewSyncTimer: null,
 };
 
 const phaseMap = new Map(phases.map((phase) => [phase.id, phase]));
@@ -859,9 +866,11 @@ function updateChrome() {
   document.querySelector("#critical-mix").textContent = formatDotDate(mixEvent?.end || mixEvent?.date || "2026-10-30");
   document.querySelector("#critical-delivery").textContent = formatDotDate(deliveryEvent?.date || "2026-11-13");
   document.querySelector("#footer-baseline").textContent = `일정 기준일 ${BASELINE_DATE.replaceAll("-", ".")}`;
-  document.querySelector("#footer-storage-note").textContent = SUPABASE_PUBLISHABLE_KEY
-    ? "체크 상태는 이 브라우저에 저장되고, 게시 일정은 Supabase에서 불러옴"
-    : "체크 상태는 이 브라우저에 저장됨";
+  document.querySelector("#footer-storage-note").textContent = canUseRemoteReviewSync()
+    ? "공모전 판단 상태는 Supabase로 동기화되고, 게시 일정은 Supabase에서 불러옴"
+    : SUPABASE_PUBLISHABLE_KEY
+      ? "공모전 판단 상태는 이 브라우저에 저장되고, 게시 일정은 Supabase에서 불러옴"
+      : "체크 상태는 이 브라우저에 저장됨";
 }
 
 function setSyncStatus(status, summary, detail) {
@@ -1068,6 +1077,179 @@ function saveOpportunityReviewState() {
   }
 }
 
+function getAuthUser() {
+  return state.session?.user || null;
+}
+
+function canUseRemoteReviewSync() {
+  return Boolean(state.authClient && getAuthUser());
+}
+
+function updateAuthChrome() {
+  const user = getAuthUser();
+  const authStatusText = document.querySelector("#auth-status-text");
+  const authStatusDetail = document.querySelector("#auth-status-detail");
+  const authSubmit = document.querySelector("#auth-submit");
+  const authSignout = document.querySelector("#auth-signout");
+  const authEmail = document.querySelector("#auth-email");
+
+  if (user) {
+    authStatusText.textContent = user.email || "로그인됨";
+    authStatusDetail.textContent = "공모전 판단 상태가 Supabase로 동기화됨";
+    authSubmit.hidden = true;
+    authSignout.hidden = false;
+    authEmail.hidden = true;
+    authEmail.value = user.email || "";
+    return;
+  }
+
+  authStatusText.textContent = state.authReady ? "로그인 전" : "로그인 확인 중";
+  authStatusDetail.textContent = state.authReady
+    ? "공모전 판단 상태는 이 기기에만 저장됨"
+    : "Supabase 세션을 확인하는 중";
+  authSubmit.hidden = false;
+  authSignout.hidden = true;
+  authEmail.hidden = false;
+}
+
+async function loadRemoteOpportunityReviews() {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  const { data, error } = await state.authClient
+    .from("opportunity_reviews")
+    .select("opportunity_id, review_status, updated_at")
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  state.opportunityReview = Object.fromEntries(
+    (data || []).map((row) => [
+      row.opportunity_id,
+      {
+        status: row.review_status,
+        updatedAt: row.updated_at,
+      },
+    ])
+  );
+  saveOpportunityReviewState();
+  rebuildEventState();
+  renderAll();
+}
+
+async function syncOpportunityReview(opportunityId, status) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  const payload = {
+    user_id: user.id,
+    opportunity_id: opportunityId,
+    review_status: status,
+    updated_at: new Date().toISOString(),
+  };
+
+  const query =
+    status === "new"
+      ? state.authClient.from("opportunity_reviews").delete().eq("user_id", user.id).eq("opportunity_id", opportunityId)
+      : state.authClient.from("opportunity_reviews").upsert(payload, { onConflict: "user_id,opportunity_id" });
+
+  const { error } = await query;
+  if (error) {
+    console.error(error);
+    throw error;
+  }
+}
+
+async function handleAuthSubmit(event) {
+  event.preventDefault();
+  if (!state.authClient) return;
+
+  const email = document.querySelector("#auth-email").value.trim();
+  if (!email) {
+    document.querySelector("#auth-status-detail").textContent = "로그인할 이메일을 입력해 주세요";
+    return;
+  }
+
+  document.querySelector("#auth-status-detail").textContent = "로그인 링크를 보내는 중";
+  const { error } = await state.authClient.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: AUTH_REDIRECT_URL,
+    },
+  });
+
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "링크 전송 실패. 이메일 설정을 확인해 주세요";
+    return;
+  }
+
+  document.querySelector("#auth-status-detail").textContent = `${email} 로 로그인 링크를 보냈습니다`;
+}
+
+async function handleSignout() {
+  if (!state.authClient) return;
+  await state.authClient.auth.signOut();
+}
+
+function stopRemoteReviewPolling() {
+  if (!state.reviewSyncTimer) return;
+  window.clearInterval(state.reviewSyncTimer);
+  state.reviewSyncTimer = null;
+}
+
+function startRemoteReviewPolling() {
+  stopRemoteReviewPolling();
+  if (!canUseRemoteReviewSync()) return;
+  state.reviewSyncTimer = window.setInterval(() => {
+    loadRemoteOpportunityReviews();
+  }, 45000);
+}
+
+async function setAuthSession(session) {
+  state.session = session;
+  state.authReady = true;
+  updateAuthChrome();
+
+  if (getAuthUser()) {
+    startRemoteReviewPolling();
+    await loadRemoteOpportunityReviews();
+    return;
+  }
+
+  stopRemoteReviewPolling();
+  state.opportunityReview = loadOpportunityReviewState();
+  rebuildEventState();
+  renderAll();
+}
+
+async function initAuth() {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    state.authReady = true;
+    updateAuthChrome();
+    return;
+  }
+
+  state.authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+    },
+  });
+
+  const { data, error } = await state.authClient.auth.getSession();
+  if (error) console.error(error);
+  await setAuthSession(data.session || null);
+
+  state.authClient.auth.onAuthStateChange((_event, session) => {
+    setAuthSession(session);
+  });
+}
+
 function loadWeeklyCheckinState() {
   const defaults = {
     available: "",
@@ -1130,7 +1312,7 @@ function buildAcceptedOpportunityEvents() {
     }));
 }
 
-function setOpportunityReview(opportunityId, status) {
+async function setOpportunityReview(opportunityId, status) {
   state.opportunityReview[opportunityId] = {
     status,
     updatedAt: new Date().toISOString(),
@@ -1138,6 +1320,12 @@ function setOpportunityReview(opportunityId, status) {
   saveOpportunityReviewState();
   rebuildEventState();
   renderAll();
+
+  try {
+    await syncOpportunityReview(opportunityId, status);
+  } catch {
+    document.querySelector("#auth-status-detail").textContent = "원격 동기화에 실패해 현재 기기에만 저장했습니다";
+  }
 }
 
 function formatOpportunityDateLabel(opportunity) {
@@ -1754,6 +1942,7 @@ function drawWaveform(progress) {
 
 function renderAll() {
   updateChrome();
+  updateAuthChrome();
   renderDashboard();
   renderOpportunities();
   renderPhaseFilters();
@@ -1771,6 +1960,8 @@ document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWee
 document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
 document.querySelector("#save-checkin").addEventListener("click", saveWeeklyCheckin);
 document.querySelector("#copy-checkin-prompt").addEventListener("click", copyCheckinPrompt);
+document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
+document.querySelector("#auth-signout").addEventListener("click", handleSignout);
 ["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", () => {
     readWeeklyCheckinForm();
@@ -1784,3 +1975,4 @@ document.querySelector("#task-dialog").addEventListener("click", (event) => {
 
 renderAll();
 refreshSupabaseData();
+initAuth();
