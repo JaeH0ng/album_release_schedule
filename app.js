@@ -1139,9 +1139,8 @@ function updateAuthChrome() {
   const user = getAuthUser();
   const authStatusText = document.querySelector("#auth-status-text");
   const authStatusDetail = document.querySelector("#auth-status-detail");
-  const authSubmit = document.querySelector("#auth-submit");
+  const authGoogle = document.querySelector("#auth-google");
   const authSignout = document.querySelector("#auth-signout");
-  const authEmail = document.querySelector("#auth-email");
   const installButton = document.querySelector("#install-app");
 
   if (user) {
@@ -1149,21 +1148,18 @@ function updateAuthChrome() {
     authStatusDetail.textContent = state.isAdmin
       ? "공모전 판단 상태와 관리자 편집 권한이 활성화됨"
       : "공모전 판단 상태가 Supabase로 동기화됨";
-    authSubmit.hidden = true;
+    authGoogle.hidden = true;
     authSignout.hidden = false;
-    authEmail.hidden = true;
-    authEmail.value = user.email || "";
     installButton.hidden = !deferredInstallPrompt;
     return;
   }
 
-  authStatusText.textContent = state.authReady ? "로그인 전" : "로그인 확인 중";
+  authStatusText.textContent = state.authReady ? "Google 로그인 전" : "로그인 확인 중";
   authStatusDetail.textContent = state.authReady
-    ? "공모전 판단 상태는 이 기기에만 저장됨"
+    ? "Google로 로그인하면 작업 상태와 관리자 권한을 이어서 사용합니다"
     : "Supabase 세션을 확인하는 중";
-  authSubmit.hidden = false;
+  authGoogle.hidden = false;
   authSignout.hidden = true;
-  authEmail.hidden = false;
   installButton.hidden = !deferredInstallPrompt;
 }
 
@@ -1268,28 +1264,23 @@ async function syncOpportunityReview(opportunityId, status) {
 async function handleAuthSubmit(event) {
   event.preventDefault();
   if (!state.authClient) return;
-
-  const email = document.querySelector("#auth-email").value.trim();
-  if (!email) {
-    document.querySelector("#auth-status-detail").textContent = "로그인할 이메일을 입력해 주세요";
-    return;
-  }
-
-  document.querySelector("#auth-status-detail").textContent = "로그인 링크를 보내는 중";
-  const { error } = await state.authClient.auth.signInWithOtp({
-    email,
+  document.querySelector("#auth-status-detail").textContent = "Google 로그인으로 이동하는 중";
+  const { error } = await state.authClient.auth.signInWithOAuth({
+    provider: "google",
     options: {
-      emailRedirectTo: AUTH_REDIRECT_URL,
+      redirectTo: AUTH_REDIRECT_URL,
+      queryParams: {
+        access_type: "offline",
+        prompt: "select_account",
+      },
     },
   });
 
   if (error) {
     console.error(error);
-    document.querySelector("#auth-status-detail").textContent = "링크 전송 실패. 이메일 설정을 확인해 주세요";
+    document.querySelector("#auth-status-detail").textContent = "Google 로그인 시작 실패. Supabase Google 설정을 확인해 주세요";
     return;
   }
-
-  document.querySelector("#auth-status-detail").textContent = `${email} 로 로그인 링크를 보냈습니다`;
 }
 
 async function handleSignout() {
@@ -1681,9 +1672,38 @@ function renderPhaseFilters() {
 function renderDashboard() {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
-  document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
-
   const acceptedFocus = getAcceptedFocusEvents();
+  const heldEvents = getHeldEvents();
+  const urgencyEvents = getPullForwardCandidates();
+  document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
+  document.querySelector("#today-overview").innerHTML = [
+    {
+      value: acceptedFocus.length,
+      label: "지금 잡은 작업",
+      detail: acceptedFocus[0] ? acceptedFocus[0].title : "아직 수락한 작업이 없습니다",
+    },
+    {
+      value: heldEvents.length,
+      label: "보류 중",
+      detail: heldEvents[0] ? heldEvents[0].title : "보류 항목 없음",
+    },
+    {
+      value: urgencyEvents.length,
+      label: "다음 후보",
+      detail: urgencyEvents[0] ? urgencyEvents[0].title : "당겨올 후보 없음",
+    },
+  ]
+    .map(
+      (item) => `
+        <article class="overview-card">
+          <strong>${item.value}</strong>
+          <p>${item.label}</p>
+          <p>${item.detail}</p>
+        </article>
+      `
+    )
+    .join("");
+
   document.querySelector("#weekly-focus-list").innerHTML = acceptedFocus.length
     ? acceptedFocus.map((event) => renderDashboardTaskCard(event, "accepted")).join("")
     : '<p class="empty-copy">이번 주 수락한 작업이 아직 없습니다. 아래 후보에서 하나를 바로 수락해보세요.</p>';
@@ -1692,14 +1712,12 @@ function renderDashboard() {
     .map((item) => `<li>${item}</li>`)
     .join("");
 
-  const urgencyEvents = getPullForwardCandidates();
   document.querySelector("#urgency-list").innerHTML = urgencyEvents.length
     ? urgencyEvents
         .map((event) => renderDashboardTaskCard(event, "candidate"))
         .join("")
     : '<p class="empty-copy">당겨올 만한 작업이 없습니다. 이번 주 수락한 작업을 마친 뒤 새 후보가 나타납니다.</p>';
 
-  const heldEvents = getHeldEvents();
   document.querySelector("#hold-list").innerHTML = heldEvents.length
     ? heldEvents.map((event) => renderDashboardTaskCard(event, "hold")).join("")
     : '<p class="empty-copy">보류 중인 작업이 없습니다.</p>';
