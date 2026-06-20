@@ -48,7 +48,7 @@ async function copyTrackReadmes() {
 await rm(distDir, { recursive: true, force: true });
 await ensureDir(distDir);
 
-for (const file of ["index.html", "styles.css", "app.js", "manifest.webmanifest", "service-worker.js"]) {
+for (const file of ["index.html", "styles.css", "app.js", "manifest.webmanifest", "service-worker.js", "pwa-reset.html"]) {
   await copyFile(file);
 }
 
