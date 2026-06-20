@@ -215,6 +215,12 @@ input:focus-visible {
   justify-content: flex-end;
 }
 
+#install-app {
+  border-color: rgba(181, 132, 24, 0.28);
+  background: #fcf6e8;
+  color: var(--structure);
+}
+
 .auth-input {
   min-width: 220px;
   min-height: 36px;
