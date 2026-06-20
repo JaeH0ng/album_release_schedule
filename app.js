@@ -4,6 +4,7 @@ const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
+const EVENT_PLAN_KEY = "album-release-event-plan-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -724,6 +725,7 @@ const state = {
   activeView: "dashboard",
   completed: completionState.completed,
   completedMeta: completionState.completedMeta,
+  eventPlan: loadEventPlanState(),
   trackChecklist: loadTrackChecklistState(),
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
@@ -762,6 +764,10 @@ function addDays(date, days) {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+function getDayOffset(fromIso, toIso) {
+  return Math.round((parseDate(toIso) - parseDate(fromIso)) / 86400000);
 }
 
 function startOfWeek(date) {
@@ -830,8 +836,28 @@ function setOpportunityData(opportunities = state.opportunities) {
 
 function rebuildEventState() {
   const acceptedEvents = buildAcceptedOpportunityEvents();
-  state.events = sortEvents([...state.baseEvents, ...acceptedEvents]);
+  state.events = sortEvents(
+    [...state.baseEvents, ...acceptedEvents].map((event) => applyEventPlan(event))
+  );
   state.eventMap = new Map(state.events.map((event) => [event.id, event]));
+}
+
+function applyEventPlan(event) {
+  const plan = state.eventPlan[event.id] || {};
+  const originalDate = event.originalDate || event.date;
+  const originalEnd = event.originalEnd || event.end || null;
+  const overrideDate = plan.overrideDate || null;
+  const nextDate = overrideDate || originalDate;
+  const offsetDays = overrideDate ? getDayOffset(originalDate, overrideDate) : 0;
+  return {
+    ...event,
+    originalDate,
+    originalEnd,
+    date: nextDate,
+    end: originalEnd ? toIso(addDays(parseDate(originalEnd), offsetDays)) : null,
+    focusStatus: plan.focusStatus || "none",
+    overrideDate,
+  };
 }
 
 function findEvent(eventId) {
@@ -1022,6 +1048,23 @@ function saveCompletedTasks() {
     );
   } catch {
     // The calendar still works when a browser blocks storage for local files.
+  }
+}
+
+function loadEventPlanState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(EVENT_PLAN_KEY) || "{}");
+    return stored && typeof stored === "object" ? stored : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveEventPlanState() {
+  try {
+    localStorage.setItem(EVENT_PLAN_KEY, JSON.stringify(state.eventPlan));
+  } catch {
+    // Ignore storage errors for local previews.
   }
 }
 
@@ -1412,6 +1455,89 @@ function formatOpportunityReview(reviewStatus) {
   return "미정";
 }
 
+function getEventPlan(eventId) {
+  return state.eventPlan[eventId] || { focusStatus: "none", overrideDate: null };
+}
+
+function updateEventPlan(eventId, patch) {
+  const current = getEventPlan(eventId);
+  state.eventPlan[eventId] = {
+    ...current,
+    ...patch,
+  };
+
+  if (state.eventPlan[eventId].focusStatus === "none" && !state.eventPlan[eventId].overrideDate) {
+    delete state.eventPlan[eventId];
+  }
+
+  saveEventPlanState();
+  rebuildEventState();
+  renderAll();
+}
+
+function acceptEventForThisWeek(eventId) {
+  updateEventPlan(eventId, { focusStatus: "accepted" });
+}
+
+function holdEvent(eventId) {
+  updateEventPlan(eventId, { focusStatus: "hold" });
+}
+
+function resetEventPlan(eventId) {
+  updateEventPlan(eventId, { focusStatus: "none", overrideDate: null });
+}
+
+function pullEventIntoThisWeek(eventId) {
+  updateEventPlan(eventId, {
+    focusStatus: "accepted",
+    overrideDate: toIso(today),
+  });
+}
+
+function getAlbumPlanningEvents() {
+  return state.events.filter((event) => event.kind !== "opportunity");
+}
+
+function isEventInCurrentWeek(event) {
+  const weekStart = startOfWeek(today);
+  const weekEnd = addDays(weekStart, 6);
+  const date = parseDate(event.date);
+  return date >= weekStart && date <= weekEnd;
+}
+
+function getAcceptedFocusEvents() {
+  const incomplete = getIncompleteEvents().filter((event) => event.kind !== "opportunity");
+  const explicitAccepted = incomplete.filter((event) => getEventPlan(event.id).focusStatus === "accepted");
+  const acceptedIds = new Set(explicitAccepted.map((event) => event.id));
+  const autoWeekly = incomplete
+    .filter((event) => !acceptedIds.has(event.id) && getEventPlan(event.id).focusStatus !== "hold" && isEventInCurrentWeek(event))
+    .slice(0, 3);
+  return [...explicitAccepted, ...autoWeekly]
+    .sort((left, right) => parseDate(left.date) - parseDate(right.date))
+    .slice(0, 5);
+}
+
+function getHeldEvents() {
+  return getIncompleteEvents()
+    .filter((event) => event.kind !== "opportunity" && getEventPlan(event.id).focusStatus === "hold")
+    .slice(0, 4);
+}
+
+function getPullForwardCandidates() {
+  const acceptedIds = new Set(getAcceptedFocusEvents().map((event) => event.id));
+  return getIncompleteEvents()
+    .filter((event) => {
+      const plan = getEventPlan(event.id);
+      return (
+        event.kind !== "opportunity" &&
+        !acceptedIds.has(event.id) &&
+        plan.focusStatus !== "hold"
+      );
+    })
+    .sort((left, right) => parseDate(left.date) - parseDate(right.date))
+    .slice(0, 5);
+}
+
 function getIncompleteEvents() {
   return state.events
     .filter((event) => !state.completed.has(event.id))
@@ -1517,44 +1643,30 @@ function renderPhaseFilters() {
 }
 
 function renderDashboard() {
-  document.querySelector("#weekly-period").textContent = weeklyFocus.period.replaceAll("-", ".").replaceAll("~", "-");
+  const weekStart = startOfWeek(today);
+  const weekEnd = addDays(weekStart, 6);
+  document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
 
-  document.querySelector("#weekly-focus-list").innerHTML = weeklyFocus.mustFinish
-    .map(
-      (item) => `
-        <article class="focus-item">
-          <strong>${item.title}</strong>
-          <p>${item.detail}</p>
-          <div class="focus-meta">
-            ${item.meta.map((meta) => `<span class="meta-pill">${meta}</span>`).join("")}
-          </div>
-        </article>
-      `
-    )
-    .join("");
+  const acceptedFocus = getAcceptedFocusEvents();
+  document.querySelector("#weekly-focus-list").innerHTML = acceptedFocus.length
+    ? acceptedFocus.map((event) => renderDashboardTaskCard(event, "accepted")).join("")
+    : '<p class="empty-copy">이번 주 수락한 작업이 아직 없습니다. 아래 후보에서 하나를 바로 수락해보세요.</p>';
 
   document.querySelector("#fallback-list").innerHTML = weeklyFocus.fallback30
     .map((item) => `<li>${item}</li>`)
     .join("");
 
-  const urgencyEvents = getUrgencyEvents();
+  const urgencyEvents = getPullForwardCandidates();
   document.querySelector("#urgency-list").innerHTML = urgencyEvents.length
     ? urgencyEvents
-        .map((event) => {
-          const delayed = parseDate(event.date) < today;
-          return `
-            <article class="urgency-item">
-              <strong>${event.title}</strong>
-              <p>${event.detail}</p>
-              <div class="urgency-meta">
-                <span class="meta-pill">${delayed ? "지연 중" : "가까운 마감"}</span>
-                <span class="meta-pill">${formatDateRange(event)}</span>
-              </div>
-            </article>
-          `;
-        })
+        .map((event) => renderDashboardTaskCard(event, "candidate"))
         .join("")
-    : '<p class="empty-copy">지금은 급한 미완료 작업이 없습니다.</p>';
+    : '<p class="empty-copy">당겨올 만한 작업이 없습니다. 이번 주 수락한 작업을 마친 뒤 새 후보가 나타납니다.</p>';
+
+  const heldEvents = getHeldEvents();
+  document.querySelector("#hold-list").innerHTML = heldEvents.length
+    ? heldEvents.map((event) => renderDashboardTaskCard(event, "hold")).join("")
+    : '<p class="empty-copy">보류 중인 작업이 없습니다.</p>';
 
   const recentDone = getRecentCompletedEvents();
   document.querySelector("#recent-done-list").innerHTML = recentDone.length
@@ -1577,8 +1689,57 @@ function renderDashboard() {
     ? `${formatSyncTimestamp(new Date(latestCheckedAt))} 확인`
     : "업데이트 전";
 
+  bindDashboardTaskControls();
   populateWeeklyCheckinForm();
   updateCheckinPromptPreview();
+}
+
+function renderDashboardTaskCard(event, mode) {
+  const delayed = parseDate(event.date) < today;
+  const isPulled = Boolean(event.overrideDate);
+  const plan = getEventPlan(event.id);
+  const modeLabel =
+    mode === "accepted" ? "이번 주 수락" : mode === "hold" ? "보류 중" : delayed ? "지연 중" : "다음 후보";
+  const restoreButton = isPulled
+    ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">원래 일정</button>`
+    : "";
+  const acceptButton =
+    mode === "accepted"
+      ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${event.id}">보류</button>`
+      : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${event.id}">수락</button>`;
+
+  return `
+    <article class="focus-item">
+      <strong>${event.title}</strong>
+      <p>${event.detail}</p>
+      <div class="focus-meta">
+        <span class="meta-pill">${modeLabel}</span>
+        <span class="meta-pill">${formatDateRange(event)}</span>
+        ${isPulled ? `<span class="meta-pill">원래 ${formatShortDate(event.originalDate)}</span>` : ""}
+        ${plan.focusStatus === "accepted" ? '<span class="meta-pill">직접 수락함</span>' : ""}
+      </div>
+      <div class="focus-actions">
+        ${acceptButton}
+        <button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${event.id}">이번 주로 당겨오기</button>
+        <button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${event.id}">완료</button>
+        ${restoreButton}
+      </div>
+    </article>
+  `;
+}
+
+function bindDashboardTaskControls() {
+  document.querySelectorAll("[data-dashboard-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const eventId = button.dataset.eventId;
+      const action = button.dataset.dashboardAction;
+      if (action === "accept") acceptEventForThisWeek(eventId);
+      if (action === "hold") holdEvent(eventId);
+      if (action === "pull") pullEventIntoThisWeek(eventId);
+      if (action === "restore") resetEventPlan(eventId);
+      if (action === "complete") toggleCompleted(eventId, true);
+    });
+  });
 }
 
 function renderOpportunityCard(opportunity, options = {}) {
