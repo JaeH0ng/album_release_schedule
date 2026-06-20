@@ -82,6 +82,25 @@
         <span id="sync-status-detail" class="sync-detail">Supabase 연동 전</span>
         <button id="refresh-data" class="sync-button" type="button">새로고침</button>
       </div>
+      <div class="auth-strip">
+        <div>
+          <p class="sync-label">개인 동기화</p>
+          <strong id="auth-status-text">로그인 전</strong>
+          <span id="auth-status-detail" class="sync-detail">공모전 판단 상태는 이 기기에만 저장됨</span>
+        </div>
+        <form id="auth-form" class="auth-form">
+          <input
+            id="auth-email"
+            class="auth-input"
+            type="email"
+            inputmode="email"
+            autocomplete="email"
+            placeholder="이메일로 로그인 링크 받기"
+          />
+          <button id="auth-submit" class="sync-button" type="submit">링크 보내기</button>
+          <button id="auth-signout" class="text-button" type="button" hidden>로그아웃</button>
+        </form>
+      </div>
     </section>
 
     <nav class="view-tabs" aria-label="일정 보기 방식">
@@ -353,6 +372,6 @@
       <div id="dialog-links" class="dialog-links"></div>
     </dialog>
 
-    <script src="app.js"></script>
+    <script type="module" src="app.js"></script>
   </body>
 </html>
