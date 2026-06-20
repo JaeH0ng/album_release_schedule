@@ -1169,6 +1169,12 @@ function updateAuthChrome() {
   installButton.hidden = !deferredInstallPrompt;
 }
 
+function updateAppModeChrome() {
+  const standalone =
+    window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  document.body.classList.toggle("body-standalone", standalone);
+}
+
 function updateAdminChrome() {
   const panel = document.querySelector("#admin-panel");
   const badge = document.querySelector("#admin-status-badge");
@@ -1681,7 +1687,37 @@ function renderDashboard() {
   const acceptedFocus = getAcceptedFocusEvents();
   const heldEvents = getHeldEvents();
   const urgencyEvents = getPullForwardCandidates();
+  const user = getAuthUser();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
+  document.querySelector("#app-home-panel").innerHTML = `
+    <div class="app-home-copy">
+      <strong>${user ? `안녕하세요, ${user.email}` : "앱처럼 바로 확인하세요"}</strong>
+      <p>${user
+        ? "지금 잡고 있는 작업, 보류한 작업, 캘린더를 이 화면에서 바로 이어서 볼 수 있습니다."
+        : "로그인하면 폰과 PC에서 같은 작업 상태를 이어서 볼 수 있고, 관리자 계정이면 공모전 편집도 가능합니다."}</p>
+      <div class="app-home-pills">
+        <span class="meta-pill">오늘 집중 ${acceptedFocus.length}개</span>
+        <span class="meta-pill">보류 ${heldEvents.length}개</span>
+        <span class="meta-pill">다음 후보 ${urgencyEvents.length}개</span>
+      </div>
+      <div class="app-home-cta">
+        ${user
+          ? '<button class="quick-link is-primary" type="button" data-quick-action="calendar">캘린더 열기</button>'
+          : '<button class="quick-link is-primary" type="button" data-quick-action="google-login">Google 로그인</button>'}
+        <button class="quick-link" type="button" data-quick-action="today">오늘 할 일 보기</button>
+        <button class="quick-link" type="button" data-quick-action="opportunities">공모전 보기</button>
+      </div>
+    </div>
+    <div class="app-home-actions">
+      <strong>바로가기</strong>
+      <p>${acceptedFocus[0] ? acceptedFocus[0].title : "아직 수락한 작업이 없습니다. 아래 후보에서 하나를 수락해보세요."}</p>
+      <div class="app-home-quick">
+        <button class="quick-link" type="button" data-quick-action="tracks">곡별 현황</button>
+        <button class="quick-link" type="button" data-quick-action="roadmap">전체 일정</button>
+        <button class="quick-link" type="button" data-quick-action="refresh">새로고침</button>
+      </div>
+    </div>
+  `;
   document.querySelector("#today-overview").innerHTML = [
     {
       value: acceptedFocus.length,
@@ -1750,8 +1786,46 @@ function renderDashboard() {
     : "업데이트 전";
 
   bindDashboardTaskControls();
+  bindAppHomeControls();
   populateWeeklyCheckinForm();
   updateCheckinPromptPreview();
+}
+
+function bindAppHomeControls() {
+  document.querySelectorAll("[data-quick-action]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const action = button.dataset.quickAction;
+      if (action === "google-login") {
+        await handleAuthSubmit(new Event("submit"));
+        return;
+      }
+      if (action === "calendar") {
+        setActiveView("calendar");
+        jumpToCurrentWeek();
+        return;
+      }
+      if (action === "today") {
+        setActiveView("dashboard");
+        document.querySelector("#weekly-focus-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+      }
+      if (action === "opportunities") {
+        setActiveView("opportunities");
+        return;
+      }
+      if (action === "tracks") {
+        setActiveView("tracks");
+        return;
+      }
+      if (action === "roadmap") {
+        setActiveView("roadmap");
+        return;
+      }
+      if (action === "refresh") {
+        refreshSupabaseData();
+      }
+    });
+  });
 }
 
 function renderDashboardTaskCard(event, mode) {
@@ -2332,6 +2406,7 @@ function drawWaveform(progress) {
 }
 
 function renderAll() {
+  updateAppModeChrome();
   updateChrome();
   updateAuthChrome();
   renderDashboard();
@@ -2373,3 +2448,4 @@ refreshSupabaseData();
 initAuth();
 bindPwaInstall();
 registerServiceWorker();
+window.matchMedia("(display-mode: standalone)").addEventListener?.("change", updateAppModeChrome);

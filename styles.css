@@ -521,6 +521,84 @@ input:focus-visible {
   gap: 12px;
 }
 
+.app-home-card {
+  background:
+    radial-gradient(circle at top left, rgba(181, 132, 24, 0.12), transparent 28%),
+    linear-gradient(135deg, rgba(24, 37, 31, 0.02), transparent 55%),
+    var(--paper);
+}
+
+.app-home-panel {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+}
+
+.app-home-copy,
+.app-home-actions {
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #fbfcfb;
+}
+
+.app-home-copy strong {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 22px;
+}
+
+.app-home-copy p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.app-home-pills,
+.app-home-quick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.app-home-cta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.quick-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.quick-link.is-primary {
+  border-color: rgba(47, 125, 105, 0.28);
+  background: #eef8f2;
+  color: var(--success);
+}
+
+.body-standalone .topbar,
+.body-standalone .view-tabs {
+  position: static;
+}
+
+.body-standalone .app-shell {
+  padding-top: 18px;
+}
+
 .overview-card {
   padding: 14px 15px;
   border: 1px solid var(--line);
@@ -1446,7 +1524,8 @@ footer {
   .checkin-grid,
   .opportunity-summary-grid,
   .admin-form,
-  .dashboard-overview {
+  .dashboard-overview,
+  .app-home-panel {
     grid-template-columns: 1fr;
   }
 
@@ -1576,6 +1655,10 @@ footer {
 
   .dashboard-card {
     padding: 16px;
+  }
+
+  .app-home-copy strong {
+    font-size: 20px;
   }
 
   .card-heading,
