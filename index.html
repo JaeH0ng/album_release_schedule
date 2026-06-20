@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#18251f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="앨범 캘린더" />
+    <meta
+      name="description"
+      content="2026년 12월 정규 앨범 발매를 위한 주차별 제작 캘린더"
+    />
+    <title>앨범 제작 캘린더</title>
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <a class="skip-link" href="#main-content">일정으로 바로가기</a>
+
+    <header class="topbar">
+      <div class="brand-block">
+        <div class="record-mark" aria-hidden="true"><span></span></div>
+        <div>
+          <p class="eyebrow">ALBUM RELEASE 2026</p>
+          <h1>앨범 제작 캘린더</h1>
+        </div>
+      </div>
+
+      <canvas
+        id="waveform"
+        class="waveform"
+        width="180"
+        height="40"
+        aria-label="앨범 제작 진행 파형"
+      ></canvas>
+
+      <div class="release-lockup">
+        <span id="countdown" class="countdown">D-</span>
+        <span id="release-date-display">2026.12.04 발매</span>
+      </div>
+    </header>
+
+    <section class="summary-band" aria-label="제작 현황 요약">
+      <div class="summary-item progress-summary">
+        <div class="summary-label-row">
+          <span>전체 진행률</span>
+          <strong id="progress-percent">0%</strong>
+        </div>
+        <div
+          class="progress-track"
+          role="progressbar"
+          aria-label="전체 일정 완료율"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          aria-valuenow="0"
+        >
+          <span id="progress-fill"></span>
+        </div>
+      </div>
+      <div class="summary-item">
+        <span class="summary-label">현재 단계</span>
+        <strong id="current-phase">판단용 데모</strong>
+      </div>
+      <div class="summary-item next-deadline">
+        <span class="summary-label">다음 마감</span>
+        <strong id="next-deadline">good night 데모</strong>
+        <span id="next-deadline-date">6월 21일</span>
+      </div>
+      <div class="summary-item delivery-date">
+        <span class="summary-label">유통사 전달</span>
+        <strong id="delivery-date-display">2026.11.13</strong>
+      </div>
+    </section>
+
+    <section class="sync-strip" aria-label="데이터 동기화 상태">
+      <div>
+        <p class="sync-label">게시 일정</p>
+        <strong id="sync-status-text">로컬 일정 사용 중</strong>
+      </div>
+      <div class="sync-actions">
+        <span id="sync-status-detail" class="sync-detail">Supabase 연동 전</span>
+        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
+      </div>
+    </section>
+
+    <nav class="view-tabs" aria-label="일정 보기 방식">
+      <button class="tab-button is-active" type="button" data-view="calendar" aria-selected="true">
+        주차별 캘린더
+      </button>
+      <button class="tab-button" type="button" data-view="roadmap" aria-selected="false">
+        전체 제작 일정
+      </button>
+      <button class="tab-button" type="button" data-view="tracks" aria-selected="false">
+        곡별 현황
+      </button>
+    </nav>
+
+    <main id="main-content" class="app-shell">
+      <aside class="phase-sidebar" aria-label="제작 단계 필터">
+        <div class="sidebar-heading">
+          <h2>제작 단계</h2>
+          <button id="jump-today" class="text-button" type="button">현재 주</button>
+        </div>
+        <div id="phase-filters" class="phase-filters"></div>
+        <div class="critical-dates">
+          <h2>고정 마감</h2>
+          <dl>
+            <div>
+              <dt>전곡 데모</dt>
+              <dd id="critical-demo">07.21</dd>
+            </div>
+            <div>
+              <dt>편곡 확정</dt>
+              <dd id="critical-arrangement">08.23</dd>
+            </div>
+            <div>
+              <dt>본녹음 마감</dt>
+              <dd id="critical-recording">09.20</dd>
+            </div>
+            <div>
+              <dt>최종 믹스</dt>
+              <dd id="critical-mix">10.30</dd>
+            </div>
+            <div>
+              <dt>유통사 전달</dt>
+              <dd id="critical-delivery">11.13</dd>
+            </div>
+          </dl>
+        </div>
+      </aside>
+
+      <section class="content-panel">
+        <div id="calendar-view" class="view-panel is-active" aria-labelledby="calendar-title">
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">2026.06.15 - 2026.12.06</p>
+              <h2 id="calendar-title">주차별 작업 캘린더</h2>
+            </div>
+            <div class="calendar-legend" aria-label="상태 범례">
+              <span><i class="legend-dot due"></i>작업</span>
+              <span><i class="legend-dot milestone"></i>마감</span>
+              <span><i class="legend-dot done"></i>완료</span>
+            </div>
+          </div>
+          <div id="week-list" class="week-list"></div>
+        </div>
+
+        <div id="roadmap-view" class="view-panel" aria-labelledby="roadmap-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">RELEASE PIPELINE</p>
+              <h2 id="roadmap-title">전체 제작 일정</h2>
+            </div>
+          </div>
+          <div id="roadmap-list" class="roadmap-list"></div>
+        </div>
+
+        <div id="tracks-view" class="view-panel" aria-labelledby="tracks-title" hidden>
+          <div class="panel-heading">
+            <div>
+              <p class="section-kicker">10 CANDIDATE TRACKS</p>
+              <h2 id="tracks-title">곡별 데모 현황</h2>
+            </div>
+          </div>
+          <div class="track-table-wrap">
+            <table class="track-table">
+              <thead>
+                <tr>
+                  <th scope="col">번호</th>
+                  <th scope="col">곡</th>
+                  <th scope="col">데모 마감</th>
+                  <th scope="col">상태</th>
+                  <th scope="col">문서</th>
+                </tr>
+              </thead>
+              <tbody id="track-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <span id="footer-baseline">일정 기준일 2026.06.18</span>
+      <span id="footer-storage-note">체크 상태는 이 브라우저에 저장됨</span>
+    </footer>
+
+    <dialog id="task-dialog" class="task-dialog">
+      <button id="close-dialog" class="icon-button" type="button" aria-label="닫기" title="닫기">
+        ×
+      </button>
+      <p id="dialog-phase" class="dialog-phase"></p>
+      <h2 id="dialog-title"></h2>
+      <p id="dialog-date" class="dialog-date"></p>
+      <p id="dialog-detail" class="dialog-detail"></p>
+      <dl id="dialog-meta" class="dialog-meta"></dl>
+      <div id="dialog-links" class="dialog-links"></div>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
