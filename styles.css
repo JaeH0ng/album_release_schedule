@@ -1283,6 +1283,92 @@ input:focus-visible {
   color: var(--arrangement);
 }
 
+.event-badge.is-dismissed {
+  background: rgba(182, 80, 67, 0.14);
+  color: var(--danger);
+}
+
+.calendar-overview-board {
+  margin-bottom: 18px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(75, 111, 168, 0.08), transparent 60%),
+    var(--paper);
+}
+
+.calendar-overview {
+  display: grid;
+  gap: 12px;
+}
+
+.calendar-overview-months {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  padding-left: 160px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.calendar-overview-rows {
+  display: grid;
+  gap: 10px;
+}
+
+.calendar-overview-row {
+  display: grid;
+  grid-template-columns: 148px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+}
+
+.calendar-overview-row.is-current .calendar-overview-meta strong {
+  color: var(--demo);
+}
+
+.calendar-overview-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.calendar-overview-meta strong {
+  font-size: 13px;
+}
+
+.calendar-overview-meta span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.calendar-overview-track {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.overview-phase-cell {
+  height: 18px;
+  border-radius: 999px;
+  background: #edf1ef;
+  border: 1px solid transparent;
+}
+
+.overview-phase-cell.is-active {
+  background: color-mix(in srgb, var(--phase-color), #ffffff 72%);
+  border-color: color-mix(in srgb, var(--phase-color), #ffffff 44%);
+}
+
+.overview-phase-cell.is-start {
+  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--phase-color), #18211d 5%);
+}
+
+.overview-phase-cell.is-end {
+  box-shadow: inset -4px 0 0 color-mix(in srgb, var(--phase-color), #18211d 5%);
+}
+
 .event-check {
   width: 15px;
   height: 15px;
@@ -1878,6 +1964,27 @@ footer {
 
   .calendar-legend {
     display: none;
+  }
+
+  .calendar-overview-board {
+    padding: 14px;
+  }
+
+  .calendar-overview-months {
+    padding-left: 0;
+    grid-template-columns: repeat(7, minmax(46px, 1fr));
+    gap: 6px;
+    font-size: 10px;
+  }
+
+  .calendar-overview-row {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .calendar-overview-track {
+    grid-template-columns: repeat(7, minmax(46px, 1fr));
+    gap: 6px;
   }
 
   .week-row {
