@@ -18,6 +18,7 @@ const SUPABASE_HEADERS = {
   Accept: "application/json",
 };
 const AUTH_REDIRECT_URL = typeof window !== "undefined" ? window.location.href.split("#")[0] : "";
+let deferredInstallPrompt = null;
 const PHASE_BOUNDARIES = [
   { phase: "demo", eventId: "demo-buffer", field: "end" },
   { phase: "structure", eventId: "structure-lock", field: "end" },
@@ -1141,6 +1142,7 @@ function updateAuthChrome() {
   const authSubmit = document.querySelector("#auth-submit");
   const authSignout = document.querySelector("#auth-signout");
   const authEmail = document.querySelector("#auth-email");
+  const installButton = document.querySelector("#install-app");
 
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
@@ -1151,6 +1153,7 @@ function updateAuthChrome() {
     authSignout.hidden = false;
     authEmail.hidden = true;
     authEmail.value = user.email || "";
+    installButton.hidden = !deferredInstallPrompt;
     return;
   }
 
@@ -1161,6 +1164,7 @@ function updateAuthChrome() {
   authSubmit.hidden = false;
   authSignout.hidden = true;
   authEmail.hidden = false;
+  installButton.hidden = !deferredInstallPrompt;
 }
 
 function updateAdminChrome() {
@@ -1350,6 +1354,38 @@ async function initAuth() {
   state.authClient.auth.onAuthStateChange((_event, session) => {
     setAuthSession(session);
   });
+}
+
+async function registerServiceWorker() {
+  if (!("serviceWorker" in navigator)) return;
+
+  try {
+    await navigator.serviceWorker.register("./service-worker.js");
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+function bindPwaInstall() {
+  window.addEventListener("beforeinstallprompt", (event) => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    updateAuthChrome();
+  });
+
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    updateAuthChrome();
+  });
+}
+
+async function promptInstallApp() {
+  if (!deferredInstallPrompt) return;
+
+  deferredInstallPrompt.prompt();
+  await deferredInstallPrompt.userChoice.catch(() => null);
+  deferredInstallPrompt = null;
+  updateAuthChrome();
 }
 
 function loadWeeklyCheckinState() {
@@ -2273,6 +2309,7 @@ document.querySelector("#save-checkin").addEventListener("click", saveWeeklyChec
 document.querySelector("#copy-checkin-prompt").addEventListener("click", copyCheckinPrompt);
 document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
+document.querySelector("#install-app").addEventListener("click", promptInstallApp);
 document.querySelector("#admin-opportunity-form").addEventListener("submit", saveAdminOpportunity);
 document.querySelector("#admin-reset").addEventListener("click", resetAdminOpportunityForm);
 document.querySelector("#admin-delete").addEventListener("click", deleteAdminOpportunity);
@@ -2290,3 +2327,5 @@ document.querySelector("#task-dialog").addEventListener("click", (event) => {
 renderAll();
 refreshSupabaseData();
 initAuth();
+bindPwaInstall();
+registerServiceWorker();

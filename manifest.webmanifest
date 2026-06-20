@@ -1,8 +1,12 @@
 {
   "name": "앨범 제작 캘린더",
   "short_name": "앨범 캘린더",
+  "id": "./",
   "start_url": "./",
+  "scope": "./",
   "display": "standalone",
+  "orientation": "portrait",
+  "description": "앨범 일정, 공모전, 주간 집중 작업을 휴대폰 홈 화면에서 바로 확인하는 PWA",
   "background_color": "#f3f6f4",
   "theme_color": "#18251f",
   "lang": "ko",
