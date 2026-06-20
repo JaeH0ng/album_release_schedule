@@ -12,6 +12,14 @@ Supabase 게시 일정이 준비되면 웹은 `album_events`, `album_tracks`, `s
 
 웹 첫 화면은 `이번 주 집중 대시보드`다. 여기서 이번 주에 반드시 끝낼 것, 30분 fallback, 지연 중인 작업, 최근 완료한 작업, 주간 체크인과 코덱스에게 보낼 메시지 초안을 바로 확인할 수 있다. `공모전` 탭에서는 매주 갱신되는 싱어송라이터 공모전 카드와 `수락/보류/제외` 상태를 바로 관리할 수 있다. 상단 이메일 로그인으로 들어가면 공모전 판단 상태가 폰과 PC 사이에 동기화되고, `admin_users`에 등록된 계정은 관리자 편집 패널도 사용할 수 있다.
 
+`GROUNZ` 공고를 기준으로 후보를 다시 가져오려면 아래 명령을 실행한다.
+
+```bash
+npm run opportunities:grounz
+```
+
+이 명령은 `https://api.grounz.net/announcement`에서 최근 공고를 읽고, 싱어송라이터 성격에 맞는 후보만 골라 `public.singer_songwriter_opportunities`에 upsert한다.
+
 ## 빌드와 배포
 
 ```bash

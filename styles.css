@@ -883,6 +883,13 @@ input:focus-visible {
     #f7fbf8;
 }
 
+.opportunity-card.is-held {
+  border-color: rgba(75, 111, 168, 0.22);
+  background:
+    radial-gradient(circle at top right, rgba(75, 111, 168, 0.08), transparent 28%),
+    #f7faff;
+}
+
 .opportunity-card.is-dismissed {
   opacity: 0.72;
 }
@@ -899,6 +906,22 @@ input:focus-visible {
   font-size: 17px;
 }
 
+.opportunity-title-button {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.4;
+  text-align: left;
+}
+
+.opportunity-title-button:hover {
+  color: var(--demo);
+}
+
 .opportunity-card-top p,
 .opportunity-card-body p,
 .opportunity-empty {
@@ -913,6 +936,10 @@ input:focus-visible {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+}
+
+.opportunity-body[role="button"] {
+  cursor: pointer;
 }
 
 .opportunity-status {
@@ -1114,77 +1141,80 @@ input:focus-visible {
   background: var(--success);
 }
 
-.week-list {
+.month-list {
   display: grid;
-  gap: 12px;
+  gap: 18px;
 }
 
-.week-row {
+.month-section {
+  padding: 18px;
   border: 1px solid var(--line);
-  border-radius: 7px;
-  background: var(--paper);
-  box-shadow: 0 1px 0 rgba(24, 33, 29, 0.02);
-  overflow: hidden;
+  border-radius: 14px;
+  background:
+    radial-gradient(circle at top right, rgba(47, 125, 105, 0.08), transparent 28%),
+    var(--paper);
 }
 
-.week-row.is-current {
-  border-color: var(--demo);
-  box-shadow: var(--shadow);
-}
-
-.week-header {
-  min-height: 42px;
-  padding: 9px 12px;
-  border-bottom: 1px solid var(--line);
-  background: #fafcfb;
+.month-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  margin-bottom: 12px;
 }
 
-.week-range {
-  font-size: 13px;
-  font-weight: 800;
+.month-header h3 {
+  margin: 0;
+  font-size: 20px;
 }
 
-.week-label {
+.month-weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.month-weekdays span {
+  padding: 0 4px;
   color: var(--muted);
   font-size: 11px;
-}
-
-.current-label {
-  padding: 3px 7px;
-  border-radius: 3px;
-  background: var(--demo);
-  color: #fff;
-  font-size: 10px;
   font-weight: 800;
 }
 
-.week-grid {
+.month-grid {
   display: grid;
-  grid-template-columns: repeat(7, minmax(105px, 1fr));
-  min-width: 760px;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
 }
 
-.day-cell {
+.month-cell {
   min-width: 0;
-  min-height: 122px;
-  padding: 8px;
-  border-right: 1px solid var(--line);
+  min-height: 150px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfcfb;
 }
 
-.day-cell:last-child {
-  border-right: 0;
+.month-cell-empty {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
 }
 
-.day-cell.is-weekend {
-  background: #fafbfa;
+.month-cell.is-weekend {
+  background: #f9fbfa;
 }
 
-.day-cell.is-today {
+.month-cell.is-today {
+  border-color: rgba(47, 125, 105, 0.28);
   box-shadow: inset 0 3px 0 var(--demo);
+}
+
+.month-cell.is-empty .day-events {
+  min-height: 0;
 }
 
 .day-heading {
@@ -1197,29 +1227,18 @@ input:focus-visible {
   font-size: 10px;
 }
 
-.day-heading-main,
-.day-heading-side {
+.day-heading-main {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
-.day-heading-side {
-  flex-wrap: wrap;
-  justify-content: flex-end;
-}
-
-.day-weekday {
-  letter-spacing: 0.02em;
-}
-
 .day-number {
   color: var(--ink);
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 800;
 }
 
-.day-date-label,
 .day-count,
 .day-today-chip {
   display: inline-flex;
@@ -1303,87 +1322,6 @@ input:focus-visible {
 .event-badge.is-dismissed {
   background: rgba(182, 80, 67, 0.14);
   color: var(--danger);
-}
-
-.calendar-overview-board {
-  margin-bottom: 18px;
-  padding: 18px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background:
-    linear-gradient(135deg, rgba(75, 111, 168, 0.08), transparent 60%),
-    var(--paper);
-}
-
-.calendar-overview {
-  display: grid;
-  gap: 12px;
-}
-
-.calendar-overview-months {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-  padding-left: 160px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-}
-
-.calendar-overview-rows {
-  display: grid;
-  gap: 10px;
-}
-
-.calendar-overview-row {
-  display: grid;
-  grid-template-columns: 148px minmax(0, 1fr);
-  gap: 12px;
-  align-items: center;
-}
-
-.calendar-overview-row.is-current .calendar-overview-meta strong {
-  color: var(--demo);
-}
-
-.calendar-overview-meta {
-  display: grid;
-  gap: 2px;
-}
-
-.calendar-overview-meta strong {
-  font-size: 13px;
-}
-
-.calendar-overview-meta span {
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.calendar-overview-track {
-  display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
-  gap: 8px;
-}
-
-.overview-phase-cell {
-  height: 18px;
-  border-radius: 999px;
-  background: #edf1ef;
-  border: 1px solid transparent;
-}
-
-.overview-phase-cell.is-active {
-  background: color-mix(in srgb, var(--phase-color), #ffffff 72%);
-  border-color: color-mix(in srgb, var(--phase-color), #ffffff 44%);
-}
-
-.overview-phase-cell.is-start {
-  box-shadow: inset 4px 0 0 color-mix(in srgb, var(--phase-color), #18211d 5%);
-}
-
-.overview-phase-cell.is-end {
-  box-shadow: inset -4px 0 0 color-mix(in srgb, var(--phase-color), #18211d 5%);
 }
 
 .event-check {
@@ -1570,6 +1508,60 @@ input:focus-visible {
   border-color: rgba(181, 132, 24, 0.24);
   background: #fcf6e8;
   color: var(--structure);
+}
+
+.status-pill.is-ready {
+  border-color: rgba(182, 80, 67, 0.22);
+  background: #fdf4f2;
+  color: var(--danger);
+}
+
+.track-summary-board {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.track-hero-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, rgba(47, 125, 105, 0.08), transparent 55%),
+    var(--paper);
+}
+
+.track-hero-card h3 {
+  margin: 0 0 6px;
+  font-size: 20px;
+}
+
+.track-hero-card p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.track-hero-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.track-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.track-action-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .document-links {
@@ -1983,77 +1975,40 @@ footer {
     display: none;
   }
 
-  .calendar-overview-board {
+  .month-section {
     padding: 14px;
   }
 
-  .calendar-overview-months {
-    padding-left: 0;
-    grid-template-columns: repeat(7, minmax(46px, 1fr));
-    gap: 6px;
-    font-size: 10px;
+  .month-header {
+    align-items: flex-start;
   }
 
-  .calendar-overview-row {
+  .month-grid {
     grid-template-columns: 1fr;
-    gap: 6px;
   }
 
-  .calendar-overview-track {
-    grid-template-columns: repeat(7, minmax(46px, 1fr));
-    gap: 6px;
+  .month-weekdays {
+    display: none;
   }
 
-  .week-row {
-    overflow: visible;
-    border-radius: 14px;
-    border-radius: 18px;
-  }
-
-  .week-grid {
-    display: block;
-    min-width: 0;
-  }
-
-  .day-cell {
+  .month-cell {
     min-height: 0;
-    margin: 8px;
-    padding: 12px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: #fcfdfc;
   }
 
-  .day-cell:last-child {
-    margin-bottom: 10px;
-  }
-
-  .day-cell.is-empty {
+  .month-cell-empty,
+  .month-cell.is-empty {
     display: none;
   }
 
   .day-heading {
-    flex-direction: column;
-    align-items: flex-start;
+    align-items: center;
     margin-bottom: 10px;
-  }
-
-  .day-heading-main,
-  .day-heading-side {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .day-weekday {
-    font-size: 12px;
-    font-weight: 800;
   }
 
   .day-number {
     font-size: 18px;
   }
 
-  .day-date-label,
   .day-count,
   .day-today-chip {
     font-size: 11px;
@@ -2093,6 +2048,15 @@ footer {
   .roadmap-progress {
     grid-column: 1 / -1;
     text-align: left;
+  }
+
+  .track-hero-card,
+  .track-detail-top {
+    flex-direction: column;
+  }
+
+  .track-summary-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .track-table {

@@ -17,6 +17,30 @@
 
 ## 변경 로그
 
+### 2026-06-21 — 공모전 상세 모달과 빌드 버전 캐시 무효화 추가
+
+**작업자:** Codex (GPT-5, macOS)
+
+**무엇을 / 왜**
+- 공모전 카드에서 제목이나 요약을 눌렀을 때, 같은 페이지 안에서 어떤 공모전인지 바로 확인할 수 있도록 상세 모달을 연결했다.
+- GitHub Pages/PWA에서 이전 `app.js`나 `styles.css`가 남아 화면이 늦게 바뀌는 문제를 줄이기 위해, 빌드 시 `index.html`에 버전 쿼리를 자동으로 붙이고 서비스워커도 새 버전을 우선 가져오도록 정리했다.
+
+**바꾼 파일**
+- `app.js` — 공모전 카드 클릭 시 `task-dialog`를 재사용해 상세 정보를 열도록 연결. 서비스워커 등록 시 빌드 버전 쿼리 사용.
+- `styles.css` — 공모전 카드 제목 버튼/클릭 영역 스타일 추가.
+- `service-worker.js` — HTML은 네트워크 우선, 정적 셸은 `cache: "reload"` 우선으로 조정하고 `index.html`만 오프라인 대비 캐시에 유지.
+- `scripts/build-static-site.mjs` — 배포용 `dist/index.html`에 `data-build-version`과 정적 자산 버전 쿼리를 주입.
+
+**검증**
+- `node --check app.js`
+- `npm run build`
+- 로컬 브라우저에서 공모전 탭 진입 후 카드 클릭 시 상세 모달 오픈 확인
+- 로컬 브라우저에서 공모전 `수락` 클릭 시 후보 보드에서 빠지고 Accepted 보드로 즉시 이동하는지 확인
+
+**Codex가 알아야 할 점**
+- 소스 `index.html`은 그대로 두고, 배포 산출물 `dist/index.html`에서만 자산 버전 쿼리를 주입한다.
+- 기존 PWA를 이미 설치한 기기에서는 한 번 정도 재실행이나 새로고침이 필요할 수 있지만, 이후 배포부터는 `app.js?v=...`, `styles.css?v=...` 형태로 이전 파일을 오래 붙잡는 문제가 훨씬 줄어든다.
+
 ### 2026-06-20 — 핸드오프 자동 갱신용 Claude Stop 훅 추가
 
 **작업자:** Claude (Claude Code, macOS)

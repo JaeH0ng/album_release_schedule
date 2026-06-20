@@ -812,6 +812,14 @@ function startOfWeek(date) {
   return result;
 }
 
+function startOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth(), 1, 12, 0, 0, 0);
+}
+
+function endOfMonth(date) {
+  return new Date(date.getFullYear(), date.getMonth() + 1, 0, 12, 0, 0, 0);
+}
+
 function formatShortDate(value) {
   const date = typeof value === "string" ? parseDate(value) : value;
   return `${date.getMonth() + 1}월 ${date.getDate()}일`;
@@ -1265,7 +1273,7 @@ function updateAuthChrome() {
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
     authStatusDetail.textContent = state.isAdmin
-      ? "공모전 판단 상태와 관리자 편집 권한이 활성화됨"
+      ? "공모전 판단 상태와 개인 동기화가 활성화됨"
       : "공모전 판단 상태가 Supabase로 동기화됨";
     if (mobileAuthSummary) {
       mobileAuthSummary.textContent = state.isAdmin ? "관리자 모드 가능" : "Google 동기화 연결됨";
@@ -1496,7 +1504,11 @@ async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
   try {
-    await navigator.serviceWorker.register("./service-worker.js");
+    const buildVersion = document.documentElement.dataset.buildVersion || "dev";
+    const registration = await navigator.serviceWorker.register(`./service-worker.js?v=${encodeURIComponent(buildVersion)}`, {
+      updateViaCache: "none",
+    });
+    registration.update().catch(() => null);
   } catch (error) {
     console.error(error);
   }
@@ -1608,11 +1620,35 @@ function getTrackChecklistProgress(trackNumber) {
   return { completed, total: defaultTrackSteps.length };
 }
 
+function getTrackStageProgress(trackNumber) {
+  const checklist = getTrackChecklist(trackNumber);
+  const sessionSteps = defaultTrackSteps.filter((step) => step.group === "세션");
+  const closingSteps = defaultTrackSteps.filter((step) => step.group === "마감");
+  const sessionCompleted = sessionSteps.filter((step) => checklist[step.id]).length;
+  const closingCompleted = closingSteps.filter((step) => checklist[step.id]).length;
+  return {
+    sessionCompleted,
+    sessionTotal: sessionSteps.length,
+    closingCompleted,
+    closingTotal: closingSteps.length,
+  };
+}
+
+function getTrackNextStep(trackNumber) {
+  const checklist = getTrackChecklist(trackNumber);
+  return defaultTrackSteps.find((step) => !checklist[step.id])?.label || "데모 완료 처리";
+}
+
 function getTrackStatus(trackNumber, eventId) {
   if (state.completed.has(eventId)) return { label: "완료", className: "is-complete" };
   const { completed, total } = getTrackChecklistProgress(trackNumber);
+  const { sessionCompleted, sessionTotal, closingCompleted } = getTrackStageProgress(trackNumber);
   if (completed === 0) return { label: "대기", className: "" };
-  if (completed >= total - 2) return { label: "검토", className: "is-review" };
+  if (completed === total) return { label: "데모 완료 체크", className: "is-ready" };
+  if (sessionCompleted > 0 && sessionCompleted < sessionTotal) return { label: "세션 중", className: "is-active" };
+  if (sessionCompleted === sessionTotal && closingCompleted < total - sessionTotal) {
+    return { label: "정리 중", className: "is-review" };
+  }
   return { label: "진행", className: "is-active" };
 }
 
@@ -1622,6 +1658,21 @@ function getOpportunityReview(opportunityId) {
 
 function getAcceptedOpportunities() {
   return state.opportunities.filter((opportunity) => getOpportunityReview(opportunity.id).status === "accepted");
+}
+
+function getHeldOpportunities() {
+  return state.opportunities.filter((opportunity) => getOpportunityReview(opportunity.id).status === "hold");
+}
+
+function getDismissedOpportunities() {
+  return state.opportunities.filter((opportunity) => getOpportunityReview(opportunity.id).status === "dismissed");
+}
+
+function getOpportunityCandidates() {
+  return state.opportunities.filter((opportunity) => {
+    const reviewStatus = getOpportunityReview(opportunity.id).status;
+    return reviewStatus !== "accepted" && reviewStatus !== "hold" && reviewStatus !== "dismissed";
+  });
 }
 
 function buildAcceptedOpportunityEvents() {
@@ -1918,7 +1969,7 @@ function renderDashboard() {
       <strong>${user ? `안녕하세요, ${user.email}` : "앱처럼 바로 확인하세요"}</strong>
       <p>${user
         ? "지금 잡고 있는 작업, 보류한 작업, 캘린더를 이 화면에서 바로 이어서 볼 수 있습니다."
-        : "로그인하면 폰과 PC에서 같은 작업 상태를 이어서 볼 수 있고, 관리자 계정이면 공모전 편집도 가능합니다."}</p>
+        : "로그인하면 폰과 PC에서 같은 작업 상태를 이어서 볼 수 있습니다."}</p>
       <div class="app-home-pills">
         <span class="meta-pill">오늘 집중 ${acceptedFocus.length}개</span>
         <span class="meta-pill">보류 ${heldEvents.length}개</span>
@@ -2000,7 +2051,9 @@ function renderDashboard() {
         .join("")
     : '<li>아직 완료한 작업이 없습니다. 오늘 끝낸 작업 하나부터 체크해보세요.</li>';
 
-  const spotlight = state.opportunities.filter((opportunity) => opportunity.status !== "closed").slice(0, 3);
+  const spotlight = getOpportunityCandidates()
+    .filter((opportunity) => opportunity.status !== "closed")
+    .slice(0, 3);
   document.querySelector("#dashboard-opportunity-list").innerHTML = spotlight.length
     ? spotlight.map((opportunity) => renderOpportunityCard(opportunity, { compact: true })).join("")
     : '<p class="opportunity-empty">이번 주 표시할 공모전이 아직 없습니다.</p>';
@@ -2135,6 +2188,7 @@ function renderOpportunityCard(opportunity, options = {}) {
   const review = getOpportunityReview(opportunity.id);
   const classes = ["opportunity-card"];
   if (review.status === "accepted") classes.push("is-accepted");
+  if (review.status === "hold") classes.push("is-held");
   if (review.status === "dismissed") classes.push("is-dismissed");
   const statusClasses = ["opportunity-status", getOpportunityStatusClass(opportunity.status)]
     .filter(Boolean)
@@ -2146,15 +2200,14 @@ function renderOpportunityCard(opportunity, options = {}) {
     : "최근 확인 기록 없음";
   const reviewLabel = formatOpportunityReview(review.status);
   const compactClass = options.compact ? " compact" : "";
-  const adminAction = canUseAdminMode()
-    ? '<button class="opportunity-action" type="button" data-fill-admin="true">관리자 편집</button>'
-    : "";
 
   return `
     <article class="${classes.join(" ")}${compactClass ? compactClass : ""}" data-opportunity-id="${opportunity.id}">
       <div class="opportunity-card-top">
         <div>
-          <h4>${opportunity.title}</h4>
+          <button class="opportunity-title-button" type="button" data-opportunity-open="true">
+            ${opportunity.title}
+          </button>
           <p>${opportunity.host}</p>
         </div>
         <div class="opportunity-meta">
@@ -2162,7 +2215,7 @@ function renderOpportunityCard(opportunity, options = {}) {
           ${acceptedBadge}
         </div>
       </div>
-      <div class="opportunity-body">
+      <div class="opportunity-body" data-opportunity-open="true" role="button" tabindex="0" aria-label="${opportunity.title} 상세 보기">
         <p>${opportunity.summary}</p>
       </div>
       <div class="opportunity-meta">
@@ -2183,7 +2236,6 @@ function renderOpportunityCard(opportunity, options = {}) {
         <button class="opportunity-action is-danger${review.status === "dismissed" ? " is-current" : ""}" type="button" data-action="dismissed">
           제외
         </button>
-        ${adminAction}
       </div>
       <div class="opportunity-links">
         <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
@@ -2196,32 +2248,51 @@ function renderOpportunityCard(opportunity, options = {}) {
 function bindOpportunityControls() {
   document.querySelectorAll("[data-opportunity-id]").forEach((card) => {
     const opportunityId = card.dataset.opportunityId;
+    const opportunity = state.opportunities.find((item) => item.id === opportunityId);
     card.querySelectorAll("[data-action]").forEach((button) => {
       button.addEventListener("click", () => setOpportunityReview(opportunityId, button.dataset.action));
     });
-    card.querySelector("[data-fill-admin]")?.addEventListener("click", () => {
-      const opportunity = state.opportunities.find((item) => item.id === opportunityId);
-      if (opportunity) fillAdminOpportunityForm(opportunity);
+    card.querySelectorAll("[data-opportunity-open]").forEach((button) => {
+      const open = () => {
+        if (opportunity) openOpportunityDialog(opportunity);
+      };
+      button.addEventListener("click", open);
+      button.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          open();
+        }
+      });
     });
   });
 }
 
 function renderOpportunities() {
-  const openCount = state.opportunities.filter((opportunity) => opportunity.status === "open").length;
-  const spotlightCount = state.opportunities.filter((opportunity) => opportunity.status !== "closed").slice(0, 3).length;
   const accepted = getAcceptedOpportunities();
+  const held = getHeldOpportunities();
+  const dismissed = getDismissedOpportunities();
+  const candidates = getOpportunityCandidates();
+  const openCount = candidates.length;
 
   document.querySelector("#opportunity-open-count").textContent = String(openCount);
-  document.querySelector("#opportunity-spotlight-count").textContent = String(spotlightCount);
+  document.querySelector("#opportunity-hold-count").textContent = String(held.length);
   document.querySelector("#opportunity-accepted-count").textContent = String(accepted.length);
 
   document.querySelector("#accepted-opportunity-list").innerHTML = accepted.length
     ? accepted.map((opportunity) => renderOpportunityCard(opportunity)).join("")
     : '<p class="opportunity-empty">아직 캘린더에 넣은 공모전이 없습니다. 카드에서 수락을 누르면 바로 일정에 합쳐집니다.</p>';
 
-  document.querySelector("#opportunity-list").innerHTML = state.opportunities.length
-    ? state.opportunities.map((opportunity) => renderOpportunityCard(opportunity)).join("")
-    : '<p class="opportunity-empty">표시할 공모전 데이터가 아직 없습니다.</p>';
+  document.querySelector("#held-opportunity-list").innerHTML = held.length
+    ? held.map((opportunity) => renderOpportunityCard(opportunity)).join("")
+    : '<p class="opportunity-empty">보류 중인 공모전이 없습니다.</p>';
+
+  document.querySelector("#opportunity-list").innerHTML = candidates.length
+    ? candidates.map((opportunity) => renderOpportunityCard(opportunity)).join("")
+    : '<p class="opportunity-empty">지금 검토 중인 후보가 없습니다.</p>';
+
+  document.querySelector("#dismissed-opportunity-list").innerHTML = dismissed.length
+    ? dismissed.map((opportunity) => renderOpportunityCard(opportunity)).join("")
+    : '<p class="opportunity-empty">이번에 넘긴 공모전이 없습니다.</p>';
 
   bindOpportunityControls();
   updateAdminChrome();
@@ -2309,145 +2380,92 @@ async function deleteAdminOpportunity() {
   document.querySelector("#auth-status-detail").textContent = `${id} 삭제 완료`;
 }
 
+function eventOccursOnDate(event, iso) {
+  const target = parseDate(iso);
+  const start = parseDate(event.date);
+  const end = parseDate(event.end || event.date);
+  return target >= start && target <= end;
+}
+
 function renderCalendar() {
-  const weekList = document.querySelector("#week-list");
-  renderCalendarOverview();
+  const monthList = document.querySelector("#month-list");
   const bounds = getCalendarBounds();
-  const firstWeek = startOfWeek(bounds.start);
-  const lastDate = bounds.end;
+  const firstMonth = startOfMonth(bounds.start);
+  const lastMonth = startOfMonth(bounds.end);
   const todayIso = toIso(today);
-  const todayWeekIso = toIso(startOfWeek(today));
+  const dayNames = ["일", "월", "화", "수", "목", "금", "토"];
   const filteredEvents =
     state.activePhase === "all"
       ? state.events
       : state.events.filter((event) => event.phase === state.activePhase);
-  const weeks = [];
+  const monthMarkup = [];
 
-  let weekStart = firstWeek;
-  let weekNumber = 1;
-  while (weekStart <= lastDate) {
-    const weekEnd = addDays(weekStart, 6);
-    const weekEventCount = filteredEvents.filter((event) => {
-      const eventDate = parseDate(event.date);
-      return eventDate >= weekStart && eventDate <= weekEnd;
-    }).length;
+  for (let current = new Date(firstMonth); current <= lastMonth; current = startOfMonth(addDays(endOfMonth(current), 1))) {
+    const monthStart = startOfMonth(current);
+    const monthEnd = endOfMonth(current);
+    const firstDayIndex = monthStart.getDay();
+    const totalDays = monthEnd.getDate();
+    const monthEvents = filteredEvents.filter((event) => {
+      const eventStart = parseDate(event.date);
+      const eventEnd = parseDate(event.end || event.date);
+      return eventStart <= monthEnd && eventEnd >= monthStart;
+    });
+    const cells = [];
 
-    if (state.activePhase === "all" || weekEventCount > 0) {
-      const days = Array.from({ length: 7 }, (_, index) => addDays(weekStart, index));
-      const dayNames = ["월", "화", "수", "목", "금", "토", "일"];
-      const dayCells = days
-        .map((day, index) => {
-          const iso = toIso(day);
-          const dayEvents = filteredEvents.filter((event) => event.date === iso);
-          const classes = ["day-cell"];
-          if (index >= 5) classes.push("is-weekend");
-          if (iso === todayIso) classes.push("is-today");
-          if (dayEvents.length === 0) classes.push("is-empty");
+    for (let blank = 0; blank < firstDayIndex; blank += 1) {
+      cells.push('<div class="month-cell month-cell-empty" aria-hidden="true"></div>');
+    }
 
-          return `
-            <div class="${classes.join(" ")}" data-date="${iso}">
-              <div class="day-heading">
-                <div class="day-heading-main">
-                  <span class="day-weekday">${dayNames[index]}</span>
-                  <span class="day-number">${day.getDate()}</span>
-                </div>
-                <div class="day-heading-side">
-                  <span class="day-date-label">${formatDotDate(day)}</span>
-                  ${iso === todayIso ? '<span class="day-today-chip">오늘</span>' : ""}
-                  ${dayEvents.length ? `<span class="day-count">${dayEvents.length}개</span>` : ""}
-                </div>
-              </div>
-              <div class="day-events">
-                ${dayEvents.map(renderEvent).join("")}
-              </div>
+    for (let day = 1; day <= totalDays; day += 1) {
+      const date = new Date(monthStart.getFullYear(), monthStart.getMonth(), day, 12, 0, 0, 0);
+      const iso = toIso(date);
+      const dayEvents = monthEvents.filter((event) => eventOccursOnDate(event, iso));
+      const classes = ["month-cell"];
+      if (date.getDay() === 0 || date.getDay() === 6) classes.push("is-weekend");
+      if (iso === todayIso) classes.push("is-today");
+      if (dayEvents.length === 0) classes.push("is-empty");
+
+      cells.push(`
+        <article class="${classes.join(" ")}" data-date="${iso}">
+          <div class="day-heading">
+            <div class="day-heading-main">
+              <span class="day-number">${day}</span>
+              ${iso === todayIso ? '<span class="day-today-chip">오늘</span>' : ""}
             </div>
-          `;
-        })
-        .join("");
-
-      const weekIso = toIso(weekStart);
-      const isCurrent = weekIso === todayWeekIso;
-      weeks.push(`
-        <article class="week-row${isCurrent ? " is-current" : ""}" data-week-start="${weekIso}">
-          <header class="week-header">
-            <div>
-              <span class="week-range">${formatShortDate(weekStart)} - ${formatShortDate(weekEnd)}</span>
-              <span class="week-label"> · 제작 ${weekNumber}주차</span>
-            </div>
-            ${isCurrent ? '<span class="current-label">현재 주</span>' : ""}
-          </header>
-          <div class="week-grid">${dayCells}</div>
+            ${dayEvents.length ? `<span class="day-count">${dayEvents.length}개</span>` : ""}
+          </div>
+          <div class="day-events">
+            ${dayEvents.map((event) => renderEvent(event, iso)).join("")}
+          </div>
         </article>
       `);
     }
 
-    weekStart = addDays(weekStart, 7);
-    weekNumber += 1;
+    monthMarkup.push(`
+      <section class="month-section" data-month="${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}">
+        <header class="month-header">
+          <div>
+            <p class="section-kicker">MONTH VIEW</p>
+            <h3>${monthStart.getFullYear()}년 ${monthStart.getMonth() + 1}월</h3>
+          </div>
+          <span class="card-chip">${monthEvents.length}개 일정</span>
+        </header>
+        <div class="month-weekdays">
+          ${dayNames.map((dayName) => `<span>${dayName}</span>`).join("")}
+        </div>
+        <div class="month-grid">${cells.join("")}</div>
+      </section>
+    `);
   }
 
-  weekList.innerHTML = weeks.length
-    ? weeks.join("")
+  monthList.innerHTML = monthMarkup.length
+    ? monthMarkup.join("")
     : '<div class="empty-week">선택한 단계의 일정이 없습니다.</div>';
 
   bindEventControls();
 }
 
-function renderCalendarOverview() {
-  const container = document.querySelector("#calendar-overview");
-  if (!container) return;
-
-  const months = [
-    { key: "2026-06", label: "6월" },
-    { key: "2026-07", label: "7월" },
-    { key: "2026-08", label: "8월" },
-    { key: "2026-09", label: "9월" },
-    { key: "2026-10", label: "10월" },
-    { key: "2026-11", label: "11월" },
-    { key: "2026-12", label: "12월" },
-  ];
-  const phaseRows = phases.filter((phase) => phase.id !== "opportunity");
-
-  const monthHeader = months.map((month) => `<span>${month.label}</span>`).join("");
-  const rows = phaseRows
-    .map((phase) => {
-      const phaseEvents = state.events.filter((event) => event.phase === phase.id && event.kind !== "opportunity");
-      if (!phaseEvents.length) return "";
-      const start = phaseEvents[0].date.slice(0, 7);
-      const lastEvent = phaseEvents.at(-1);
-      const end = (lastEvent.end || lastEvent.date).slice(0, 7);
-      const startIndex = months.findIndex((month) => month.key === start);
-      const endIndex = months.findIndex((month) => month.key === end);
-      const completed = phaseEvents.filter((event) => state.completed.has(event.id)).length;
-      const current = getCurrentPhase(today).id === phase.id;
-
-      const cells = months
-        .map((month, index) => {
-          const active = index >= startIndex && index <= endIndex;
-          const isStart = index === startIndex;
-          const isEnd = index === endIndex;
-          return `<span class="overview-phase-cell${active ? " is-active" : ""}${isStart ? " is-start" : ""}${isEnd ? " is-end" : ""}" style="--phase-color:${phase.color}"></span>`;
-        })
-        .join("");
-
-      return `
-        <article class="calendar-overview-row${current ? " is-current" : ""}">
-          <div class="calendar-overview-meta">
-            <strong>${phase.label}</strong>
-            <span>${completed}/${phaseEvents.length}</span>
-          </div>
-          <div class="calendar-overview-track">${cells}</div>
-        </article>
-      `;
-    })
-    .join("");
-
-  container.innerHTML = `
-    <div class="calendar-overview-months">${monthHeader}</div>
-    <div class="calendar-overview-rows">${rows}</div>
-  `;
-}
-
-function renderEvent(event) {
+function renderEvent(event, iso = event.date) {
   const phase = phaseMap.get(event.phase);
   const complete = state.completed.has(event.id);
   const classes = ["calendar-event"];
@@ -2480,7 +2498,7 @@ function renderEvent(event) {
         <button class="event-title-button" type="button">${event.title}</button>
       </div>
       <p class="event-meta">${event.end ? formatDateRange(event) : event.duration}</p>
-      <p class="event-submeta">${formatDayLabel(event.date)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
+      <p class="event-submeta">${formatDayLabel(iso)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
     </div>
   `;
 }
@@ -2584,7 +2602,54 @@ function renderRoadmap() {
     .join("");
 }
 
+function renderTrackSummaryBoard() {
+  const container = document.querySelector("#track-summary-board");
+  if (!container) return;
+
+  const statuses = state.tracks.map((track) => ({ track, status: getTrackStatus(track.number, track.eventId) }));
+  const currentFocus =
+    statuses.find(({ status }) => status.className === "is-active" || status.className === "is-review")?.track ||
+    state.tracks.find((track) => !state.completed.has(track.eventId)) ||
+    state.tracks[0];
+  const currentEvent = currentFocus ? findEvent(currentFocus.eventId) : null;
+  const currentStatus = currentFocus ? getTrackStatus(currentFocus.number, currentFocus.eventId) : null;
+
+  const summaryItems = [
+    { label: "대기", count: statuses.filter(({ status }) => status.label === "대기").length },
+    { label: "세션/정리 중", count: statuses.filter(({ status }) => ["세션 중", "정리 중", "진행"].includes(status.label)).length },
+    { label: "완료 체크 필요", count: statuses.filter(({ status }) => status.label === "데모 완료 체크").length },
+    { label: "완료", count: statuses.filter(({ status }) => status.label === "완료").length },
+  ];
+
+  container.innerHTML = `
+    <section class="track-hero-card">
+      <div>
+        <p class="section-kicker">CURRENT TRACK FOCUS</p>
+        <h3>${currentFocus ? `${currentFocus.number}. ${currentFocus.title}` : "진행 중인 곡 없음"}</h3>
+        <p>${currentEvent?.detail || "아직 곡이 선택되지 않았습니다."}</p>
+      </div>
+      <div class="track-hero-meta">
+        ${currentStatus ? `<span class="status-pill ${currentStatus.className}">${currentStatus.label}</span>` : ""}
+        ${currentFocus ? `<span class="card-chip">다음: ${getTrackNextStep(currentFocus.number)}</span>` : ""}
+      </div>
+    </section>
+    <section class="track-summary-grid">
+      ${summaryItems
+        .map(
+          (item) => `
+            <article class="summary-mini-card">
+              <span class="summary-label">${item.label}</span>
+              <strong>${item.count}</strong>
+            </article>
+          `
+        )
+        .join("")}
+    </section>
+  `;
+}
+
 function renderTracks() {
+  renderTrackSummaryBoard();
   const body = document.querySelector("#track-table-body");
   body.innerHTML = state.tracks
     .map((track) => {
@@ -2614,6 +2679,7 @@ function renderTracks() {
     .map((track) => {
       const checklist = getTrackChecklist(track.number);
       const progress = getTrackChecklistProgress(track.number);
+      const stage = getTrackStageProgress(track.number);
       const event = findEvent(track.eventId);
       const notes = getTrackNotes(track.number);
       const status = getTrackStatus(track.number, track.eventId);
@@ -2630,11 +2696,28 @@ function renderTracks() {
             <div>
               <h3>${track.number}. ${track.title}</h3>
               <p>${event?.detail || "이번 곡의 데모 준비를 진행합니다."}</p>
+              <div class="focus-meta">
+                <span class="meta-pill">데모 마감 ${formatShortDate(track.due)}</span>
+                <span class="meta-pill">세션 ${stage.sessionCompleted}/${stage.sessionTotal}</span>
+                <span class="meta-pill">마감 ${stage.closingCompleted}/${stage.closingTotal}</span>
+                <span class="meta-pill">다음 단계 ${getTrackNextStep(track.number)}</span>
+              </div>
             </div>
             <div class="track-card-meta">
               <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
               <span class="card-chip">${progress.completed}/${progress.total} 체크</span>
             </div>
+          </div>
+          <div class="track-action-row">
+            <button class="opportunity-action is-primary" type="button" data-track-action="focus" data-track-event-id="${track.eventId}">
+              오늘 보드에 올리기
+            </button>
+            <button class="opportunity-action" type="button" data-track-action="complete" data-track-event-id="${track.eventId}">
+              ${state.completed.has(track.eventId) ? "완료 해제" : "데모 완료"}
+            </button>
+            <button class="opportunity-action is-secondary" type="button" data-track-action="hold" data-track-event-id="${track.eventId}">
+              보류
+            </button>
           </div>
           <div class="track-checklist" data-track-number="${track.number}">
             ${groupedSteps
@@ -2683,6 +2766,16 @@ function renderTracks() {
     });
   });
 
+  document.querySelectorAll("[data-track-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const eventId = button.dataset.trackEventId;
+      const action = button.dataset.trackAction;
+      if (action === "focus") acceptEventForThisWeek(eventId);
+      if (action === "hold") holdEvent(eventId);
+      if (action === "complete") toggleCompleted(eventId, !state.completed.has(eventId));
+    });
+  });
+
   document.querySelectorAll("[data-track-choice]").forEach((button) => {
     button.addEventListener("click", () => {
       toggleTrackNoteChoice(button.dataset.trackNumber, button.dataset.noteKey, button.dataset.trackChoice);
@@ -2717,6 +2810,36 @@ function openTaskDialog(event) {
   dialog.showModal();
 }
 
+function openOpportunityDialog(opportunity) {
+  if (!opportunity) return;
+  const dialog = document.querySelector("#task-dialog");
+  const phase = phaseMap.get("opportunity");
+  const review = getOpportunityReview(opportunity.id);
+  dialog.style.setProperty("--dialog-color", phase.color);
+  document.querySelector("#dialog-phase").textContent = "싱어송라이터 공모전";
+  document.querySelector("#dialog-title").textContent = opportunity.title;
+  document.querySelector("#dialog-date").textContent = formatOpportunityDateLabel(opportunity);
+  document.querySelector("#dialog-detail").textContent = opportunity.summary;
+
+  const meta = [
+    ["주최", opportunity.host],
+    ["상태", formatOpportunityStatus(opportunity.status)],
+    ["내 판단", formatOpportunityReview(review.status)],
+    ["적합도", opportunity.fitLabel],
+    ["준비", opportunity.preparation],
+    ["갱신", opportunity.lastCheckedAt ? formatSyncTimestamp(new Date(opportunity.lastCheckedAt)) : "최근 확인 기록 없음"],
+  ];
+  document.querySelector("#dialog-meta").innerHTML = meta
+    .map(([term, value]) => `<dt>${term}</dt><dd>${value}</dd>`)
+    .join("");
+
+  document.querySelector("#dialog-links").innerHTML = `
+    <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
+    <span class="summary-label">${opportunity.sourceNote || "출처 메모 없음"}</span>
+  `;
+  dialog.showModal();
+}
+
 function setActiveView(view) {
   state.activeView = view;
   document.querySelectorAll(".tab-button").forEach((button) => {
@@ -2736,8 +2859,8 @@ function jumpToCurrentWeek() {
   state.activePhase = "all";
   renderPhaseFilters();
   renderCalendar();
-  const currentWeek = document.querySelector(`[data-week-start="${toIso(startOfWeek(today))}"]`);
-  (currentWeek || document.querySelector(".week-row"))?.scrollIntoView({ behavior: "smooth", block: "start" });
+  const todayCell = document.querySelector(`[data-date="${toIso(today)}"]`);
+  (todayCell || document.querySelector(".month-section"))?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 function drawWaveform(progress) {
@@ -2786,9 +2909,9 @@ document.querySelector("#auth-signout").addEventListener("click", handleSignout)
 document.querySelector("#install-app").addEventListener("click", promptInstallApp);
 document.querySelector("#mobile-focus-toggle").addEventListener("click", toggleMobileCompactMode);
 document.querySelector("#mobile-utility-toggle").addEventListener("click", toggleMobileUtilityPanel);
-document.querySelector("#admin-opportunity-form").addEventListener("submit", saveAdminOpportunity);
-document.querySelector("#admin-reset").addEventListener("click", resetAdminOpportunityForm);
-document.querySelector("#admin-delete").addEventListener("click", deleteAdminOpportunity);
+document.querySelector("#admin-opportunity-form")?.addEventListener("submit", saveAdminOpportunity);
+document.querySelector("#admin-reset")?.addEventListener("click", resetAdminOpportunityForm);
+document.querySelector("#admin-delete")?.addEventListener("click", deleteAdminOpportunity);
 document.querySelectorAll("[data-mobile-jump]").forEach((button) => {
   button.addEventListener("click", () => {
     const target = button.dataset.mobileJump;

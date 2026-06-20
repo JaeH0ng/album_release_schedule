@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { cp, mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -45,6 +45,21 @@ async function copyTrackReadmes() {
   }
 }
 
+async function stampIndexHtml() {
+  const buildVersion = new Date().toISOString().replace(/[^\d]/g, "").slice(0, 14);
+  const indexPath = path.join(distDir, "index.html");
+  const source = await readFile(indexPath, "utf8");
+  const stamped = source
+    .replace('<html lang="ko">', `<html lang="ko" data-build-version="${buildVersion}">`)
+    .replace('href="assets/icon.svg"', `href="assets/icon.svg?v=${buildVersion}"`)
+    .replace('href="manifest.webmanifest"', `href="manifest.webmanifest?v=${buildVersion}"`)
+    .replace('href="assets/icon.svg"', `href="assets/icon.svg?v=${buildVersion}"`)
+    .replace('href="styles.css"', `href="styles.css?v=${buildVersion}"`)
+    .replace('src="app.js"', `src="app.js?v=${buildVersion}"`);
+
+  await writeFile(indexPath, stamped);
+}
+
 await rm(distDir, { recursive: true, force: true });
 await ensureDir(distDir);
 
@@ -56,5 +71,6 @@ await copyFile(path.join("assets", "icon.svg"));
 await copyDocsFolder();
 await copyLyricsFolder();
 await copyTrackReadmes();
+await stampIndexHtml();
 
 console.log(`Built static site to ${distDir}`);
