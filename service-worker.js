@@ -1,4 +1,4 @@
-const CACHE_NAME = "album-release-pwa-v2";
+const CACHE_NAME = "album-release-pwa-v3";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -7,6 +7,19 @@ const APP_SHELL = [
   "./manifest.webmanifest",
   "./assets/icon.svg",
 ];
+const NETWORK_FIRST_ASSETS = new Set([
+  `${self.location.origin}/album_release_schedule/`,
+  `${self.location.origin}/album_release_schedule/index.html`,
+  `${self.location.origin}/album_release_schedule/styles.css`,
+  `${self.location.origin}/album_release_schedule/app.js`,
+  `${self.location.origin}/album_release_schedule/manifest.webmanifest`,
+  `${self.location.origin}/album_release_schedule/service-worker.js`,
+]);
+
+function shouldUseNetworkFirst(request) {
+  const url = new URL(request.url);
+  return NETWORK_FIRST_ASSETS.has(url.href);
+}
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)));
@@ -25,15 +38,19 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   if (event.request.method !== "GET") return;
 
-  if (event.request.mode === "navigate") {
+  if (event.request.mode === "navigate" || shouldUseNetworkFirst(event.request)) {
     event.respondWith(
       fetch(event.request)
         .then((response) => {
           const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put("./index.html", copy));
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
           return response;
         })
-        .catch(() => caches.match("./index.html"))
+        .catch(async () => {
+          const cached = await caches.match(event.request);
+          if (cached) return cached;
+          return caches.match("./index.html");
+        })
     );
     return;
   }
