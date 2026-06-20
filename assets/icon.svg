@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="앨범 제작 캘린더 아이콘">
+  <rect width="256" height="256" rx="44" fill="#18251f"/>
+  <circle cx="128" cy="128" r="76" fill="none" stroke="#f4f7f5" stroke-width="10"/>
+  <circle cx="128" cy="128" r="34" fill="none" stroke="#f4f7f5" stroke-width="10"/>
+  <circle cx="128" cy="128" r="10" fill="#e9b850"/>
+  <path d="M58 186h140" stroke="#88c0ab" stroke-width="12" stroke-linecap="round"/>
+  <path d="M76 164v32M108 152v44M140 138v58M172 160v36" stroke="#88c0ab" stroke-width="10" stroke-linecap="round"/>
+</svg>

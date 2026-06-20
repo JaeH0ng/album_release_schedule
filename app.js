@@ -2,6 +2,23 @@ const STORAGE_KEY = "album-release-completed-tasks-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
+const BASELINE_DATE = "2026-06-18";
+const SUPABASE_URL = "https://udbtglztjkijxwzhfxgr.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_aOLCnLPzDgr-E3SjF5lbsg_oPJb2nCJ";
+const SUPABASE_REST_URL = `${SUPABASE_URL}/rest/v1`;
+const SUPABASE_HEADERS = {
+  apikey: SUPABASE_PUBLISHABLE_KEY,
+  Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
+  Accept: "application/json",
+};
+const PHASE_BOUNDARIES = [
+  { phase: "demo", eventId: "demo-buffer", field: "end" },
+  { phase: "structure", eventId: "structure-lock", field: "end" },
+  { phase: "arrangement", eventId: "arrangement-lock", field: "date" },
+  { phase: "recording", eventId: "recording-lock", field: "date" },
+  { phase: "post", eventId: "post-master", field: "end" },
+  { phase: "delivery", eventId: "delivery-submit", field: "date" },
+];
 
 const phases = [
   { id: "demo", label: "판단용 데모", color: "#2f7d69" },
@@ -13,13 +30,13 @@ const phases = [
   { id: "release", label: "발매", color: "#1f2522" },
 ];
 
-const tracks = [
+const defaultTracks = [
   {
     number: "01",
     title: "Psyche",
     due: "2026-06-25",
     eventId: "demo-psyche",
-    document: "tracks/01_psyche.md",
+    document: "tracks/01_psyche/README.md",
     lyrics: "lyrics/01_Psyche.txt",
   },
   {
@@ -27,7 +44,7 @@ const tracks = [
     title: "괜한 말",
     due: "2026-06-28",
     eventId: "demo-gwaenhan-mal",
-    document: "tracks/02_gwaenhan-mal.md",
+    document: "tracks/02_gwaenhan-mal/README.md",
     lyrics: "lyrics/02_괜한_말.txt",
   },
   {
@@ -35,7 +52,7 @@ const tracks = [
     title: "날 좀 봐줘요, 좀 봐줘요",
     due: "2026-07-01",
     eventId: "demo-look-at-me",
-    document: "tracks/03_look-at-me.md",
+    document: "tracks/03_look-at-me/README.md",
     lyrics: "lyrics/03_날_좀_봐줘요_좀_봐줘요.txt",
   },
   {
@@ -43,7 +60,7 @@ const tracks = [
     title: "누군가의",
     due: "2026-07-03",
     eventId: "demo-nugungaui",
-    document: "tracks/04_nugungaui.md",
+    document: "tracks/04_nugungaui/README.md",
     lyrics: "lyrics/04_누군가의.txt",
   },
   {
@@ -51,7 +68,7 @@ const tracks = [
     title: "대동제",
     due: "2026-07-05",
     eventId: "demo-daedongje",
-    document: "tracks/05_daedongje.md",
+    document: "tracks/05_daedongje/README.md",
     lyrics: "lyrics/05_대동제.txt",
   },
   {
@@ -59,7 +76,7 @@ const tracks = [
     title: "또다시",
     due: "2026-07-09",
     eventId: "demo-ttodasi",
-    document: "tracks/06_ttodasi.md",
+    document: "tracks/06_ttodasi/README.md",
     lyrics: "lyrics/06_또다시.txt",
   },
   {
@@ -67,7 +84,7 @@ const tracks = [
     title: "새벽 두 시",
     due: "2026-07-12",
     eventId: "demo-2am",
-    document: "tracks/07_2am.md",
+    document: "tracks/07_2am/README.md",
     lyrics: "lyrics/07_새벽_두_시.txt",
   },
   {
@@ -75,7 +92,7 @@ const tracks = [
     title: "소란스러운 밤",
     due: "2026-07-16",
     eventId: "demo-noisy-night",
-    document: "tracks/08_noisy-night.md",
+    document: "tracks/08_noisy-night/README.md",
     lyrics: "lyrics/08_소란스러운_밤.txt",
   },
   {
@@ -83,7 +100,7 @@ const tracks = [
     title: "스물 여덟",
     due: "2026-07-19",
     eventId: "demo-twenty-eight",
-    document: "tracks/09_twenty-eight.md",
+    document: "tracks/09_twenty-eight/README.md",
     lyrics: "lyrics/09_스물_여덟.txt",
   },
   {
@@ -91,7 +108,7 @@ const tracks = [
     title: "good night",
     due: "2026-06-21",
     eventId: "demo-good-night",
-    document: "tracks/10_good-night.md",
+    document: "tracks/10_good-night/README.md",
     lyrics: "lyrics/10_good_night.txt",
   },
 ];
@@ -99,7 +116,7 @@ const tracks = [
 const demoDetail =
   "처음부터 끝까지 이어지는 통기타+보컬 파일을 남긴다. 연주 실수보다 키, BPM과 구조를 판단할 수 있는지가 중요하다.";
 
-const events = [
+const defaultEvents = [
   {
     id: "demo-template",
     date: "2026-06-18",
@@ -109,7 +126,7 @@ const events = [
     duration: "60분",
     result: "입력 레벨, 파일명, 기본 트랙과 저장 경로 확정",
     detail: "첫 녹음 전에 반복해서 사용할 최소한의 세션 템플릿을 만든다. 소리 선택이나 플러그인 비교는 하지 않는다.",
-    document: "DEMO_PLAN.md",
+    document: "docs/DEMO_PLAN.md",
   },
   {
     id: "demo-good-night",
@@ -120,7 +137,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "good night",
-    document: "tracks/10_good-night.md",
+    document: "tracks/10_good-night/README.md",
     lyrics: "lyrics/10_good_night.txt",
     milestone: true,
   },
@@ -133,7 +150,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "Psyche",
-    document: "tracks/01_psyche.md",
+    document: "tracks/01_psyche/README.md",
     lyrics: "lyrics/01_Psyche.txt",
   },
   {
@@ -145,7 +162,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "괜한 말",
-    document: "tracks/02_gwaenhan-mal.md",
+    document: "tracks/02_gwaenhan-mal/README.md",
     lyrics: "lyrics/02_괜한_말.txt",
   },
   {
@@ -157,7 +174,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "날 좀 봐줘요, 좀 봐줘요",
-    document: "tracks/03_look-at-me.md",
+    document: "tracks/03_look-at-me/README.md",
     lyrics: "lyrics/03_날_좀_봐줘요_좀_봐줘요.txt",
   },
   {
@@ -169,7 +186,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "누군가의",
-    document: "tracks/04_nugungaui.md",
+    document: "tracks/04_nugungaui/README.md",
     lyrics: "lyrics/04_누군가의.txt",
   },
   {
@@ -181,7 +198,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "대동제",
-    document: "tracks/05_daedongje.md",
+    document: "tracks/05_daedongje/README.md",
     lyrics: "lyrics/05_대동제.txt",
   },
   {
@@ -193,7 +210,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "또다시",
-    document: "tracks/06_ttodasi.md",
+    document: "tracks/06_ttodasi/README.md",
     lyrics: "lyrics/06_또다시.txt",
   },
   {
@@ -205,7 +222,7 @@ const events = [
     result: "전체 1테이크와 대체 가사 판단 메모",
     detail: demoDetail,
     track: "새벽 두 시",
-    document: "tracks/07_2am.md",
+    document: "tracks/07_2am/README.md",
     lyrics: "lyrics/07_새벽_두_시.txt",
   },
   {
@@ -217,7 +234,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "소란스러운 밤",
-    document: "tracks/08_noisy-night.md",
+    document: "tracks/08_noisy-night/README.md",
     lyrics: "lyrics/08_소란스러운_밤.txt",
   },
   {
@@ -229,7 +246,7 @@ const events = [
     result: "전체 1테이크, 임시 키/BPM, 불편한 구간 메모",
     detail: demoDetail,
     track: "스물 여덟",
-    document: "tracks/09_twenty-eight.md",
+    document: "tracks/09_twenty-eight/README.md",
     lyrics: "lyrics/09_스물_여덟.txt",
     milestone: true,
   },
@@ -242,7 +259,7 @@ const events = [
     duration: "최대 2시간",
     result: "후보 10곡 모두 판단 가능한 파일 보유",
     detail: "누락 파일과 판단이 불가능한 테이크만 보충한다. 새 아이디어나 음색 탐색은 다음 단계로 넘긴다.",
-    document: "DEMO_PLAN.md",
+    document: "docs/DEMO_PLAN.md",
     milestone: true,
   },
   {
@@ -254,7 +271,7 @@ const events = [
     duration: "2회 × 90분",
     result: "각 곡의 키, 템포, 구조 문제 목록",
     detail: "녹음 직후의 감각이 아닌 앨범 전체 흐름으로 판단한다. 곡마다 바꿀 것 한 가지와 유지할 것 한 가지를 적는다.",
-    document: "DEMO_PLAN.md",
+    document: "docs/DEMO_PLAN.md",
   },
   {
     id: "structure-retest",
@@ -265,7 +282,7 @@ const events = [
     duration: "최대 4곡",
     result: "판단이 어려운 곡의 후보 키/BPM 비교 파일",
     detail: "모든 곡을 다시 녹음하지 않는다. 최고음, 최저음 또는 그루브가 불분명한 최대 네 곡만 짧게 비교한다.",
-    document: "DEMO_PLAN.md",
+    document: "docs/DEMO_PLAN.md",
   },
   {
     id: "structure-lock",
@@ -276,7 +293,7 @@ const events = [
     duration: "3시간",
     result: "최종 후보 8~9곡과 곡별 기본 정보 확정",
     detail: "편곡 테스트가 시작된 뒤 반복해서 되돌아가지 않도록 곡의 뼈대를 결정 기록에 남긴다.",
-    document: "DECISIONS.md",
+    document: "docs/DECISIONS.md",
     milestone: true,
   },
   {
@@ -288,7 +305,7 @@ const events = [
     duration: "2시간",
     result: "통기타·보컬의 공통 질감과 추가 악기 원칙",
     detail: "곡마다 별개의 세계를 만들기 전에 앨범 전체에 반복될 공간감, 악기 수와 보컬 거리감을 정한다.",
-    document: "ALBUM.md",
+    document: "docs/ALBUM.md",
   },
   {
     id: "arrangement-week-1",
@@ -299,7 +316,7 @@ const events = [
     duration: "3곡",
     result: "3곡의 편곡안 A/B와 선택 메모",
     detail: "중요도가 높은 곡 세 곡부터 추가 악기, 리듬과 공간감의 두 가지 안을 빠르게 비교한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "arrangement-week-2",
@@ -310,7 +327,7 @@ const events = [
     duration: "3곡",
     result: "다음 3곡의 편곡 방향 확정",
     detail: "첫 주에 정한 앨범 팔레트를 적용하되 곡별 역할이 겹치지 않는지 확인한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "arrangement-week-3",
@@ -321,7 +338,7 @@ const events = [
     duration: "남은 2~3곡",
     result: "전곡 편곡 방향과 본녹음 순서",
     detail: "남은 곡을 정리하고 본녹음에 필요한 악기, 연주자와 세션 순서를 확정한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "arrangement-lock",
@@ -331,7 +348,7 @@ const events = [
     duration: "마감",
     result: "본녹음에 들어갈 최종 편곡안",
     detail: "이후에는 연주의 완성도와 소리의 품질에 집중한다. 새로운 편곡 방향은 추가하지 않는다.",
-    document: "DECISIONS.md",
+    document: "docs/DECISIONS.md",
     milestone: true,
   },
   {
@@ -343,7 +360,7 @@ const events = [
     duration: "2곡",
     result: "최종 통기타·메인 보컬 2곡",
     detail: "편곡 확신이 가장 높은 두 곡부터 최종 통기타와 메인 보컬을 녹음한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "recording-batch-b",
@@ -354,7 +371,7 @@ const events = [
     duration: "2곡",
     result: "최종 통기타·메인 보컬 누적 4곡",
     detail: "메인 테이크를 우선 확정하고 더블링과 코러스는 별도 세션으로 분리한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "recording-batch-c",
@@ -365,7 +382,7 @@ const events = [
     duration: "2곡 + 크레딧 초안",
     result: "최종 녹음 누적 6곡, 참여자 크레딧 목록",
     detail: "두 곡을 녹음하면서 지금까지 참여한 연주자, 엔지니어와 사용 악기를 함께 기록한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "recording-batch-d",
@@ -376,7 +393,7 @@ const events = [
     duration: "남은 2~3곡",
     result: "전곡 최종 통기타·메인 보컬",
     detail: "남은 곡과 필수 코러스, 더블링을 마친다. 선택적 장식 파트는 우선순위를 낮춘다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "recording-lock",
@@ -386,7 +403,7 @@ const events = [
     duration: "마감",
     result: "전곡 최종 통기타·메인 보컬 확보",
     detail: "이 날짜 이후 본녹음은 누락과 명백한 문제를 해결하는 보충 녹음으로만 제한한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
     milestone: true,
   },
   {
@@ -398,7 +415,7 @@ const events = [
     duration: "1주",
     result: "베스트 테이크, 튠과 타이밍 정리",
     detail: "재녹음 목록을 먼저 닫고 컴핑, 호흡, 노이즈와 타이밍을 정리한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "post-recording-close",
@@ -409,7 +426,7 @@ const events = [
     duration: "3일",
     result: "정리된 세션, 트랙명, 믹스 전달 파일",
     detail: "사용하지 않는 트랙을 숨기고 파일명, 시작점, 샘플레이트와 레퍼런스 바운스를 확인한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
     milestone: true,
   },
   {
@@ -421,7 +438,7 @@ const events = [
     duration: "4일",
     result: "기준곡 1곡과 앨범 믹스 원칙",
     detail: "보컬의 전면감, 통기타 크기와 저역 기준을 한 곡에서 먼저 확정한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
   },
   {
     id: "post-mix-a",
@@ -432,7 +449,7 @@ const events = [
     duration: "4곡",
     result: "전반부 곡 1차 믹스",
     detail: "개별 곡의 화려함보다 기준곡과의 보컬·통기타 크기 일관성을 확인한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "post-mix-b",
@@ -443,7 +460,7 @@ const events = [
     duration: "남은 4~5곡",
     result: "전곡 1차 믹스와 연속 청취본",
     detail: "전곡을 순서대로 들으며 음량, 공간감과 곡 사이의 전환을 기록한다.",
-    document: "TRACK_STATUS.md",
+    document: "docs/TRACK_STATUS.md",
   },
   {
     id: "post-mix-revision-1",
@@ -454,7 +471,7 @@ const events = [
     duration: "1주",
     result: "수정 믹스와 확정 가사·크레딧",
     detail: "믹스 수정은 곡마다 핵심 세 가지 이내로 제한한다. 동시에 제출용 가사와 크레딧을 교정한다.",
-    document: "ALBUM.md",
+    document: "docs/ALBUM.md",
   },
   {
     id: "post-mix-final",
@@ -465,7 +482,7 @@ const events = [
     duration: "5일",
     result: "마스터링용 전곡 최종 믹스",
     detail: "음악적 아이디어 추가를 중단하고 클릭, 노이즈, 출력 형식과 곡 시작·끝을 검수한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
     milestone: true,
   },
   {
@@ -477,7 +494,7 @@ const events = [
     duration: "1주",
     result: "전곡 마스터와 최종 트랙 순서",
     detail: "다양한 재생 환경에서 확인하고 트랙 간 음량, 질감과 여백을 확정한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
     milestone: true,
   },
   {
@@ -489,7 +506,7 @@ const events = [
     duration: "3일",
     result: "마스터, 커버, 가사, 크레딧, 메타데이터",
     detail: "곡 제목 표기, 참여자 이름, 작사·작곡·편곡 정보와 파일명을 하나의 제출본으로 모은다.",
-    document: "ALBUM.md",
+    document: "docs/ALBUM.md",
   },
   {
     id: "delivery-qa",
@@ -500,7 +517,7 @@ const events = [
     duration: "3일",
     result: "오탈자와 파일 오류가 없는 최종 패키지",
     detail: "처음부터 다시 입력하지 말고 체크리스트에 따라 파일과 메타데이터를 대조한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
   },
   {
     id: "delivery-submit",
@@ -510,7 +527,7 @@ const events = [
     duration: "고정 마감",
     result: "앨범 발매 자료 제출 완료",
     detail: "12월 4일 발매를 위해 움직일 수 없는 최종 제출일이다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
     milestone: true,
   },
   {
@@ -522,7 +539,7 @@ const events = [
     duration: "1주",
     result: "플랫폼 정보 확인과 발매 공지 자료",
     detail: "유통사에서 전달되는 미리보기와 표기를 확인하고 발매 공지에 필요한 이미지와 문구를 확정한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
   },
   {
     id: "release-promo-week",
@@ -533,7 +550,7 @@ const events = [
     duration: "1주",
     result: "티저와 발매 안내 공개",
     detail: "준비된 콘텐츠를 일정대로 공개하고 음악 파일 자체는 다시 수정하지 않는다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
   },
   {
     id: "release-final-week",
@@ -544,7 +561,7 @@ const events = [
     duration: "4일",
     result: "링크, 소개문, 크레딧과 당일 게시물 준비",
     detail: "발매 당일 필요한 링크와 게시물을 준비하고 휴식 시간을 확보한다.",
-    document: "SCHEDULE.md",
+    document: "docs/SCHEDULE.md",
   },
   {
     id: "release-day",
@@ -554,7 +571,7 @@ const events = [
     duration: "발매일",
     result: "앨범 공개와 플랫폼 재생 확인",
     detail: "플랫폼별 앨범 표기와 재생 상태를 확인하고 발매 공지를 게시한다.",
-    document: "ALBUM.md",
+    document: "docs/ALBUM.md",
     milestone: true,
   },
 ];
@@ -608,12 +625,17 @@ const state = {
   activePhase: "all",
   activeView: "calendar",
   completed: loadCompletedTasks(),
+  events: sortEvents(defaultEvents),
+  tracks: sortTracks(defaultTracks),
+  eventMap: new Map(),
+  syncStatus: "idle",
+  syncDetail: "로컬 일정 사용 중",
 };
 
 const phaseMap = new Map(phases.map((phase) => [phase.id, phase]));
-const eventMap = new Map(events.map((event) => [event.id, event]));
 const today = new Date();
 today.setHours(12, 0, 0, 0);
+state.eventMap = new Map(state.events.map((event) => [event.id, event]));
 
 function parseDate(value) {
   return new Date(`${value}T12:00:00`);
@@ -650,6 +672,165 @@ function formatDateRange(event) {
   return `${formatShortDate(event.date)} - ${formatShortDate(event.end)}`;
 }
 
+function formatDotDate(value) {
+  const date = typeof value === "string" ? parseDate(value) : value;
+  return `${String(date.getMonth() + 1).padStart(2, "0")}.${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function formatSyncTimestamp(date) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function sortEvents(items) {
+  return [...items].sort((left, right) => parseDate(left.date) - parseDate(right.date));
+}
+
+function sortTracks(items) {
+  return [...items].sort((left, right) => left.number.localeCompare(right.number, "en"));
+}
+
+function setScheduleData({ events = state.events, tracks = state.tracks }) {
+  state.events = sortEvents(events);
+  state.tracks = sortTracks(tracks);
+  state.eventMap = new Map(state.events.map((event) => [event.id, event]));
+}
+
+function findEvent(eventId) {
+  return state.eventMap.get(eventId);
+}
+
+function getCalendarBounds() {
+  if (state.events.length === 0) {
+    return {
+      start: parseDate(CALENDAR_START),
+      end: parseDate(CALENDAR_END),
+    };
+  }
+
+  const first = parseDate(state.events[0].date);
+  const lastEvent = state.events.at(-1);
+  const last = parseDate(lastEvent.end || lastEvent.date);
+  return { start: first, end: last };
+}
+
+function updateChrome() {
+  const releaseEvent = findEvent("release-day");
+  const deliveryEvent = findEvent("delivery-submit");
+  const demoEvent = findEvent("demo-buffer");
+  const arrangementEvent = findEvent("arrangement-lock");
+  const recordingEvent = findEvent("recording-lock");
+  const mixEvent = findEvent("post-mix-final");
+
+  document.querySelector("#release-date-display").textContent = `${(releaseEvent?.date || RELEASE_DATE).replaceAll("-", ".")} 발매`;
+  document.querySelector("#delivery-date-display").textContent = formatDotDate(deliveryEvent?.date || "2026-11-13");
+  document.querySelector("#critical-demo").textContent = formatDotDate(demoEvent?.end || demoEvent?.date || "2026-07-21");
+  document.querySelector("#critical-arrangement").textContent = formatDotDate(arrangementEvent?.date || "2026-08-23");
+  document.querySelector("#critical-recording").textContent = formatDotDate(recordingEvent?.date || "2026-09-20");
+  document.querySelector("#critical-mix").textContent = formatDotDate(mixEvent?.end || mixEvent?.date || "2026-10-30");
+  document.querySelector("#critical-delivery").textContent = formatDotDate(deliveryEvent?.date || "2026-11-13");
+  document.querySelector("#footer-baseline").textContent = `일정 기준일 ${BASELINE_DATE.replaceAll("-", ".")}`;
+  document.querySelector("#footer-storage-note").textContent = SUPABASE_PUBLISHABLE_KEY
+    ? "체크 상태는 이 브라우저에 저장되고, 게시 일정은 Supabase에서 불러옴"
+    : "체크 상태는 이 브라우저에 저장됨";
+}
+
+function setSyncStatus(status, summary, detail) {
+  state.syncStatus = status;
+  state.syncDetail = detail;
+  document.querySelector("#sync-status-text").textContent = summary;
+  document.querySelector("#sync-status-detail").textContent = detail;
+  document.querySelector("#refresh-data").disabled = status === "loading";
+}
+
+function normalizeEventRow(row) {
+  return {
+    id: row.id,
+    date: row.date,
+    end: row.end || null,
+    title: row.title,
+    phase: row.phase,
+    duration: row.duration,
+    result: row.result,
+    detail: row.detail,
+    track: row.track || null,
+    document: row.document || null,
+    lyrics: row.lyrics || null,
+    milestone: Boolean(row.milestone),
+  };
+}
+
+function normalizeTrackRow(row) {
+  return {
+    number: String(row.number).padStart(2, "0"),
+    title: row.title,
+    due: row.due,
+    eventId: row.event_id,
+    document: row.document,
+    lyrics: row.lyrics,
+  };
+}
+
+async function fetchSupabaseTable(table, select, order) {
+  const url = new URL(`${SUPABASE_REST_URL}/${table}`);
+  url.searchParams.set("select", select);
+  if (order) url.searchParams.set("order", order);
+
+  const response = await fetch(url, {
+    headers: SUPABASE_HEADERS,
+  });
+
+  if (!response.ok) {
+    throw new Error(`${table} fetch failed: ${response.status}`);
+  }
+
+  return response.json();
+}
+
+async function refreshSupabaseData() {
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    setSyncStatus("idle", "로컬 일정 사용 중", "Supabase 설정이 비어 있음");
+    return;
+  }
+
+  setSyncStatus("loading", "Supabase 일정 확인 중", "게시된 변경 사항을 가져오는 중");
+
+  try {
+    const [eventRows, trackRows] = await Promise.all([
+      fetchSupabaseTable(
+        "album_events",
+        "id,date,end,title,phase,duration,result,detail,track,document,lyrics,milestone,sort_order",
+        "sort_order.asc.nullslast,date.asc"
+      ),
+      fetchSupabaseTable(
+        "album_tracks",
+        "number,title,due,event_id,document,lyrics,sort_order",
+        "sort_order.asc.nullslast,number.asc"
+      ),
+    ]);
+
+    if (eventRows.length > 0 || trackRows.length > 0) {
+      setScheduleData({
+        events: eventRows.length > 0 ? eventRows.map(normalizeEventRow) : defaultEvents,
+        tracks: trackRows.length > 0 ? trackRows.map(normalizeTrackRow) : defaultTracks,
+      });
+      updateChrome();
+      renderAll();
+      setSyncStatus("ready", "Supabase 게시 일정 사용 중", `${formatSyncTimestamp(new Date())} 동기화 완료`);
+      return;
+    }
+
+    setSyncStatus("idle", "로컬 일정 사용 중", "Supabase 테이블이 비어 있어 기본 일정을 표시");
+  } catch (error) {
+    console.error(error);
+    setSyncStatus("error", "로컬 일정 사용 중", "Supabase 연결 실패, 기본 일정으로 계속 표시");
+  }
+}
+
 function loadCompletedTasks() {
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
@@ -673,7 +854,10 @@ function renderPhaseFilters() {
 
   container.innerHTML = filters
     .map((phase) => {
-      const count = phase.id === "all" ? events.length : events.filter((event) => event.phase === phase.id).length;
+      const count =
+        phase.id === "all"
+          ? state.events.length
+          : state.events.filter((event) => event.phase === phase.id).length;
       const active = state.activePhase === phase.id;
       return `
         <button
@@ -702,12 +886,15 @@ function renderPhaseFilters() {
 
 function renderCalendar() {
   const weekList = document.querySelector("#week-list");
-  const firstWeek = startOfWeek(parseDate(CALENDAR_START));
-  const lastDate = parseDate(CALENDAR_END);
+  const bounds = getCalendarBounds();
+  const firstWeek = startOfWeek(bounds.start);
+  const lastDate = bounds.end;
   const todayIso = toIso(today);
   const todayWeekIso = toIso(startOfWeek(today));
   const filteredEvents =
-    state.activePhase === "all" ? events : events.filter((event) => event.phase === state.activePhase);
+    state.activePhase === "all"
+      ? state.events
+      : state.events.filter((event) => event.phase === state.activePhase);
   const weeks = [];
 
   let weekStart = firstWeek;
@@ -802,7 +989,7 @@ function bindEventControls() {
     const titleButton = element.querySelector(".event-title-button");
 
     checkbox.addEventListener("change", () => toggleCompleted(eventId, checkbox.checked));
-    titleButton.addEventListener("click", () => openTaskDialog(eventMap.get(eventId)));
+    titleButton.addEventListener("click", () => openTaskDialog(findEvent(eventId)));
   });
 }
 
@@ -817,8 +1004,8 @@ function toggleCompleted(eventId, complete) {
 }
 
 function renderSummary() {
-  const completedCount = events.filter((event) => state.completed.has(event.id)).length;
-  const progress = Math.round((completedCount / events.length) * 100);
+  const completedCount = state.events.filter((event) => state.completed.has(event.id)).length;
+  const progress = state.events.length ? Math.round((completedCount / state.events.length) * 100) : 0;
   const progressFill = document.querySelector("#progress-fill");
   const progressTrack = document.querySelector(".progress-track");
   document.querySelector("#progress-percent").textContent = `${progress}%`;
@@ -828,16 +1015,17 @@ function renderSummary() {
   const currentPhase = getCurrentPhase(today);
   document.querySelector("#current-phase").textContent = currentPhase.label;
 
-  const incomplete = events
+  const incomplete = state.events
     .filter((event) => !state.completed.has(event.id))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const overdue = incomplete.filter((event) => parseDate(event.date) < today);
-  const next = overdue[0] || incomplete.find((event) => parseDate(event.date) >= today) || events.at(-1);
+  const next =
+    overdue[0] || incomplete.find((event) => parseDate(event.date) >= today) || state.events.at(-1);
   document.querySelector("#next-deadline").textContent = next.title;
   document.querySelector("#next-deadline-date").textContent =
     parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
 
-  const release = parseDate(RELEASE_DATE);
+  const release = parseDate(findEvent("release-day")?.date || RELEASE_DATE);
   const distance = Math.ceil((release - today) / 86400000);
   document.querySelector("#countdown").textContent = distance >= 0 ? `D-${distance}` : `D+${Math.abs(distance)}`;
 
@@ -846,12 +1034,11 @@ function renderSummary() {
 
 function getCurrentPhase(date) {
   const iso = toIso(date);
-  if (iso <= "2026-07-21") return phaseMap.get("demo");
-  if (iso <= "2026-07-31") return phaseMap.get("structure");
-  if (iso <= "2026-08-23") return phaseMap.get("arrangement");
-  if (iso <= "2026-09-20") return phaseMap.get("recording");
-  if (iso <= "2026-11-06") return phaseMap.get("post");
-  if (iso <= "2026-11-13") return phaseMap.get("delivery");
+  for (const boundary of PHASE_BOUNDARIES) {
+    const event = findEvent(boundary.eventId);
+    const limit = event?.[boundary.field] || event?.end || event?.date;
+    if (limit && iso <= limit) return phaseMap.get(boundary.phase);
+  }
   return phaseMap.get("release");
 }
 
@@ -860,7 +1047,7 @@ function renderRoadmap() {
   container.innerHTML = roadmap
     .map((item) => {
       const phase = phaseMap.get(item.phase);
-      const phaseEvents = events.filter((event) => event.phase === item.phase);
+      const phaseEvents = state.events.filter((event) => event.phase === item.phase);
       const completed = phaseEvents.filter((event) => state.completed.has(event.id)).length;
       const progress = phaseEvents.length ? Math.round((completed / phaseEvents.length) * 100) : 0;
       return `
@@ -883,16 +1070,16 @@ function renderRoadmap() {
 
 function renderTracks() {
   const body = document.querySelector("#track-table-body");
-  body.innerHTML = tracks
+  body.innerHTML = state.tracks
     .map((track) => {
       const complete = state.completed.has(track.eventId);
       return `
         <tr>
-          <td class="track-number">${track.number}</td>
-          <td class="track-name">${track.title}</td>
-          <td>${formatShortDate(track.due)}</td>
-          <td><span class="status-pill${complete ? " is-complete" : ""}">${complete ? "완료" : "대기"}</span></td>
-          <td>
+          <td class="track-number" data-label="번호">${track.number}</td>
+          <td class="track-name" data-label="곡">${track.title}</td>
+          <td data-label="데모 마감">${formatShortDate(track.due)}</td>
+          <td data-label="상태"><span class="status-pill${complete ? " is-complete" : ""}">${complete ? "완료" : "대기"}</span></td>
+          <td data-label="문서">
             <div class="document-links">
               <a href="${track.document}" target="_blank">작업</a>
               <a href="${track.lyrics}" target="_blank">가사</a>
@@ -905,6 +1092,7 @@ function renderTracks() {
 }
 
 function openTaskDialog(event) {
+  if (!event) return;
   const dialog = document.querySelector("#task-dialog");
   const phase = phaseMap.get(event.phase);
   dialog.style.setProperty("--dialog-color", phase.color);
@@ -972,18 +1160,25 @@ function drawWaveform(progress) {
   });
 }
 
+function renderAll() {
+  updateChrome();
+  renderPhaseFilters();
+  renderCalendar();
+  renderRoadmap();
+  renderTracks();
+  renderSummary();
+}
+
 document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => setActiveView(button.dataset.view));
 });
 
 document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWeek);
+document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
 document.querySelector("#close-dialog").addEventListener("click", () => document.querySelector("#task-dialog").close());
 document.querySelector("#task-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
 
-renderPhaseFilters();
-renderCalendar();
-renderRoadmap();
-renderTracks();
-renderSummary();
+renderAll();
+refreshSupabaseData();

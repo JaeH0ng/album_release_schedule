@@ -1,5 +1,7 @@
 # Track 00 - 제목
 
+이 템플릿은 새 곡 폴더 안의 `README.md`로 복제해 사용한다.
+
 ## 기본 정보
 
 | 항목 | 내용 |
@@ -22,8 +24,18 @@
 
 ## 가사
 
-- 기준 가사: [가사 파일](../lyrics/00_제목.txt)
+- 기준 가사: [가사 파일](../../lyrics/00_제목.txt)
 - 수정이 필요한 부분:
+
+## 작업 폴더
+
+- Logic Pro 프로젝트: `logic/00_title.logicx`
+- 판단용 데모: `audio/demos/`
+- 편곡 테스트: `audio/arrangement-tests/`
+- 본녹음: `audio/final-recordings/`
+- 바운스: `exports/bounces/`
+- 스템: `exports/stems/`
+- 추가 메모: `notes/`
 
 ## 구조
 

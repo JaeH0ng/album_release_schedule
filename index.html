@@ -3,11 +3,16 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#18251f" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="앨범 캘린더" />
     <meta
       name="description"
       content="2026년 12월 정규 앨범 발매를 위한 주차별 제작 캘린더"
     />
     <title>앨범 제작 캘린더</title>
+    <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -32,7 +37,7 @@
 
       <div class="release-lockup">
         <span id="countdown" class="countdown">D-</span>
-        <span>2026.12.04 발매</span>
+        <span id="release-date-display">2026.12.04 발매</span>
       </div>
     </header>
 
@@ -64,7 +69,18 @@
       </div>
       <div class="summary-item delivery-date">
         <span class="summary-label">유통사 전달</span>
-        <strong>2026.11.13</strong>
+        <strong id="delivery-date-display">2026.11.13</strong>
+      </div>
+    </section>
+
+    <section class="sync-strip" aria-label="데이터 동기화 상태">
+      <div>
+        <p class="sync-label">게시 일정</p>
+        <strong id="sync-status-text">로컬 일정 사용 중</strong>
+      </div>
+      <div class="sync-actions">
+        <span id="sync-status-detail" class="sync-detail">Supabase 연동 전</span>
+        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
       </div>
     </section>
 
@@ -92,23 +108,23 @@
           <dl>
             <div>
               <dt>전곡 데모</dt>
-              <dd>07.21</dd>
+              <dd id="critical-demo">07.21</dd>
             </div>
             <div>
               <dt>편곡 확정</dt>
-              <dd>08.23</dd>
+              <dd id="critical-arrangement">08.23</dd>
             </div>
             <div>
               <dt>본녹음 마감</dt>
-              <dd>09.20</dd>
+              <dd id="critical-recording">09.20</dd>
             </div>
             <div>
               <dt>최종 믹스</dt>
-              <dd>10.30</dd>
+              <dd id="critical-mix">10.30</dd>
             </div>
             <div>
               <dt>유통사 전달</dt>
-              <dd>11.13</dd>
+              <dd id="critical-delivery">11.13</dd>
             </div>
           </dl>
         </div>
@@ -166,8 +182,8 @@
     </main>
 
     <footer>
-      <span>일정 기준일 2026.06.18</span>
-      <span>체크 상태는 이 브라우저에 저장됨</span>
+      <span id="footer-baseline">일정 기준일 2026.06.18</span>
+      <span id="footer-storage-note">체크 상태는 이 브라우저에 저장됨</span>
     </footer>
 
     <dialog id="task-dialog" class="task-dialog">
