@@ -5,6 +5,7 @@ const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
+const MOBILE_COMPACT_KEY = "album-release-mobile-compact-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -730,6 +731,7 @@ const state = {
   trackChecklist: loadTrackChecklistState(),
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
+  mobileCompact: loadMobileCompactState(),
   baseEvents: sortEvents(defaultEvents),
   events: [],
   tracks: sortTracks(defaultTracks),
@@ -1075,6 +1077,25 @@ function saveEventPlanState() {
   }
 }
 
+function loadMobileCompactState() {
+  try {
+    const stored = localStorage.getItem(MOBILE_COMPACT_KEY);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+  return typeof window !== "undefined" ? window.innerWidth <= 760 : false;
+}
+
+function saveMobileCompactState() {
+  try {
+    localStorage.setItem(MOBILE_COMPACT_KEY, String(state.mobileCompact));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
 function buildDefaultTrackChecklist() {
   return Object.fromEntries(
     defaultTracks.map((track) => [
@@ -1173,6 +1194,11 @@ function updateAppModeChrome() {
   const standalone =
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   document.body.classList.toggle("body-standalone", standalone);
+  document.body.classList.toggle("body-mobile-compact", window.innerWidth <= 760 && state.mobileCompact);
+  const toggle = document.querySelector("#mobile-focus-toggle");
+  if (toggle) {
+    toggle.textContent = state.mobileCompact ? "전체 보기" : "집중 보기";
+  }
 }
 
 function updateAdminChrome() {
@@ -1389,6 +1415,12 @@ async function promptInstallApp() {
   await deferredInstallPrompt.userChoice.catch(() => null);
   deferredInstallPrompt = null;
   updateAuthChrome();
+}
+
+function toggleMobileCompactMode() {
+  state.mobileCompact = !state.mobileCompact;
+  saveMobileCompactState();
+  renderAll();
 }
 
 function loadWeeklyCheckinState() {
@@ -2429,6 +2461,7 @@ document.querySelector("#copy-checkin-prompt").addEventListener("click", copyChe
 document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
 document.querySelector("#install-app").addEventListener("click", promptInstallApp);
+document.querySelector("#mobile-focus-toggle").addEventListener("click", toggleMobileCompactMode);
 document.querySelector("#admin-opportunity-form").addEventListener("submit", saveAdminOpportunity);
 document.querySelector("#admin-reset").addEventListener("click", resetAdminOpportunityForm);
 document.querySelector("#admin-delete").addEventListener("click", deleteAdminOpportunity);
@@ -2449,3 +2482,4 @@ initAuth();
 bindPwaInstall();
 registerServiceWorker();
 window.matchMedia("(display-mode: standalone)").addEventListener?.("change", updateAppModeChrome);
+window.addEventListener("resize", updateAppModeChrome);

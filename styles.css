@@ -634,6 +634,14 @@ input:focus-visible {
   grid-column: 1 / -1;
 }
 
+.mobile-focus-toggle {
+  display: none;
+}
+
+.body-mobile-compact .dashboard-secondary-card {
+  display: none;
+}
+
 .card-heading {
   display: flex;
   align-items: flex-start;
@@ -1655,6 +1663,19 @@ footer {
 
   .dashboard-card {
     padding: 16px;
+  }
+
+  .mobile-focus-toggle {
+    display: inline-flex;
+  }
+
+  .body-mobile-compact .dashboard-grid {
+    gap: 14px;
+  }
+
+  .body-mobile-compact .dashboard-card {
+    padding: 14px;
+    border-radius: 14px;
   }
 
   .app-home-copy strong {
