@@ -167,6 +167,10 @@ input:focus-visible {
   padding: 0 clamp(18px, 4vw, 54px);
 }
 
+.mobile-glance {
+  display: none;
+}
+
 .sync-strip {
   min-height: 62px;
   padding: 12px clamp(18px, 4vw, 54px);
@@ -1579,6 +1583,60 @@ footer {
 }
 
 @media (max-width: 760px) {
+  .mobile-glance {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+    padding: 10px 12px 0;
+  }
+
+  .mobile-glance-card,
+  .mobile-glance-actions {
+    padding: 13px 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--paper);
+    box-shadow: 0 2px 14px rgba(24, 33, 29, 0.04);
+  }
+
+  .mobile-glance-card {
+    display: grid;
+    gap: 4px;
+  }
+
+  .mobile-glance-label {
+    color: var(--muted);
+    font-size: 11px;
+    font-weight: 700;
+  }
+
+  .mobile-glance-card strong {
+    font-size: 15px;
+    line-height: 1.4;
+  }
+
+  .mobile-glance-meta {
+    color: var(--muted);
+    font-size: 11px;
+  }
+
+  .mobile-glance-actions {
+    grid-column: 1 / -1;
+    display: flex;
+    gap: 8px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .mobile-glance-actions .sync-button {
+    flex: 1 1 0;
+    min-height: 42px;
+    border-radius: 14px;
+    background: #f7faf8;
+  }
+
   .summary-band {
     display: none;
   }
@@ -1611,8 +1669,12 @@ footer {
   }
 
   .sync-strip {
+    display: none;
     min-height: auto;
-    padding: 10px 16px;
+    margin: 10px 12px 0;
+    padding: 12px 14px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
     align-items: flex-start;
     flex-direction: column;
     gap: 10px;
@@ -1679,6 +1741,10 @@ footer {
     gap: 14px;
   }
 
+  .phase-sidebar {
+    display: none;
+  }
+
   .dashboard-card {
     padding: 14px;
     border-radius: 16px;
@@ -1697,6 +1763,30 @@ footer {
   .body-mobile-compact .dashboard-card {
     padding: 13px;
     border-radius: 16px;
+  }
+
+  .body-mobile .dashboard-grid > :nth-child(1) {
+    order: 2;
+  }
+
+  .body-mobile .dashboard-grid > :nth-child(2) {
+    order: 3;
+  }
+
+  .body-mobile .dashboard-grid > :nth-child(3) {
+    order: 1;
+  }
+
+  .body-mobile .app-home-actions {
+    display: none;
+  }
+
+  .body-mobile .dashboard-card .section-kicker {
+    font-size: 10px;
+  }
+
+  .body-mobile-utility-open .sync-strip {
+    display: flex;
   }
 
   .app-home-copy strong {

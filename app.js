@@ -6,6 +6,7 @@ const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
 const MOBILE_COMPACT_KEY = "album-release-mobile-compact-v1";
+const MOBILE_UTILITY_KEY = "album-release-mobile-utility-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -732,6 +733,7 @@ const state = {
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
   mobileCompact: loadMobileCompactState(),
+  mobileUtilityOpen: loadMobileUtilityState(),
   baseEvents: sortEvents(defaultEvents),
   events: [],
   tracks: sortTracks(defaultTracks),
@@ -915,6 +917,10 @@ function setSyncStatus(status, summary, detail) {
   state.syncDetail = detail;
   document.querySelector("#sync-status-text").textContent = summary;
   document.querySelector("#sync-status-detail").textContent = detail;
+  const mobileAuthSummary = document.querySelector("#mobile-auth-summary");
+  if (mobileAuthSummary && !getAuthUser()) {
+    mobileAuthSummary.textContent = summary;
+  }
   document.querySelector("#refresh-data").disabled = status === "loading";
 }
 
@@ -1096,6 +1102,25 @@ function saveMobileCompactState() {
   }
 }
 
+function loadMobileUtilityState() {
+  try {
+    const stored = localStorage.getItem(MOBILE_UTILITY_KEY);
+    if (stored === "true") return true;
+    if (stored === "false") return false;
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+  return false;
+}
+
+function saveMobileUtilityState() {
+  try {
+    localStorage.setItem(MOBILE_UTILITY_KEY, String(state.mobileUtilityOpen));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
 function buildDefaultTrackChecklist() {
   return Object.fromEntries(
     defaultTracks.map((track) => [
@@ -1169,12 +1194,16 @@ function updateAuthChrome() {
   const authGoogle = document.querySelector("#auth-google");
   const authSignout = document.querySelector("#auth-signout");
   const installButton = document.querySelector("#install-app");
+  const mobileAuthSummary = document.querySelector("#mobile-auth-summary");
 
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
     authStatusDetail.textContent = state.isAdmin
       ? "공모전 판단 상태와 관리자 편집 권한이 활성화됨"
       : "공모전 판단 상태가 Supabase로 동기화됨";
+    if (mobileAuthSummary) {
+      mobileAuthSummary.textContent = state.isAdmin ? "관리자 모드 가능" : "Google 동기화 연결됨";
+    }
     authGoogle.hidden = true;
     authSignout.hidden = false;
     installButton.hidden = !deferredInstallPrompt;
@@ -1185,6 +1214,9 @@ function updateAuthChrome() {
   authStatusDetail.textContent = state.authReady
     ? "Google로 로그인하면 작업 상태와 관리자 권한을 이어서 사용합니다"
     : "Supabase 세션을 확인하는 중";
+  if (mobileAuthSummary) {
+    mobileAuthSummary.textContent = state.authReady ? "로그인 전" : "세션 확인 중";
+  }
   authGoogle.hidden = false;
   authSignout.hidden = true;
   installButton.hidden = !deferredInstallPrompt;
@@ -1196,11 +1228,17 @@ function updateAppModeChrome() {
   const mobile = window.innerWidth <= 760;
   document.body.classList.toggle("body-standalone", standalone);
   document.body.classList.toggle("body-mobile-compact", mobile && state.mobileCompact);
+  document.body.classList.toggle("body-mobile-utility-open", mobile && state.mobileUtilityOpen);
   document.body.classList.toggle("body-mobile", mobile);
   const toggle = document.querySelector("#mobile-focus-toggle");
+  const utilityToggle = document.querySelector("#mobile-utility-toggle");
   if (toggle) {
     toggle.hidden = !mobile;
     toggle.textContent = state.mobileCompact ? "전체 보기" : "집중 보기";
+  }
+  if (utilityToggle) {
+    utilityToggle.hidden = !mobile;
+    utilityToggle.textContent = state.mobileUtilityOpen ? "상태 접기" : "상태 펼치기";
   }
 }
 
@@ -1424,6 +1462,12 @@ function toggleMobileCompactMode() {
   state.mobileCompact = !state.mobileCompact;
   saveMobileCompactState();
   renderAll();
+}
+
+function toggleMobileUtilityPanel() {
+  state.mobileUtilityOpen = !state.mobileUtilityOpen;
+  saveMobileUtilityState();
+  updateAppModeChrome();
 }
 
 function loadWeeklyCheckinState() {
@@ -2256,6 +2300,12 @@ function renderSummary() {
   document.querySelector("#next-deadline").textContent = next.title;
   document.querySelector("#next-deadline-date").textContent =
     parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
+  document.querySelector("#mobile-next-deadline").textContent = next.title;
+  document.querySelector("#mobile-next-deadline-date").textContent =
+    parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
+  document.querySelector("#mobile-delivery-date").textContent = formatDotDate(
+    findEvent("delivery-submit")?.date || "2026-11-13"
+  );
 
   const release = parseDate(findEvent("release-day")?.date || RELEASE_DATE);
   const distance = Math.ceil((release - today) / 86400000);
@@ -2465,9 +2515,20 @@ document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
 document.querySelector("#install-app").addEventListener("click", promptInstallApp);
 document.querySelector("#mobile-focus-toggle").addEventListener("click", toggleMobileCompactMode);
+document.querySelector("#mobile-utility-toggle").addEventListener("click", toggleMobileUtilityPanel);
 document.querySelector("#admin-opportunity-form").addEventListener("submit", saveAdminOpportunity);
 document.querySelector("#admin-reset").addEventListener("click", resetAdminOpportunityForm);
 document.querySelector("#admin-delete").addEventListener("click", deleteAdminOpportunity);
+document.querySelectorAll("[data-mobile-jump]").forEach((button) => {
+  button.addEventListener("click", () => {
+    const target = button.dataset.mobileJump;
+    if (target === "calendar") {
+      jumpToCurrentWeek();
+      return;
+    }
+    setActiveView(target);
+  });
+});
 ["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
   document.querySelector(selector).addEventListener("input", () => {
     readWeeklyCheckinForm();
