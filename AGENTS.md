@@ -1,6 +1,7 @@
 # Codex Project Instructions
 
 - Start by reading `docs/PROJECT_CONTEXT.md`, `docs/SCHEDULE.md`, `docs/DEMO_PLAN.md`, and `docs/TRACK_STATUS.md`.
+- Then read `docs/HANDOFF_FOR_CODEX.md` for recent changes made via other agents (e.g. Claude), the deploy runbook, and open follow-ups.
 - Treat `C:\workSpace\album_release` as the canonical project location.
 - Keep album information in Markdown and use the cleaned files in `lyrics` as the canonical lyrics.
 - Do not silently correct or rewrite lyrics. Preserve the artist's wording unless explicitly asked to edit it.
