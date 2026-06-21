@@ -638,6 +638,19 @@ input:focus-visible {
   font-size: 12px;
 }
 
+.overview-card-wide {
+  grid-column: span 3;
+}
+
+.overview-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: var(--ink);
+  font-size: 12px;
+  display: grid;
+  gap: 4px;
+}
+
 .dashboard-card {
   padding: 20px;
   border: 1px solid var(--line);
