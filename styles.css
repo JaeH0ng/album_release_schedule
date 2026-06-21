@@ -1328,9 +1328,49 @@ input:focus-visible {
   margin-bottom: 12px;
 }
 
+.month-summary-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .month-header h3 {
   margin: 0;
   font-size: 20px;
+}
+
+.is-overlap-chip {
+  background: rgba(181, 132, 24, 0.12);
+  color: var(--structure);
+}
+
+.month-overlap-summary {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.overlap-summary-item {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid rgba(181, 132, 24, 0.24);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(181, 132, 24, 0.1), transparent 80%), #fffdf7;
+  color: var(--ink);
+  cursor: pointer;
+  text-align: left;
+}
+
+.overlap-summary-item strong {
+  font-size: 12px;
+}
+
+.overlap-summary-item span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .month-weekdays {
@@ -1378,6 +1418,11 @@ input:focus-visible {
   box-shadow: inset 0 3px 0 var(--demo);
 }
 
+.month-cell.is-overlap {
+  border-color: rgba(181, 132, 24, 0.28);
+  box-shadow: inset 0 3px 0 rgba(181, 132, 24, 0.65);
+}
+
 .month-cell.is-empty .day-events {
   min-height: 0;
 }
@@ -1413,6 +1458,18 @@ input:focus-visible {
   border-radius: 999px;
   background: #eef4f1;
   color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.day-overlap-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(181, 132, 24, 0.12);
+  color: var(--structure);
   font-size: 10px;
   font-weight: 700;
 }
