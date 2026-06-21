@@ -47,6 +47,7 @@ tracks/
 - [08 - 소란스러운 밤](08_noisy-night/README.md)
 - [09 - 스물 여덟](09_twenty-eight/README.md)
 - [10 - good night](10_good-night/README.md)
+- [11 - 부둣가](11_budutga/README.md)
 - [새 곡 템플릿](TRACK_TEMPLATE.md)
 
 현재 번호는 정리용 임시 번호다. 최종 곡 순서가 정해지면 폴더명, 문서 링크와 Logic Pro 프로젝트 이름을 함께 갱신한다.

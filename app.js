@@ -3,6 +3,8 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
 const TRACK_NOTES_KEY = "album-release-track-notes-v1";
+const TRACK_ACTIVITY_KEY = "album-release-track-activity-v1";
+const TRACK_FOLLOWUPS_KEY = "album-release-track-followups-v1";
 const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
@@ -44,12 +46,13 @@ const phases = [
 
 const defaultTrackSteps = [
   { id: "tune", group: "세션", label: "튜닝 + 현재 키 확인" },
-  { id: "key", group: "세션", label: "후렴·최고음으로 키 테스트" },
-  { id: "bpm", group: "세션", label: "메트로놈 BPM 후보 2개 비교" },
-  { id: "take", group: "세션", label: "멈추지 않은 전체 1테이크 확보" },
-  { id: "comfort", group: "세션", label: "바로 청취하며 불편한 구간 표시" },
+  { id: "key", group: "세션", label: "후렴·최고음으로 키 테스트", repeatable: true },
+  { id: "bpm", group: "세션", label: "메트로놈 BPM 후보 2개 비교", repeatable: true },
+  { id: "take", group: "세션", label: "멈추지 않은 전체 1테이크 확보", repeatable: true },
+  { id: "comfort", group: "세션", label: "바로 청취하며 불편한 구간 표시", repeatable: true },
   { id: "structure", group: "마감", label: "키·카포·BPM·구조 곡 문서에 기록" },
-  { id: "arrangement", group: "마감", label: "얹어볼 악기·질감 1개 메모" },
+  { id: "arrangement", group: "마감", label: "얹어볼 악기·질감 1개 메모", repeatable: true },
+  { id: "idea", group: "마감", label: "다음 편곡 아이디어 정리", repeatable: true },
   { id: "memo", group: "마감", label: "파일명 정리 + 곡 문서·세션 노트 연결" },
   { id: "next", group: "마감", label: "다음에 이어갈 것 1줄 기록" },
 ];
@@ -63,6 +66,12 @@ const defaultTrackNotes = {
   completedThisWeek: [],
   arrangementIdeas: [],
   nextUp: [],
+};
+
+const trackNoteLabels = {
+  completedThisWeek: "이번 주에 한 것",
+  arrangementIdeas: "얹어볼 악기 / 편곡 방향",
+  nextUp: "다음에 할 것",
 };
 
 const trackNoteOptions = {
@@ -151,6 +160,14 @@ const defaultTracks = [
     eventId: "demo-good-night",
     document: "tracks/10_good-night/README.md",
     lyrics: "lyrics/10_good_night.txt",
+  },
+  {
+    number: "11",
+    title: "부둣가",
+    due: "2026-07-20",
+    eventId: "demo-budutga",
+    document: "tracks/11_budutga/README.md",
+    lyrics: "lyrics/11_부둣가.txt",
   },
 ];
 
@@ -293,13 +310,24 @@ const defaultEvents = [
     milestone: true,
   },
   {
-    id: "demo-buffer",
+    id: "demo-budutga",
     date: "2026-07-20",
-    end: "2026-07-21",
+    title: "부둣가 데모",
+    phase: "demo",
+    duration: "60~90분",
+    result: demoResult,
+    detail: demoDetail,
+    track: "부둣가",
+    document: "tracks/11_budutga/README.md",
+    lyrics: "lyrics/11_부둣가.txt",
+  },
+  {
+    id: "demo-buffer",
+    date: "2026-07-21",
     title: "전곡 데모 보충 및 마감",
     phase: "demo",
     duration: "최대 2시간",
-    result: "후보 10곡 모두 판단 가능한 파일 보유",
+    result: "후보 11곡 모두 판단 가능한 파일 보유",
     detail: "누락 파일과 판단이 불가능한 테이크만 보충한다. 새 아이디어나 음색 탐색은 다음 단계로 넘긴다.",
     document: "docs/DEMO_PLAN.md",
     milestone: true,
@@ -308,7 +336,7 @@ const defaultEvents = [
     id: "structure-listen",
     date: "2026-07-22",
     end: "2026-07-24",
-    title: "10곡 연속 청취와 비교",
+    title: "11곡 연속 청취와 비교",
     phase: "structure",
     duration: "2회 × 90분",
     result: "각 곡의 키, 템포, 구조 문제 목록",
@@ -759,6 +787,8 @@ const state = {
   eventPlan: loadEventPlanState(),
   trackChecklist: loadTrackChecklistState(),
   trackNotes: loadTrackNotesState(),
+  trackActivity: loadTrackActivityState(),
+  trackFollowups: loadTrackFollowupsState(),
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
   mobileCompact: loadMobileCompactState(),
@@ -850,6 +880,15 @@ function formatSyncTimestamp(date) {
   }).format(date);
 }
 
+function formatTrackActivityTimestamp(value) {
+  return new Intl.DateTimeFormat("ko-KR", {
+    month: "numeric",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
 function sortEvents(items) {
   return [...items].sort((left, right) => parseDate(left.date) - parseDate(right.date));
 }
@@ -871,6 +910,14 @@ function sortOpportunities(items) {
   });
 }
 
+function findTrack(trackNumber) {
+  return state.tracks.find((track) => track.number === trackNumber);
+}
+
+function findTrackStep(stepId) {
+  return defaultTrackSteps.find((step) => step.id === stepId);
+}
+
 function setScheduleData({ events = state.events, tracks = state.tracks }) {
   state.baseEvents = sortEvents(events);
   state.tracks = sortTracks(tracks);
@@ -884,10 +931,38 @@ function setOpportunityData(opportunities = state.opportunities) {
 
 function rebuildEventState() {
   const acceptedEvents = buildAcceptedOpportunityEvents();
+  const trackFollowupEvents = buildTrackFollowupEvents();
   state.events = sortEvents(
-    [...state.baseEvents, ...acceptedEvents].map((event) => applyEventPlan(event))
+    [...state.baseEvents, ...acceptedEvents, ...trackFollowupEvents].map((event) => applyEventPlan(event))
   );
   state.eventMap = new Map(state.events.map((event) => [event.id, event]));
+}
+
+function buildTrackFollowupEvents() {
+  return state.trackFollowups
+    .map((followup) => {
+      const track = findTrack(followup.trackNumber);
+      const step = findTrackStep(followup.stepId);
+      if (!track || !step) return null;
+
+      return {
+        id: followup.id,
+        date: followup.date,
+        title: `${track.title} · ${step.label}`,
+        phase: "demo",
+        duration: "30분",
+        result: "반복 확인 메모 1개",
+        detail: `이전에 했던 "${step.label}" 작업을 다시 점검하고, 다음에 이어갈 판단을 남긴다.`,
+        track: track.title,
+        document: track.document,
+        lyrics: track.lyrics,
+        kind: "track-followup",
+        trackNumber: track.number,
+        stepId: step.id,
+        isFollowup: true,
+      };
+    })
+    .filter(Boolean);
 }
 
 function applyEventPlan(event) {
@@ -1159,7 +1234,20 @@ function saveMobileUtilityState() {
 }
 
 function buildDefaultTrackNotes() {
-  return Object.fromEntries(defaultTracks.map((track) => [track.number, { ...defaultTrackNotes }]));
+  return Object.fromEntries(
+    defaultTracks.map((track) => [
+      track.number,
+      {
+        completedThisWeek: [...defaultTrackNotes.completedThisWeek],
+        arrangementIdeas: [...defaultTrackNotes.arrangementIdeas],
+        nextUp: [...defaultTrackNotes.nextUp],
+      },
+    ])
+  );
+}
+
+function buildDefaultTrackActivity() {
+  return Object.fromEntries(defaultTracks.map((track) => [track.number, []]));
 }
 
 function buildDefaultTrackChecklist() {
@@ -1227,6 +1315,69 @@ function loadTrackNotesState() {
 function saveTrackNotesState() {
   try {
     localStorage.setItem(TRACK_NOTES_KEY, JSON.stringify(state.trackNotes));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+function loadTrackActivityState() {
+  const base = buildDefaultTrackActivity();
+  try {
+    const stored = JSON.parse(localStorage.getItem(TRACK_ACTIVITY_KEY) || "{}");
+    if (!stored || typeof stored !== "object") return base;
+
+    return Object.fromEntries(
+      Object.entries(base).map(([trackNumber, defaults]) => [
+        trackNumber,
+        Array.isArray(stored[trackNumber])
+          ? stored[trackNumber]
+              .filter(
+                (entry) =>
+                  entry &&
+                  typeof entry === "object" &&
+                  typeof entry.id === "string" &&
+                  typeof entry.text === "string" &&
+                  typeof entry.createdAt === "string"
+              )
+              .slice(0, 20)
+          : defaults,
+      ])
+    );
+  } catch {
+    return base;
+  }
+}
+
+function saveTrackActivityState() {
+  try {
+    localStorage.setItem(TRACK_ACTIVITY_KEY, JSON.stringify(state.trackActivity));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+function loadTrackFollowupsState() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(TRACK_FOLLOWUPS_KEY) || "[]");
+    if (!Array.isArray(stored)) return [];
+
+    return stored.filter(
+      (item) =>
+        item &&
+        typeof item === "object" &&
+        typeof item.id === "string" &&
+        typeof item.trackNumber === "string" &&
+        typeof item.stepId === "string" &&
+        typeof item.date === "string"
+    );
+  } catch {
+    return [];
+  }
+}
+
+function saveTrackFollowupsState() {
+  try {
+    localStorage.setItem(TRACK_FOLLOWUPS_KEY, JSON.stringify(state.trackFollowups));
   } catch {
     // Ignore storage errors for local previews.
   }
@@ -1536,6 +1687,27 @@ async function promptInstallApp() {
   updateAuthChrome();
 }
 
+async function refreshAppShell() {
+  setSyncStatus("loading", "페이지 새로고침 준비 중", "최신 일정과 화면을 다시 불러오는 중");
+
+  try {
+    await refreshSupabaseData();
+  } catch {
+    // refreshSupabaseData already falls back to local data and reports status.
+  }
+
+  if ("serviceWorker" in navigator) {
+    try {
+      const registration = await navigator.serviceWorker.getRegistration();
+      await registration?.update();
+    } catch {
+      // Ignore service worker update errors and still refresh the page.
+    }
+  }
+
+  window.location.reload();
+}
+
 function toggleMobileCompactMode() {
   state.mobileCompact = !state.mobileCompact;
   saveMobileCompactState();
@@ -1579,11 +1751,103 @@ function getTrackNotes(trackNumber) {
   return state.trackNotes[trackNumber] || { ...defaultTrackNotes };
 }
 
+function getTrackActivity(trackNumber) {
+  return state.trackActivity[trackNumber] || [];
+}
+
+function addTrackActivity(trackNumber, category, text) {
+  const entry = {
+    id: `track-activity-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    category,
+    text,
+    createdAt: new Date().toISOString(),
+  };
+  state.trackActivity[trackNumber] = [entry, ...getTrackActivity(trackNumber)].slice(0, 20);
+  saveTrackActivityState();
+}
+
+function getTrackFollowups(trackNumber) {
+  return state.trackFollowups
+    .filter((followup) => followup.trackNumber === trackNumber)
+    .sort((left, right) => parseDate(left.date) - parseDate(right.date));
+}
+
+function createTrackFollowup(trackNumber, stepId) {
+  const step = findTrackStep(stepId);
+  const track = findTrack(trackNumber);
+  if (!step || !track) return;
+
+  const date = toIso(addDays(today, 1));
+  const id = `track-followup-${trackNumber}-${stepId}-${Date.now()}`;
+  state.trackFollowups = [
+    ...state.trackFollowups,
+    {
+      id,
+      trackNumber,
+      stepId,
+      date,
+      createdAt: new Date().toISOString(),
+    },
+  ];
+  state.eventPlan[id] = {
+    ...getEventPlan(id),
+    focusStatus: "accepted",
+    overrideDate: null,
+  };
+  addTrackActivity(trackNumber, "일정 추가", `${step.label} 다시 일정에 추가 (${formatShortDate(date)})`);
+  saveTrackFollowupsState();
+  saveEventPlanState();
+  rebuildEventState();
+  renderAll();
+}
+
+function updateTrackFollowupDate(followupId, nextDate) {
+  const followup = state.trackFollowups.find((item) => item.id === followupId);
+  if (!followup || !nextDate || followup.date === nextDate) return;
+
+  followup.date = nextDate;
+  if (state.eventPlan[followupId]?.overrideDate) {
+    state.eventPlan[followupId] = {
+      ...state.eventPlan[followupId],
+      overrideDate: null,
+    };
+    saveEventPlanState();
+  }
+  const step = findTrackStep(followup.stepId);
+  addTrackActivity(followup.trackNumber, "일정 이동", `${step?.label || "반복 작업"} 날짜를 ${formatShortDate(nextDate)}로 변경`);
+  saveTrackFollowupsState();
+  rebuildEventState();
+  renderAll();
+}
+
+function removeTrackFollowup(followupId) {
+  const followup = state.trackFollowups.find((item) => item.id === followupId);
+  if (!followup) return;
+
+  const step = findTrackStep(followup.stepId);
+  state.trackFollowups = state.trackFollowups.filter((item) => item.id !== followupId);
+  delete state.eventPlan[followupId];
+  state.completed.delete(followupId);
+  state.completedMeta.delete(followupId);
+  addTrackActivity(followup.trackNumber, "일정 제거", `${step?.label || "반복 작업"} 다시 일정을 제거`);
+  saveTrackFollowupsState();
+  saveEventPlanState();
+  saveCompletedTasks();
+  rebuildEventState();
+  renderAll();
+}
+
 function toggleTrackNoteChoice(trackNumber, noteKey, choice) {
   const current = new Set(getTrackNotes(trackNumber)[noteKey] || []);
-  if (current.has(choice)) current.delete(choice);
+  const removing = current.has(choice);
+  if (removing) current.delete(choice);
   else current.add(choice);
   state.trackNotes[trackNumber][noteKey] = [...current];
+  addTrackActivity(
+    trackNumber,
+    removing ? "메모 해제" : "메모",
+    `${trackNoteLabels[noteKey] || "메모"}: ${choice}${removing ? " 제거" : ""}`
+  );
   saveTrackNotesState();
   renderTracks();
 }
@@ -1610,6 +1874,74 @@ function renderTrackChoiceGroup(trackNumber, noteKey, label, selectedChoices, wi
           )
           .join("")}
       </div>
+    </section>
+  `;
+}
+
+function renderTrackActivityList(trackNumber) {
+  const entries = getTrackActivity(trackNumber).slice(0, 6);
+  if (entries.length === 0) {
+    return '<p class="track-empty-copy">아직 기록된 작업이 없습니다. 체크하거나 메모를 누르면 여기에 쌓입니다.</p>';
+  }
+
+  return `
+    <ul class="track-activity-list">
+      ${entries
+        .map(
+          (entry) => `
+            <li class="track-activity-item">
+              <span class="track-activity-kind">${entry.category}</span>
+              <div>
+                <strong>${entry.text}</strong>
+                <span>${formatTrackActivityTimestamp(entry.createdAt)}</span>
+              </div>
+            </li>
+          `
+        )
+        .join("")}
+    </ul>
+  `;
+}
+
+function renderTrackFollowupSection(track) {
+  const followups = getTrackFollowups(track.number).filter((followup) => !state.completed.has(followup.id));
+
+  return `
+    <section class="track-log-card">
+      <div class="track-log-header">
+        <div>
+          <span class="track-log-eyebrow">REPEATABLE</span>
+          <h4>다시 잡아둘 작업</h4>
+        </div>
+        <span class="card-chip">${followups.length}개</span>
+      </div>
+      <p class="track-empty-copy">체크리스트 항목 옆 <code>다시 일정</code>으로 같은 작업을 다음 세션에 다시 올릴 수 있습니다.</p>
+      ${
+        followups.length > 0
+          ? `
+            <ul class="track-followup-list">
+              ${followups
+                .map((followup) => {
+                  const step = findTrackStep(followup.stepId);
+                  return `
+                    <li class="track-followup-item">
+                      <div>
+                        <strong>${step?.label || "반복 작업"}</strong>
+                        <span>다시 할 일정</span>
+                      </div>
+                      <div class="track-followup-controls">
+                        <input type="date" value="${followup.date}" data-track-followup-date="${followup.id}" />
+                        <button class="opportunity-action" type="button" data-track-followup-action="complete" data-track-followup-id="${followup.id}">완료</button>
+                        <button class="opportunity-action is-danger" type="button" data-track-followup-action="remove" data-track-followup-id="${followup.id}">삭제</button>
+                      </div>
+                    </li>
+                  `;
+                })
+                .join("")}
+            </ul>
+          `
+          : '<p class="track-empty-copy">반복으로 다시 잡아둘 작업이 아직 없습니다.</p>'
+      }
     </section>
   `;
 }
@@ -1781,7 +2113,7 @@ function pullEventIntoThisWeek(eventId) {
 }
 
 function getAlbumPlanningEvents() {
-  return state.events.filter((event) => event.kind !== "opportunity");
+  return state.events.filter((event) => event.kind !== "opportunity" && event.kind !== "track-followup");
 }
 
 function isEventInCurrentWeek(event) {
@@ -2515,12 +2847,20 @@ function bindEventControls() {
 }
 
 function toggleCompleted(eventId, complete) {
+  const event = findEvent(eventId);
   if (complete) {
     state.completed.add(eventId);
     state.completedMeta.set(eventId, { completedAt: new Date().toISOString() });
   } else {
     state.completed.delete(eventId);
     state.completedMeta.delete(eventId);
+  }
+  if (event?.kind === "track-followup" && event.trackNumber) {
+    addTrackActivity(
+      event.trackNumber,
+      complete ? "반복 완료" : "반복 재개",
+      `${event.title}${complete ? " 완료" : " 완료 해제"}`
+    );
   }
   saveCompletedTasks();
   renderDashboard();
@@ -2728,10 +3068,17 @@ function renderTracks() {
                     ${group.steps
                       .map(
                         (step) => `
-                          <label>
-                            <input type="checkbox" data-step-id="${step.id}" ${checklist[step.id] ? "checked" : ""} />
-                            <span>${step.label}</span>
-                          </label>
+                          <div class="track-step-row">
+                            <label>
+                              <input type="checkbox" data-step-id="${step.id}" ${checklist[step.id] ? "checked" : ""} />
+                              <span>${step.label}</span>
+                            </label>
+                            ${
+                              step.repeatable
+                                ? `<button class="track-repeat-inline" type="button" data-track-repeat-add="${step.id}" data-track-number="${track.number}">다시 일정</button>`
+                                : ""
+                            }
+                          </div>
                         `
                       )
                       .join("")}
@@ -2744,6 +3091,18 @@ function renderTracks() {
             ${renderTrackChoiceGroup(track.number, "completedThisWeek", "이번 주에 한 것", notes.completedThisWeek)}
             ${renderTrackChoiceGroup(track.number, "arrangementIdeas", "얹어볼 악기 / 편곡 방향", notes.arrangementIdeas)}
             ${renderTrackChoiceGroup(track.number, "nextUp", "다음에 할 것", notes.nextUp, true)}
+          </div>
+          <div class="track-log-grid">
+            <section class="track-log-card">
+              <div class="track-log-header">
+                <div>
+                  <span class="track-log-eyebrow">RECENT WORK</span>
+                  <h4>최근 작업</h4>
+                </div>
+              </div>
+              ${renderTrackActivityList(track.number)}
+            </section>
+            ${renderTrackFollowupSection(track)}
           </div>
           <div class="track-links">
             <a href="${track.document}" target="_blank">곡 문서 열기</a>
@@ -2759,6 +3118,12 @@ function renderTracks() {
     container.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
         state.trackChecklist[trackNumber][input.dataset.stepId] = input.checked;
+        const step = findTrackStep(input.dataset.stepId);
+        addTrackActivity(
+          trackNumber,
+          input.checked ? "체크" : "체크 해제",
+          `${step?.label || "작업"}${input.checked ? " 완료" : " 체크 해제"}`
+        );
         saveTrackChecklistState();
         renderTracks();
         renderDashboard();
@@ -2780,6 +3145,27 @@ function renderTracks() {
     button.addEventListener("click", () => {
       toggleTrackNoteChoice(button.dataset.trackNumber, button.dataset.noteKey, button.dataset.trackChoice);
       renderDashboard();
+    });
+  });
+
+  document.querySelectorAll("[data-track-repeat-add]").forEach((button) => {
+    button.addEventListener("click", () => {
+      createTrackFollowup(button.dataset.trackNumber, button.dataset.trackRepeatAdd);
+    });
+  });
+
+  document.querySelectorAll("[data-track-followup-date]").forEach((input) => {
+    input.addEventListener("change", () => {
+      updateTrackFollowupDate(input.dataset.trackFollowupDate, input.value);
+    });
+  });
+
+  document.querySelectorAll("[data-track-followup-action]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const followupId = button.dataset.trackFollowupId;
+      const action = button.dataset.trackFollowupAction;
+      if (action === "complete") toggleCompleted(followupId, true);
+      if (action === "remove") removeTrackFollowup(followupId);
     });
   });
 }
@@ -2902,6 +3288,14 @@ document.querySelectorAll(".tab-button").forEach((button) => {
 
 document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWeek);
 document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
+document.querySelectorAll("[data-app-refresh]").forEach((element) => {
+  element.addEventListener("click", refreshAppShell);
+  element.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    refreshAppShell();
+  });
+});
 document.querySelector("#save-checkin")?.addEventListener("click", saveWeeklyCheckin);
 document.querySelector("#copy-checkin-prompt")?.addEventListener("click", copyCheckinPrompt);
 document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit);
