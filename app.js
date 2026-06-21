@@ -2817,6 +2817,7 @@ function renderCalendar() {
       const eventEnd = parseDate(event.end || event.date);
       return eventStart <= monthEnd && eventEnd >= monthStart;
     });
+    const overlapEntries = [];
     const cells = [];
 
     for (let blank = 0; blank < firstDayIndex; blank += 1) {
@@ -2831,6 +2832,15 @@ function renderCalendar() {
       if (date.getDay() === 0 || date.getDay() === 6) classes.push("is-weekend");
       if (iso === todayIso) classes.push("is-today");
       if (dayEvents.length === 0) classes.push("is-empty");
+      if (dayEvents.length > 1) {
+        classes.push("is-overlap");
+        overlapEntries.push({
+          iso,
+          day,
+          count: dayEvents.length,
+          titles: dayEvents.map((event) => event.title),
+        });
+      }
 
       cells.push(`
         <article class="${classes.join(" ")}" data-date="${iso}">
@@ -2838,6 +2848,7 @@ function renderCalendar() {
             <div class="day-heading-main">
               <span class="day-number">${day}</span>
               ${iso === todayIso ? '<span class="day-today-chip">오늘</span>' : ""}
+              ${dayEvents.length > 1 ? '<span class="day-overlap-chip">겹침</span>' : ""}
             </div>
             ${dayEvents.length ? `<span class="day-count">${dayEvents.length}개</span>` : ""}
           </div>
@@ -2855,8 +2866,33 @@ function renderCalendar() {
             <p class="section-kicker">MONTH VIEW</p>
             <h3>${monthStart.getFullYear()}년 ${monthStart.getMonth() + 1}월</h3>
           </div>
-          <span class="card-chip">${monthEvents.length}개 일정</span>
+          <div class="month-summary-chips">
+            <span class="card-chip">${monthEvents.length}개 일정</span>
+            ${
+              overlapEntries.length
+                ? `<span class="card-chip is-overlap-chip">겹치는 날짜 ${overlapEntries.length}일</span>`
+                : ""
+            }
+          </div>
         </header>
+        ${
+          overlapEntries.length
+            ? `
+              <div class="month-overlap-summary">
+                ${overlapEntries
+                  .map(
+                    (entry) => `
+                      <button class="overlap-summary-item" type="button" data-jump-date="${entry.iso}">
+                        <strong>${entry.day}일 · ${entry.count}개</strong>
+                        <span>${entry.titles.join(" · ")}</span>
+                      </button>
+                    `
+                  )
+                  .join("")}
+              </div>
+            `
+            : ""
+        }
         <div class="month-weekdays">
           ${dayNames.map((dayName) => `<span>${dayName}</span>`).join("")}
         </div>
@@ -2870,6 +2906,16 @@ function renderCalendar() {
     : '<div class="empty-week">선택한 단계의 일정이 없습니다.</div>';
 
   bindEventControls();
+  bindCalendarOverlapJumps();
+}
+
+function bindCalendarOverlapJumps() {
+  document.querySelectorAll("[data-jump-date]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const cell = document.querySelector(`[data-date="${button.dataset.jumpDate}"]`);
+      cell?.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+  });
 }
 
 function renderEvent(event, iso = event.date) {
