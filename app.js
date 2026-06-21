@@ -253,9 +253,10 @@ const defaultEvents = [
     date: "2026-07-05",
     title: "대동제 데모",
     phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
+    duration: "60~90분",
+    result: "리듬 강세 정리, 보컬/기타 재녹음, 후반 일렉 솔로 테스트 메모",
+    detail:
+      "드럼과 베이스의 박자, 강세를 먼저 정리하고 보컬과 기타를 다시 녹음한다. 데모 후반에는 뒷부분 일렉 솔로가 어울리는지도 가볍게 시험한다.",
     track: "대동제",
     document: "tracks/05_daedongje/README.md",
     lyrics: "lyrics/05_대동제.txt",
@@ -367,20 +368,44 @@ const defaultEvents = [
     milestone: true,
   },
   {
-    id: "arrangement-palette",
+    id: "post-demo-direction",
+    date: "2026-07-29",
+    end: "2026-08-01",
+    title: "데모 이후 방향 논의",
+    phase: "structure",
+    duration: "2회 × 60분",
+    result: "최종 후보, 곡별 편곡 출발점, 모니터 스피커 준비 계획",
+    detail:
+      "데모에서 간단한 편곡까지 한번 얹어본 상태를 기준으로, 어떤 곡을 밀고 어떤 곡을 줄일지 정리한다. 이때 편곡 시작 전 필요한 모니터 스피커 구매와 배치 일정도 함께 잠근다.",
+    document: "docs/POST_DEMO_DIRECTION.md",
+  },
+  {
+    id: "arrangement-monitoring",
     date: "2026-08-01",
-    end: "2026-08-02",
+    end: "2026-08-03",
+    title: "모니터 스피커 구매·배치",
+    phase: "arrangement",
+    duration: "최대 3일",
+    result: "편곡 판단용 모니터링 환경 준비",
+    detail:
+      "데모 단계와 달리 편곡 판단은 스피커 기준으로 진행한다. 구매, 배치, 기준 청취까지 끝내고 나서 곡별 편곡 실험에 들어간다.",
+    document: "docs/POST_DEMO_DIRECTION.md",
+  },
+  {
+    id: "arrangement-palette",
+    date: "2026-08-03",
+    end: "2026-08-04",
     title: "앨범 사운드 팔레트 설정",
     phase: "arrangement",
     duration: "2시간",
     result: "통기타·보컬의 공통 질감과 추가 악기 원칙",
-    detail: "곡마다 별개의 세계를 만들기 전에 앨범 전체에 반복될 공간감, 악기 수와 보컬 거리감을 정한다.",
+    detail: "모니터 스피커 셋업 이후, 곡마다 별개의 세계를 만들기 전에 앨범 전체에 반복될 공간감, 악기 수와 보컬 거리감을 정한다.",
     document: "docs/ALBUM.md",
   },
   {
     id: "arrangement-week-1",
-    date: "2026-08-03",
-    end: "2026-08-09",
+    date: "2026-08-05",
+    end: "2026-08-10",
     title: "편곡 테스트 1주차",
     phase: "arrangement",
     duration: "3곡",
@@ -390,7 +415,7 @@ const defaultEvents = [
   },
   {
     id: "arrangement-week-2",
-    date: "2026-08-10",
+    date: "2026-08-11",
     end: "2026-08-16",
     title: "편곡 테스트 2주차",
     phase: "arrangement",
@@ -650,20 +675,20 @@ const roadmap = [
   {
     phase: "demo",
     dates: "06.18 - 07.21",
-    title: "후보 10곡의 판단용 데모",
+    title: "후보 11곡의 판단용 데모",
     detail: "주당 2~3곡, 곡당 60~90분. 완성도보다 키·BPM·구조 판단을 우선한다.",
   },
   {
     phase: "structure",
-    dates: "07.22 - 07.31",
-    title: "키·BPM·구조와 최종 후보 확정",
-    detail: "전곡을 비교하고 필요한 최대 네 곡만 재테스트한다.",
+    dates: "07.22 - 08.01",
+    title: "키·BPM·구조와 데모 이후 방향 정리",
+    detail: "전곡을 비교하고 필요한 최대 네 곡만 재테스트한 뒤, 최종 후보와 편곡 출발점, 모니터 스피커 준비 계획을 정한다.",
   },
   {
     phase: "arrangement",
     dates: "08.01 - 08.23",
-    title: "앨범 팔레트와 곡별 편곡 방향",
-    detail: "세 묶음으로 편곡안을 비교하고 본녹음에 사용할 방향을 잠근다.",
+    title: "모니터링 환경 준비와 곡별 편곡 방향",
+    detail: "초반에 모니터 스피커를 준비하고, 세 묶음으로 편곡안을 비교해 본녹음에 사용할 방향을 잠근다.",
   },
   {
     phase: "recording",
@@ -720,6 +745,18 @@ const weeklyFocus = {
     "오늘 확보 가능한 시간과 곡 이름을 보내면 세션 계획을 다시 짜달라고 하기",
     "녹음 후 결과와 파일 경로를 보내고 다음 행동 한 가지만 정리해달라고 하기",
   ],
+};
+
+const dashboardDemoMonitor = {
+  activeTrackNumbers: ["02", "04", "05", "10"],
+  spotlight: {
+    trackNumber: "05",
+    bullets: [
+      "드럼/베이스 박자와 강세 정리",
+      "보컬, 기타 다시 녹음",
+      "뒷부분 일렉 솔로 넣어보기",
+    ],
+  },
 };
 
 const defaultOpportunities = [
@@ -2198,6 +2235,21 @@ function getRecentCompletedEvents() {
     .filter(Boolean);
 }
 
+function getDashboardActiveDemoTracks() {
+  return dashboardDemoMonitor.activeTrackNumbers
+    .map((trackNumber) => findTrack(trackNumber))
+    .filter(Boolean);
+}
+
+function getDashboardDemoSpotlight() {
+  const track = findTrack(dashboardDemoMonitor.spotlight.trackNumber);
+  if (!track) return null;
+  return {
+    track,
+    bullets: dashboardDemoMonitor.spotlight.bullets,
+  };
+}
+
 function populateWeeklyCheckinForm() {
   if (!document.querySelector("#checkin-available")) return;
   document.querySelector("#checkin-available").value = state.weeklyCheckin.available;
@@ -2294,6 +2346,8 @@ function renderDashboard() {
   const heldEvents = getHeldEvents();
   const dismissedEvents = getDismissedEvents();
   const urgencyEvents = getPullForwardCandidates();
+  const activeDemoTracks = getDashboardActiveDemoTracks();
+  const demoSpotlight = getDashboardDemoSpotlight();
   const user = getAuthUser();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
   document.querySelector("#app-home-panel").innerHTML = `
@@ -2342,13 +2396,34 @@ function renderDashboard() {
       label: "이번 주 안 함",
       detail: dismissedEvents[0] ? dismissedEvents[0].title : "제외 항목 없음",
     },
+    {
+      value: activeDemoTracks.length,
+      label: "데모 작업 중",
+      detail:
+        activeDemoTracks.length > 0
+          ? activeDemoTracks.map((track) => track.title).join(", ")
+          : "아직 표시된 진행 곡 없음",
+      wide: true,
+    },
+    {
+      value: demoSpotlight ? demoSpotlight.track.title : "-",
+      label: "이번 확인 포인트",
+      detail: demoSpotlight ? demoSpotlight.bullets[0] : "설정된 포인트 없음",
+      detailList: demoSpotlight?.bullets || [],
+      wide: true,
+    },
   ]
     .map(
       (item) => `
-        <article class="overview-card">
+        <article class="overview-card${item.wide ? " overview-card-wide" : ""}">
           <strong>${item.value}</strong>
           <p>${item.label}</p>
           <p>${item.detail}</p>
+          ${
+            item.detailList?.length
+              ? `<ul class="overview-list">${item.detailList.map((detail) => `<li>${detail}</li>`).join("")}</ul>`
+              : ""
+          }
         </article>
       `
     )
