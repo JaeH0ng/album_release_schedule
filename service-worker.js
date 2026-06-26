@@ -1,4 +1,5 @@
-const CACHE_NAME = "album-release-pwa-v4";
+const BUILD_VERSION = "__BUILD_VERSION__";
+const CACHE_NAME = `album-release-pwa-${BUILD_VERSION}`;
 const APP_SHELL = [
   "./index.html",
   "./manifest.webmanifest",

@@ -58,6 +58,14 @@ async function stampIndexHtml() {
     .replace('src="app.js"', `src="app.js?v=${buildVersion}"`);
 
   await writeFile(indexPath, stamped);
+  await stampServiceWorker(buildVersion);
+}
+
+async function stampServiceWorker(buildVersion) {
+  const workerPath = path.join(distDir, "service-worker.js");
+  const source = await readFile(workerPath, "utf8");
+  const stamped = source.replace("__BUILD_VERSION__", buildVersion);
+  await writeFile(workerPath, stamped);
 }
 
 await rm(distDir, { recursive: true, force: true });
