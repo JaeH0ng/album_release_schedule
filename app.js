@@ -2937,6 +2937,53 @@ function eventOccursOnDate(event, iso) {
   return target >= start && target <= end;
 }
 
+function getDemoCalendarSlot(event) {
+  if (event.phase !== "demo" || !event.track) return null;
+  if (event.id.includes("arrangement-sketch")) {
+    return {
+      type: "review",
+      badge: "리뷰",
+      title: event.track,
+      summaryTitle: `${event.track} 리뷰`,
+      helper: "데모 리뷰 + 악기 아이디어 정리",
+      className: "is-demo-review",
+    };
+  }
+  if (event.id.startsWith("demo-")) {
+    return {
+      type: "recording",
+      badge: "녹음",
+      title: event.track,
+      summaryTitle: `${event.track} 녹음`,
+      helper: "기타+보컬 녹음",
+      className: "is-demo-recording",
+    };
+  }
+  return null;
+}
+
+function getCalendarEventPresentation(event) {
+  const demoSlot = getDemoCalendarSlot(event);
+  if (demoSlot) {
+    return {
+      ...demoSlot,
+      meta: event.duration,
+      submeta: `${formatDayLabel(event.date)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}`,
+    };
+  }
+
+  return {
+    type: null,
+    badge: null,
+    title: event.title,
+    summaryTitle: event.title,
+    helper: null,
+    className: "",
+    meta: event.end ? formatDateRange(event) : event.duration,
+    submeta: `${formatDayLabel(event.date)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}`,
+  };
+}
+
 function renderCalendar() {
   const monthList = document.querySelector("#month-list");
   const bounds = getCalendarBounds();
@@ -2981,7 +3028,7 @@ function renderCalendar() {
           iso,
           day,
           count: dayEvents.length,
-          titles: dayEvents.map((event) => event.title),
+          titles: dayEvents.map((event) => getCalendarEventPresentation(event).summaryTitle),
         });
       }
 
@@ -3065,8 +3112,10 @@ function renderEvent(event, iso = event.date) {
   const phase = phaseMap.get(event.phase);
   const complete = state.completed.has(event.id);
   const classes = ["calendar-event"];
+  const presentation = getCalendarEventPresentation(event);
   if (event.milestone) classes.push("is-milestone");
   if (complete) classes.push("is-complete");
+  if (presentation.className) classes.push(presentation.className);
   const plan = getEventPlan(event.id);
   const phaseLabel = phase?.label || "일정";
   const focusBadge =
@@ -3082,6 +3131,7 @@ function renderEvent(event, iso = event.date) {
     <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${event.id}">
       <div class="event-badges">
         <span class="event-badge">${phaseLabel}</span>
+        ${presentation.badge ? `<span class="event-badge is-slot">${presentation.badge}</span>` : ""}
         ${focusBadge}
       </div>
       <div class="event-topline">
@@ -3091,9 +3141,10 @@ function renderEvent(event, iso = event.date) {
           aria-label="${event.title} 완료"
           ${complete ? "checked" : ""}
         />
-        <button class="event-title-button" type="button">${event.title}</button>
+        <button class="event-title-button" type="button">${presentation.title}</button>
       </div>
-      <p class="event-meta">${event.end ? formatDateRange(event) : event.duration}</p>
+      ${presentation.helper ? `<p class="event-helper">${presentation.helper}</p>` : ""}
+      <p class="event-meta">${presentation.meta}</p>
       <p class="event-submeta">${formatDayLabel(iso)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
     </div>
   `;
