@@ -1495,6 +1495,20 @@ input:focus-visible {
   color: var(--ink);
 }
 
+.calendar-event.is-demo-recording {
+  background:
+    linear-gradient(135deg, rgba(47, 125, 105, 0.12), rgba(255, 255, 255, 0) 58%),
+    color-mix(in srgb, var(--event-color), #ffffff 93%);
+}
+
+.calendar-event.is-demo-review {
+  background:
+    linear-gradient(135deg, rgba(181, 132, 24, 0.14), rgba(255, 255, 255, 0) 58%),
+    #fffaf0;
+  border-color: rgba(181, 132, 24, 0.24);
+  border-left-color: var(--structure);
+}
+
 .calendar-event.is-milestone {
   border-left-width: 5px;
 }
@@ -1529,6 +1543,11 @@ input:focus-visible {
   color: color-mix(in srgb, var(--event-color), #18211d 35%);
   font-size: 10px;
   font-weight: 800;
+}
+
+.event-badge.is-slot {
+  background: rgba(24, 33, 29, 0.08);
+  color: var(--ink);
 }
 
 .event-badge.is-focus {
@@ -1569,8 +1588,16 @@ input:focus-visible {
   overflow-wrap: anywhere;
 }
 
-.event-meta {
+.event-helper {
   margin: 5px 0 0 21px;
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.event-meta {
+  margin: 4px 0 0 21px;
   color: var(--muted);
   font-size: 10px;
 }
@@ -2242,6 +2269,10 @@ footer {
   .event-title-button {
     font-size: 14px;
     line-height: 1.45;
+  }
+
+  .event-helper {
+    font-size: 11px;
   }
 
   .event-badge {
