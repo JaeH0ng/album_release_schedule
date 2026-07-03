@@ -10,6 +10,7 @@ const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
 const MOBILE_COMPACT_KEY = "album-release-mobile-compact-v1";
 const MOBILE_UTILITY_KEY = "album-release-mobile-utility-v1";
+const ONBOARDING_KEY = "album-release-onboarding-dismissed-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
 const CALENDAR_END = "2026-12-06";
@@ -80,740 +81,7 @@ const trackNoteOptions = {
   nextUp: ["전체 데모 닫기", "후렴 키 재확인", "악기 하나 더 얹기", "구조 다시 정리", "다음 곡으로 이동"],
 };
 
-const defaultTracks = [
-  {
-    number: "01",
-    title: "Psyche",
-    due: "2026-06-25",
-    eventId: "demo-psyche",
-    document: "tracks/01_psyche/README.md",
-    lyrics: "lyrics/01_Psyche.txt",
-  },
-  {
-    number: "02",
-    title: "괜한 말",
-    due: "2026-06-28",
-    eventId: "demo-gwaenhan-mal",
-    document: "tracks/02_gwaenhan-mal/README.md",
-    lyrics: "lyrics/02_괜한_말.txt",
-  },
-  {
-    number: "03",
-    title: "날 좀 봐줘요, 좀 봐줘요",
-    due: "2026-07-01",
-    eventId: "demo-look-at-me",
-    document: "tracks/03_look-at-me/README.md",
-    lyrics: "lyrics/03_날_좀_봐줘요_좀_봐줘요.txt",
-  },
-  {
-    number: "04",
-    title: "누군가의",
-    due: "2026-07-03",
-    eventId: "demo-nugungaui",
-    document: "tracks/04_nugungaui/README.md",
-    lyrics: "lyrics/04_누군가의.txt",
-  },
-  {
-    number: "05",
-    title: "대동제",
-    due: "2026-07-05",
-    eventId: "demo-daedongje",
-    document: "tracks/05_daedongje/README.md",
-    lyrics: "lyrics/05_대동제.txt",
-  },
-  {
-    number: "06",
-    title: "또다시",
-    due: "2026-07-09",
-    eventId: "demo-ttodasi",
-    document: "tracks/06_ttodasi/README.md",
-    lyrics: "lyrics/06_또다시.txt",
-  },
-  {
-    number: "07",
-    title: "새벽 두 시",
-    due: "2026-07-12",
-    eventId: "demo-2am",
-    document: "tracks/07_2am/README.md",
-    lyrics: "lyrics/07_새벽_두_시.txt",
-  },
-  {
-    number: "08",
-    title: "소란스러운 밤",
-    due: "2026-07-16",
-    eventId: "demo-noisy-night",
-    document: "tracks/08_noisy-night/README.md",
-    lyrics: "lyrics/08_소란스러운_밤.txt",
-  },
-  {
-    number: "09",
-    title: "스물 여덟",
-    due: "2026-07-19",
-    eventId: "demo-twenty-eight",
-    document: "tracks/09_twenty-eight/README.md",
-    lyrics: "lyrics/09_스물_여덟.txt",
-  },
-  {
-    number: "10",
-    title: "good night",
-    due: "2026-06-21",
-    eventId: "demo-good-night",
-    document: "tracks/10_good-night/README.md",
-    lyrics: "lyrics/10_good_night.txt",
-  },
-  {
-    number: "11",
-    title: "부둣가",
-    due: "2026-07-20",
-    eventId: "demo-budutga",
-    document: "tracks/11_budutga/README.md",
-    lyrics: "lyrics/11_부둣가.txt",
-  },
-];
-
-const demoDetail =
-  "통기타+보컬 전체 파일을 중심으로 남기되, 필요하면 짧은 악기 오버더빙이나 편곡 스케치를 함께 테스트한다. 연주 완성도보다 키, BPM, 구조와 다음 편곡 방향을 판단할 수 있는지가 중요하다.";
-const demoResult = "전체 1테이크, 임시 키/BPM, 편곡 아이디어 메모";
-
-const defaultEvents = [
-  {
-    id: "demo-template",
-    date: "2026-06-18",
-    end: "2026-06-20",
-    title: "데모 녹음 템플릿 준비",
-    phase: "demo",
-    duration: "60분",
-    result: "입력 레벨, 파일명, 기본 트랙과 저장 경로 확정",
-    detail: "첫 녹음 전에 반복해서 사용할 최소한의 세션 템플릿을 만든다. 소리 선택이나 플러그인 비교는 하지 않는다.",
-    document: "docs/DEMO_PLAN.md",
-  },
-  {
-    id: "demo-good-night",
-    date: "2026-06-21",
-    title: "good night 데모",
-    phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "good night",
-    document: "tracks/10_good-night/README.md",
-    lyrics: "lyrics/10_good_night.txt",
-    milestone: true,
-  },
-  {
-    id: "demo-good-night-arrangement-sketch",
-    date: "2026-06-22",
-    title: "good night 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "추가 악기 후보 1~2개와 다음 실험 조합 1개",
-    detail:
-      "기타+보컬 데모를 바로 다시 들으며 어떤 악기가 붙어도 중심이 흐려지지 않는지 확인한다. 편곡 확정이 아니라 다음 실험 출발점만 남긴다.",
-    track: "good night",
-    document: "tracks/10_good-night/README.md",
-    lyrics: "lyrics/10_good_night.txt",
-  },
-  {
-    id: "demo-psyche",
-    date: "2026-06-25",
-    title: "Psyche 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "Psyche",
-    document: "tracks/01_psyche/README.md",
-    lyrics: "lyrics/01_Psyche.txt",
-  },
-  {
-    id: "demo-psyche-arrangement-sketch",
-    date: "2026-06-26",
-    title: "Psyche 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "추가 악기 후보 2개와 첫 조합 메모",
-    detail:
-      "기타+보컬 데모를 들으며 곡의 중심을 해치지 않는 추가 악기 후보를 적는다. 가장 먼저 시험할 조합 하나만 남긴다.",
-    track: "Psyche",
-    document: "tracks/01_psyche/README.md",
-    lyrics: "lyrics/01_Psyche.txt",
-  },
-  {
-    id: "demo-gwaenhan-mal",
-    date: "2026-06-28",
-    title: "괜한 말 데모",
-    phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "괜한 말",
-    document: "tracks/02_gwaenhan-mal/README.md",
-    lyrics: "lyrics/02_괜한_말.txt",
-  },
-  {
-    id: "demo-gwaenhan-mal-arrangement-sketch",
-    date: "2026-06-29",
-    title: "괜한 말 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "추가 악기 후보 2개와 첫 조합 메모",
-    detail:
-      "데모를 바로 들으며 악기 수를 늘릴지, 질감만 보탤지 판단해본다. 다음 편곡 실험에 바로 옮길 조합 하나를 남긴다.",
-    track: "괜한 말",
-    document: "tracks/02_gwaenhan-mal/README.md",
-    lyrics: "lyrics/02_괜한_말.txt",
-  },
-  {
-    id: "demo-look-at-me",
-    date: "2026-07-01",
-    title: "날 좀 봐줘요, 좀 봐줘요 데모",
-    phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "날 좀 봐줘요, 좀 봐줘요",
-    document: "tracks/03_look-at-me/README.md",
-    lyrics: "lyrics/03_날_좀_봐줘요_좀_봐줘요.txt",
-  },
-  {
-    id: "demo-look-at-me-arrangement-sketch",
-    date: "2026-07-02",
-    title: "날 좀 봐줘요, 좀 봐줘요 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "후렴 질감 메모와 첫 악기 조합 1개",
-    detail:
-      "후렴의 에너지를 유지하면서 어떤 질감이 더 붙을 수 있는지 짧게 정리한다. 보컬과 통기타의 중심은 건드리지 않는다.",
-    track: "날 좀 봐줘요, 좀 봐줘요",
-    document: "tracks/03_look-at-me/README.md",
-    lyrics: "lyrics/03_날_좀_봐줘요_좀_봐줘요.txt",
-  },
-  {
-    id: "demo-nugungaui",
-    date: "2026-07-03",
-    title: "누군가의 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "누군가의",
-    document: "tracks/04_nugungaui/README.md",
-    lyrics: "lyrics/04_누군가의.txt",
-  },
-  {
-    id: "demo-daedongje",
-    date: "2026-07-05",
-    title: "대동제 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: "리듬 강세 정리, 보컬/기타 재녹음, 후반 일렉 솔로 테스트 메모",
-    detail:
-      "드럼과 베이스의 박자, 강세를 먼저 정리하고 보컬과 기타를 다시 녹음한다. 데모 후반에는 뒷부분 일렉 솔로가 어울리는지도 가볍게 시험한다.",
-    track: "대동제",
-    document: "tracks/05_daedongje/README.md",
-    lyrics: "lyrics/05_대동제.txt",
-  },
-  {
-    id: "demo-ttodasi",
-    date: "2026-07-09",
-    title: "또다시 데모",
-    phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "또다시",
-    document: "tracks/06_ttodasi/README.md",
-    lyrics: "lyrics/06_또다시.txt",
-  },
-  {
-    id: "demo-nugungaui-arrangement-sketch",
-    date: "2026-07-04",
-    title: "누군가의 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "추가 악기 후보 2~3개와 첫 조합 1개",
-    detail:
-      "기타+보컬 데모를 다시 들으며 다른 악기 구성을 상상해본다. 편곡 확정이 아니라 다음 편곡 실험에서 가장 먼저 만져볼 조합 하나를 남기는 데 집중한다.",
-    track: "누군가의",
-    document: "tracks/04_nugungaui/README.md",
-    lyrics: "lyrics/04_누군가의.txt",
-  },
-  {
-    id: "demo-daedongje-arrangement-sketch",
-    date: "2026-07-06",
-    title: "대동제 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "드럼/베이스 강세 기반 추가 악기 조합 1안",
-    detail:
-      "이미 잡힌 리듬 강세를 기준으로 어떤 악기를 더하면 힘이 살아나는지 짧게 비교한다. 후반 일렉 솔로는 유지하되, 다른 악기와 겹치지 않는 한 가지 조합만 남긴다.",
-    track: "대동제",
-    document: "tracks/05_daedongje/README.md",
-    lyrics: "lyrics/05_대동제.txt",
-  },
-  {
-    id: "demo-ttodasi-arrangement-sketch",
-    date: "2026-07-10",
-    title: "또다시 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "제출용 톤을 해치지 않는 추가 악기 조합 1안",
-    detail:
-      "공모전 제출용 데모의 중심을 해치지 않는 범위에서만 다른 악기를 상상해본다. 보컬과 통기타를 흐리지 않는 조합 하나를 정리해 다음 편곡 출발점으로 남긴다.",
-    track: "또다시",
-    document: "tracks/06_ttodasi/README.md",
-    lyrics: "lyrics/06_또다시.txt",
-  },
-  {
-    id: "demo-2am",
-    date: "2026-07-12",
-    title: "새벽 두 시 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: "전체 1테이크, 대체 가사 판단과 질감 스케치 메모",
-    detail: demoDetail,
-    track: "새벽 두 시",
-    document: "tracks/07_2am/README.md",
-    lyrics: "lyrics/07_새벽_두_시.txt",
-  },
-  {
-    id: "demo-2am-arrangement-sketch",
-    date: "2026-07-13",
-    title: "새벽 두 시 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "대체 질감 메모와 첫 악기 조합 1개",
-    detail:
-      "데모에서 느껴진 빈 공간을 기준으로 어떤 질감이 어울리는지 정리한다. 다음 편곡 실험에서 바로 비교할 조합 하나를 남긴다.",
-    track: "새벽 두 시",
-    document: "tracks/07_2am/README.md",
-    lyrics: "lyrics/07_새벽_두_시.txt",
-  },
-  {
-    id: "demo-noisy-night",
-    date: "2026-07-16",
-    title: "소란스러운 밤 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "소란스러운 밤",
-    document: "tracks/08_noisy-night/README.md",
-    lyrics: "lyrics/08_소란스러운_밤.txt",
-  },
-  {
-    id: "demo-noisy-night-arrangement-sketch",
-    date: "2026-07-17",
-    title: "소란스러운 밤 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "추가 악기 스케치와 첫 조합 1개",
-    detail:
-      "기타+보컬 데모를 들으며 곡의 소란스러움을 키울지, 반대로 여백을 살릴지 가닥을 잡아본다. 다음 실험 조합 하나만 정리한다.",
-    track: "소란스러운 밤",
-    document: "tracks/08_noisy-night/README.md",
-    lyrics: "lyrics/08_소란스러운_밤.txt",
-  },
-  {
-    id: "demo-twenty-eight",
-    date: "2026-07-19",
-    title: "스물 여덟 데모",
-    phase: "demo",
-    duration: "60분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "스물 여덟",
-    document: "tracks/09_twenty-eight/README.md",
-    lyrics: "lyrics/09_스물_여덟.txt",
-    milestone: true,
-  },
-  {
-    id: "demo-twenty-eight-arrangement-sketch",
-    date: "2026-07-20",
-    title: "스물 여덟 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "다음 편곡 출발 악기 조합 메모",
-    detail:
-      "데모를 다시 들으며 곡의 온도를 유지하는 악기 조합을 상상해본다. 가장 먼저 손댈 조합 하나만 남긴다.",
-    track: "스물 여덟",
-    document: "tracks/09_twenty-eight/README.md",
-    lyrics: "lyrics/09_스물_여덟.txt",
-  },
-  {
-    id: "demo-budutga",
-    date: "2026-07-20",
-    title: "부둣가 데모",
-    phase: "demo",
-    duration: "60~90분",
-    result: demoResult,
-    detail: demoDetail,
-    track: "부둣가",
-    document: "tracks/11_budutga/README.md",
-    lyrics: "lyrics/11_부둣가.txt",
-  },
-  {
-    id: "demo-budutga-arrangement-sketch",
-    date: "2026-07-21",
-    title: "부둣가 데모 리뷰 + 악기 아이디어 정리",
-    phase: "demo",
-    duration: "30분",
-    result: "후렴 기준 악기 조합 메모",
-    detail:
-      "데모를 다시 들으며 후렴의 중심을 기준으로 어떤 악기가 자연스럽게 들어올 수 있는지 정리한다. 다음 편곡 실험의 첫 조합 하나를 남긴다.",
-    track: "부둣가",
-    document: "tracks/11_budutga/README.md",
-    lyrics: "lyrics/11_부둣가.txt",
-  },
-  {
-    id: "demo-buffer",
-    date: "2026-07-21",
-    title: "전곡 데모 보충 및 마감",
-    phase: "demo",
-    duration: "최대 2시간",
-    result: "후보 11곡 모두 판단 가능한 파일 보유",
-    detail: "누락 파일과 판단이 불가능한 테이크만 보충한다. 새 아이디어나 음색 탐색은 다음 단계로 넘긴다.",
-    document: "docs/DEMO_PLAN.md",
-    milestone: true,
-  },
-  {
-    id: "structure-listen",
-    date: "2026-07-22",
-    end: "2026-07-24",
-    title: "11곡 연속 청취와 비교",
-    phase: "structure",
-    duration: "2회 × 90분",
-    result: "각 곡의 키, 템포, 구조 문제 목록",
-    detail: "녹음 직후의 감각이 아닌 앨범 전체 흐름으로 판단한다. 곡마다 바꿀 것 한 가지와 유지할 것 한 가지를 적는다.",
-    document: "docs/DEMO_PLAN.md",
-  },
-  {
-    id: "structure-retest",
-    date: "2026-07-25",
-    end: "2026-07-28",
-    title: "키·BPM 재테스트",
-    phase: "structure",
-    duration: "최대 4곡",
-    result: "판단이 어려운 곡의 후보 키/BPM 비교 파일",
-    detail: "모든 곡을 다시 녹음하지 않는다. 최고음, 최저음 또는 그루브가 불분명한 최대 네 곡만 짧게 비교한다.",
-    document: "docs/DEMO_PLAN.md",
-  },
-  {
-    id: "structure-lock",
-    date: "2026-07-29",
-    end: "2026-07-31",
-    title: "키·BPM·구조 확정",
-    phase: "structure",
-    duration: "3시간",
-    result: "최종 후보 8~9곡과 곡별 기본 정보 확정",
-    detail: "편곡 테스트가 시작된 뒤 반복해서 되돌아가지 않도록 곡의 뼈대를 결정 기록에 남긴다.",
-    document: "docs/DECISIONS.md",
-    milestone: true,
-  },
-  {
-    id: "post-demo-direction",
-    date: "2026-07-29",
-    end: "2026-08-01",
-    title: "데모 이후 방향 논의",
-    phase: "structure",
-    duration: "2회 × 60분",
-    result: "최종 후보, 곡별 편곡 출발점, 모니터 스피커 준비 계획",
-    detail:
-      "데모에서 간단한 편곡까지 한번 얹어본 상태를 기준으로, 어떤 곡을 밀고 어떤 곡을 줄일지 정리한다. 이때 편곡 시작 전 필요한 모니터 스피커 구매와 배치 일정도 함께 잠근다.",
-    document: "docs/POST_DEMO_DIRECTION.md",
-  },
-  {
-    id: "arrangement-monitoring",
-    date: "2026-08-01",
-    end: "2026-08-03",
-    title: "모니터 스피커 구매·배치",
-    phase: "arrangement",
-    duration: "최대 3일",
-    result: "편곡 판단용 모니터링 환경 준비",
-    detail:
-      "데모 단계와 달리 편곡 판단은 스피커 기준으로 진행한다. 구매, 배치, 기준 청취까지 끝내고 나서 곡별 편곡 실험에 들어간다.",
-    document: "docs/POST_DEMO_DIRECTION.md",
-  },
-  {
-    id: "arrangement-palette",
-    date: "2026-08-03",
-    end: "2026-08-04",
-    title: "앨범 사운드 팔레트 설정",
-    phase: "arrangement",
-    duration: "2시간",
-    result: "통기타·보컬의 공통 질감과 추가 악기 원칙",
-    detail: "모니터 스피커 셋업 이후, 곡마다 별개의 세계를 만들기 전에 앨범 전체에 반복될 공간감, 악기 수와 보컬 거리감을 정한다.",
-    document: "docs/ALBUM.md",
-  },
-  {
-    id: "arrangement-week-1",
-    date: "2026-08-05",
-    end: "2026-08-10",
-    title: "편곡 테스트 1주차",
-    phase: "arrangement",
-    duration: "3곡",
-    result: "3곡의 편곡안 A/B와 선택 메모",
-    detail: "중요도가 높은 곡 세 곡부터 추가 악기, 리듬과 공간감의 두 가지 안을 빠르게 비교한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "arrangement-week-2",
-    date: "2026-08-11",
-    end: "2026-08-16",
-    title: "편곡 테스트 2주차",
-    phase: "arrangement",
-    duration: "3곡",
-    result: "다음 3곡의 편곡 방향 확정",
-    detail: "첫 주에 정한 앨범 팔레트를 적용하되 곡별 역할이 겹치지 않는지 확인한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "arrangement-week-3",
-    date: "2026-08-17",
-    end: "2026-08-22",
-    title: "편곡 테스트 3주차",
-    phase: "arrangement",
-    duration: "남은 2~3곡",
-    result: "전곡 편곡 방향과 본녹음 순서",
-    detail: "남은 곡을 정리하고 본녹음에 필요한 악기, 연주자와 세션 순서를 확정한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "arrangement-lock",
-    date: "2026-08-23",
-    title: "전곡 편곡 방향 마감",
-    phase: "arrangement",
-    duration: "마감",
-    result: "본녹음에 들어갈 최종 편곡안",
-    detail: "이후에는 연주의 완성도와 소리의 품질에 집중한다. 새로운 편곡 방향은 추가하지 않는다.",
-    document: "docs/DECISIONS.md",
-    milestone: true,
-  },
-  {
-    id: "recording-batch-a",
-    date: "2026-08-24",
-    end: "2026-08-30",
-    title: "본녹음 묶음 A",
-    phase: "recording",
-    duration: "2곡",
-    result: "최종 통기타·메인 보컬 2곡",
-    detail: "편곡 확신이 가장 높은 두 곡부터 최종 통기타와 메인 보컬을 녹음한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "recording-batch-b",
-    date: "2026-08-31",
-    end: "2026-09-06",
-    title: "본녹음 묶음 B",
-    phase: "recording",
-    duration: "2곡",
-    result: "최종 통기타·메인 보컬 누적 4곡",
-    detail: "메인 테이크를 우선 확정하고 더블링과 코러스는 별도 세션으로 분리한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "recording-batch-c",
-    date: "2026-09-07",
-    end: "2026-09-13",
-    title: "본녹음 묶음 C",
-    phase: "recording",
-    duration: "2곡 + 크레딧 초안",
-    result: "최종 녹음 누적 6곡, 참여자 크레딧 목록",
-    detail: "두 곡을 녹음하면서 지금까지 참여한 연주자, 엔지니어와 사용 악기를 함께 기록한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "recording-batch-d",
-    date: "2026-09-14",
-    end: "2026-09-19",
-    title: "본녹음 묶음 D",
-    phase: "recording",
-    duration: "남은 2~3곡",
-    result: "전곡 최종 통기타·메인 보컬",
-    detail: "남은 곡과 필수 코러스, 더블링을 마친다. 선택적 장식 파트는 우선순위를 낮춘다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "recording-lock",
-    date: "2026-09-20",
-    title: "본녹음 핵심 마감",
-    phase: "recording",
-    duration: "마감",
-    result: "전곡 최종 통기타·메인 보컬 확보",
-    detail: "이 날짜 이후 본녹음은 누락과 명백한 문제를 해결하는 보충 녹음으로만 제한한다.",
-    document: "docs/SCHEDULE.md",
-    milestone: true,
-  },
-  {
-    id: "post-edit-week",
-    date: "2026-09-21",
-    end: "2026-09-27",
-    title: "보충 녹음·컴핑·편집",
-    phase: "post",
-    duration: "1주",
-    result: "베스트 테이크, 튠과 타이밍 정리",
-    detail: "재녹음 목록을 먼저 닫고 컴핑, 호흡, 노이즈와 타이밍을 정리한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "post-recording-close",
-    date: "2026-09-28",
-    end: "2026-09-30",
-    title: "녹음 완전 마감·믹스 준비",
-    phase: "post",
-    duration: "3일",
-    result: "정리된 세션, 트랙명, 믹스 전달 파일",
-    detail: "사용하지 않는 트랙을 숨기고 파일명, 시작점, 샘플레이트와 레퍼런스 바운스를 확인한다.",
-    document: "docs/SCHEDULE.md",
-    milestone: true,
-  },
-  {
-    id: "post-mix-prep",
-    date: "2026-10-01",
-    end: "2026-10-04",
-    title: "믹스 기준 설정",
-    phase: "post",
-    duration: "4일",
-    result: "기준곡 1곡과 앨범 믹스 원칙",
-    detail: "보컬의 전면감, 통기타 크기와 저역 기준을 한 곡에서 먼저 확정한다.",
-    document: "docs/SCHEDULE.md",
-  },
-  {
-    id: "post-mix-a",
-    date: "2026-10-05",
-    end: "2026-10-11",
-    title: "1차 믹스 전반부",
-    phase: "post",
-    duration: "4곡",
-    result: "전반부 곡 1차 믹스",
-    detail: "개별 곡의 화려함보다 기준곡과의 보컬·통기타 크기 일관성을 확인한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "post-mix-b",
-    date: "2026-10-12",
-    end: "2026-10-18",
-    title: "1차 믹스 후반부",
-    phase: "post",
-    duration: "남은 4~5곡",
-    result: "전곡 1차 믹스와 연속 청취본",
-    detail: "전곡을 순서대로 들으며 음량, 공간감과 곡 사이의 전환을 기록한다.",
-    document: "docs/TRACK_STATUS.md",
-  },
-  {
-    id: "post-mix-revision-1",
-    date: "2026-10-19",
-    end: "2026-10-25",
-    title: "믹스 수정 1차·가사/크레딧 교정",
-    phase: "post",
-    duration: "1주",
-    result: "수정 믹스와 확정 가사·크레딧",
-    detail: "믹스 수정은 곡마다 핵심 세 가지 이내로 제한한다. 동시에 제출용 가사와 크레딧을 교정한다.",
-    document: "docs/ALBUM.md",
-  },
-  {
-    id: "post-mix-final",
-    date: "2026-10-26",
-    end: "2026-10-30",
-    title: "최종 믹스 마감",
-    phase: "post",
-    duration: "5일",
-    result: "마스터링용 전곡 최종 믹스",
-    detail: "음악적 아이디어 추가를 중단하고 클릭, 노이즈, 출력 형식과 곡 시작·끝을 검수한다.",
-    document: "docs/SCHEDULE.md",
-    milestone: true,
-  },
-  {
-    id: "post-master",
-    date: "2026-10-31",
-    end: "2026-11-06",
-    title: "마스터링·트랙 순서 확정",
-    phase: "post",
-    duration: "1주",
-    result: "전곡 마스터와 최종 트랙 순서",
-    detail: "다양한 재생 환경에서 확인하고 트랙 간 음량, 질감과 여백을 확정한다.",
-    document: "docs/SCHEDULE.md",
-    milestone: true,
-  },
-  {
-    id: "delivery-package",
-    date: "2026-11-07",
-    end: "2026-11-09",
-    title: "유통 제출 패키지 조립",
-    phase: "delivery",
-    duration: "3일",
-    result: "마스터, 커버, 가사, 크레딧, 메타데이터",
-    detail: "곡 제목 표기, 참여자 이름, 작사·작곡·편곡 정보와 파일명을 하나의 제출본으로 모은다.",
-    document: "docs/ALBUM.md",
-  },
-  {
-    id: "delivery-qa",
-    date: "2026-11-10",
-    end: "2026-11-12",
-    title: "제출 전 최종 검수",
-    phase: "delivery",
-    duration: "3일",
-    result: "오탈자와 파일 오류가 없는 최종 패키지",
-    detail: "처음부터 다시 입력하지 말고 체크리스트에 따라 파일과 메타데이터를 대조한다.",
-    document: "docs/SCHEDULE.md",
-  },
-  {
-    id: "delivery-submit",
-    date: "2026-11-13",
-    title: "유통사 전달",
-    phase: "delivery",
-    duration: "고정 마감",
-    result: "앨범 발매 자료 제출 완료",
-    detail: "12월 4일 발매를 위해 움직일 수 없는 최종 제출일이다.",
-    document: "docs/SCHEDULE.md",
-    milestone: true,
-  },
-  {
-    id: "release-distribution-check",
-    date: "2026-11-16",
-    end: "2026-11-22",
-    title: "유통 반영 확인·발매 콘텐츠 준비",
-    phase: "release",
-    duration: "1주",
-    result: "플랫폼 정보 확인과 발매 공지 자료",
-    detail: "유통사에서 전달되는 미리보기와 표기를 확인하고 발매 공지에 필요한 이미지와 문구를 확정한다.",
-    document: "docs/SCHEDULE.md",
-  },
-  {
-    id: "release-promo-week",
-    date: "2026-11-23",
-    end: "2026-11-29",
-    title: "발매 전 공개 일정 실행",
-    phase: "release",
-    duration: "1주",
-    result: "티저와 발매 안내 공개",
-    detail: "준비된 콘텐츠를 일정대로 공개하고 음악 파일 자체는 다시 수정하지 않는다.",
-    document: "docs/SCHEDULE.md",
-  },
-  {
-    id: "release-final-week",
-    date: "2026-11-30",
-    end: "2026-12-03",
-    title: "발매 주 최종 확인",
-    phase: "release",
-    duration: "4일",
-    result: "링크, 소개문, 크레딧과 당일 게시물 준비",
-    detail: "발매 당일 필요한 링크와 게시물을 준비하고 휴식 시간을 확보한다.",
-    document: "docs/SCHEDULE.md",
-  },
-  {
-    id: "release-day",
-    date: "2026-12-04",
-    title: "정규 앨범 발매",
-    phase: "release",
-    duration: "발매일",
-    result: "앨범 공개와 플랫폼 재생 확인",
-    detail: "플랫폼별 앨범 표기와 재생 상태를 확인하고 발매 공지를 게시한다.",
-    document: "docs/ALBUM.md",
-    milestone: true,
-  },
-];
-
+import { defaultTracks, defaultEvents } from "./schedule-data.js";
 const roadmap = [
   {
     phase: "demo",
@@ -976,6 +244,8 @@ const state = {
   baseEvents: sortEvents(defaultEvents),
   events: [],
   tracks: sortTracks(defaultTracks),
+  activeTrackNumber: null,
+  trackSearch: "",
   opportunities: sortOpportunities(defaultOpportunities),
   eventMap: new Map(),
   syncStatus: "idle",
@@ -1002,6 +272,31 @@ function toIso(date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+// 사용자/DB(관리자 편집)·인증 이메일 등 신뢰할 수 없는 문자열을 innerHTML에
+// 넣기 전에 이스케이프한다. 저장형 XSS 방지.
+function escapeHtml(value) {
+  if (value === null || value === undefined) return "";
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+// href에 들어갈 링크는 http(s)와 저장소 내부 상대경로만 허용한다.
+// javascript: 등 위험한 스킴을 차단.
+function safeUrl(value) {
+  if (!value) return "#";
+  const raw = String(value).trim();
+  if (/^(https?:|mailto:)/i.test(raw)) return escapeHtml(raw);
+  // 상대경로(docs/…, tracks/…, lyrics/…, #앵커)만 허용, 스킴 포함 값은 거부.
+  if (/^[#./]/.test(raw) || /^[\w./-]+$/.test(raw)) {
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) return escapeHtml(raw);
+  }
+  return "#";
 }
 
 function addDays(date, days) {
@@ -1070,11 +365,20 @@ function formatTrackActivityTimestamp(value) {
 }
 
 function sortEvents(items) {
-  return [...items].sort((left, right) => parseDate(left.date) - parseDate(right.date));
+  return [...items].sort((left, right) => {
+    const dateGap = parseDate(left.date) - parseDate(right.date);
+    if (dateGap !== 0) return dateGap;
+    // 같은 날짜의 작업(예: 녹음 → 리뷰 슬롯)은 sort_order로 순서를 지킨다.
+    return (left.sortOrder ?? 9999) - (right.sortOrder ?? 9999);
+  });
 }
 
 function sortTracks(items) {
-  return [...items].sort((left, right) => left.number.localeCompare(right.number, "en"));
+  return [...items].sort((left, right) => {
+    const sortGap = (left.sortOrder ?? 9999) - (right.sortOrder ?? 9999);
+    if (sortGap !== 0) return sortGap;
+    return left.number.localeCompare(right.number, "en");
+  });
 }
 
 function sortOpportunities(items) {
@@ -1101,7 +405,40 @@ function findTrackStep(stepId) {
 function setScheduleData({ events = state.events, tracks = state.tracks }) {
   state.baseEvents = sortEvents(events);
   state.tracks = sortTracks(tracks);
+  ensureTrackState();
   rebuildEventState();
+  validateScheduleIntegrity();
+}
+
+// state.tracks(로컬 기본값이든 Supabase든)에 있는 모든 곡이 체크리스트/메모/활동
+// 항목을 갖도록 보장한다. Supabase가 defaultTracks에 없는 곡(예: 12번)을 내려줘도
+// 체크박스 클릭 시 undefined 접근으로 곡 탭이 죽지 않게 하는 안전장치.
+function ensureTrackState() {
+  for (const track of state.tracks) {
+    const number = track.number;
+    if (!state.trackChecklist[number]) {
+      state.trackChecklist[number] = Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false]));
+    }
+    if (!state.trackNotes[number]) {
+      state.trackNotes[number] = { completedThisWeek: [], arrangementIdeas: [], nextUp: [] };
+    }
+    if (!state.trackActivity[number]) {
+      state.trackActivity[number] = [];
+    }
+  }
+}
+
+// 곡이 참조하는 event가 실제로 존재하는지 확인한다. events/tracks가 서로 다른
+// 소스에서 섞여 오면 참조가 끊겨 곡 상태 배지가 잘못 뜨는데, 이를 표면화한다.
+function validateScheduleIntegrity() {
+  const orphans = state.tracks.filter((track) => track.eventId && !state.eventMap.has(track.eventId));
+  if (orphans.length > 0) {
+    console.warn(
+      "[schedule] 곡이 참조하는 이벤트를 찾을 수 없습니다 (일정 데이터 불일치):",
+      orphans.map((track) => `${track.number} ${track.title} → ${track.eventId}`)
+    );
+  }
+  return orphans;
 }
 
 function setOpportunityData(opportunities = state.opportunities) {
@@ -1209,11 +546,35 @@ function setSyncStatus(status, summary, detail) {
   state.syncDetail = detail;
   document.querySelector("#sync-status-text").textContent = summary;
   document.querySelector("#sync-status-detail").textContent = detail;
+  const strip = document.querySelector(".sync-strip");
+  if (strip) strip.dataset.syncStatus = status;
   const mobileAuthSummary = document.querySelector("#mobile-auth-summary");
   if (mobileAuthSummary && !getAuthUser()) {
     mobileAuthSummary.textContent = summary;
   }
   document.querySelector("#refresh-data").disabled = status === "loading";
+  // 동기화 실패는 모바일에서도 숨기지 않는다. 오래된 데이터를 최신으로 오인하지 않게.
+  updateMobileSyncBanner(status, summary, detail);
+}
+
+// 모바일 상단 요약(mobile-glance)에 동기화 실패/로딩 배너를 노출한다.
+function updateMobileSyncBanner(status, summary, detail) {
+  const band = document.querySelector(".mobile-glance");
+  if (!band) return;
+  let banner = document.querySelector("#mobile-sync-banner");
+  if (status === "error") {
+    if (!banner) {
+      banner = document.createElement("div");
+      banner.id = "mobile-sync-banner";
+      banner.className = "mobile-sync-banner";
+      banner.setAttribute("role", "status");
+      band.appendChild(banner);
+    }
+    banner.textContent = `${summary} — ${detail}`;
+    banner.hidden = false;
+  } else if (banner) {
+    banner.hidden = true;
+  }
 }
 
 function normalizeEventRow(row) {
@@ -1231,6 +592,7 @@ function normalizeEventRow(row) {
     lyrics: row.lyrics || null,
     milestone: Boolean(row.milestone),
     kind: row.kind || "album",
+    sortOrder: row.sort_order ?? null,
   };
 }
 
@@ -1242,6 +604,7 @@ function normalizeTrackRow(row) {
     eventId: row.event_id,
     document: row.document,
     lyrics: row.lyrics,
+    sortOrder: row.sort_order ?? null,
   };
 }
 
@@ -1307,24 +670,61 @@ async function refreshSupabaseData() {
       ),
     ]);
 
-    if (eventRows.length > 0 || trackRows.length > 0 || opportunityRows.length > 0) {
-      setScheduleData({
-        events: eventRows.length > 0 ? eventRows.map(normalizeEventRow) : defaultEvents,
-        tracks: trackRows.length > 0 ? trackRows.map(normalizeTrackRow) : defaultTracks,
-      });
-      setOpportunityData(
-        opportunityRows.length > 0 ? opportunityRows.map(normalizeOpportunityRow) : defaultOpportunities
-      );
+    // events와 tracks는 event_id로 서로를 참조하므로 반드시 같은 소스에서 와야 한다.
+    // 한쪽만 채워진 상태(부분 시드)에서 섞으면 곡↔이벤트 참조가 끊긴다.
+    const useSupabaseSchedule = eventRows.length > 0 && trackRows.length > 0;
+    const partialSchedule = eventRows.length > 0 !== (trackRows.length > 0);
+    const timestamp = formatSyncTimestamp(new Date());
+    const nextOpportunities =
+      opportunityRows.length > 0 ? opportunityRows.map(normalizeOpportunityRow) : defaultOpportunities;
+
+    // 부분 시드: 공모전 테이블 유무와 무관하게 먼저 처리해, 기본 일정으로
+    // 원자적 폴백하고 오류를 표면화한다. (실제 표시 데이터 = 기본값)
+    if (partialSchedule) {
+      setScheduleData({ events: defaultEvents, tracks: defaultTracks });
+      setOpportunityData(nextOpportunities);
       updateChrome();
       renderAll();
-      setSyncStatus("ready", "Supabase 게시 일정 사용 중", `${formatSyncTimestamp(new Date())} 동기화 완료`);
+      setSyncStatus(
+        "error",
+        "로컬 일정 사용 중",
+        `일정/곡 테이블 중 하나만 채워져 있어 기본 일정을 사용합니다 (${timestamp})`
+      );
       return;
     }
 
+    if (useSupabaseSchedule || opportunityRows.length > 0) {
+      setScheduleData({
+        events: useSupabaseSchedule ? eventRows.map(normalizeEventRow) : defaultEvents,
+        tracks: useSupabaseSchedule ? trackRows.map(normalizeTrackRow) : defaultTracks,
+      });
+      setOpportunityData(nextOpportunities);
+      updateChrome();
+      renderAll();
+      setSyncStatus(
+        "ready",
+        useSupabaseSchedule ? "Supabase 게시 일정 사용 중" : "로컬 일정 사용 중",
+        `${timestamp} 동기화 완료`
+      );
+      return;
+    }
+
+    // 세 테이블 모두 비어 있음: 이전에 Supabase 데이터를 표시했더라도 기본값으로 되돌려
+    // 화면과 상태 문구를 일치시킨다.
+    setScheduleData({ events: defaultEvents, tracks: defaultTracks });
+    setOpportunityData(defaultOpportunities);
+    updateChrome();
+    renderAll();
     setSyncStatus("idle", "로컬 일정 사용 중", "Supabase 테이블이 비어 있어 기본 일정을 표시");
   } catch (error) {
     console.error(error);
-    setSyncStatus("error", "로컬 일정 사용 중", "Supabase 연결 실패, 기본 일정으로 계속 표시");
+    // 연결 실패 시에도 실제 표시 데이터를 기본값으로 되돌려 상태 문구("기본 일정")와
+    // 화면을 일치시킨다. (이전에 Supabase 데이터를 로드한 뒤 실패해도 안전)
+    setScheduleData({ events: defaultEvents, tracks: defaultTracks });
+    setOpportunityData(defaultOpportunities);
+    updateChrome();
+    renderAll();
+    setSyncStatus("error", "로컬 일정 사용 중", "Supabase 연결 실패, 기본 일정으로 표시");
   }
 }
 
@@ -1632,13 +1032,14 @@ function updateAppModeChrome() {
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   const mobile = window.innerWidth <= 760;
   document.body.classList.toggle("body-standalone", standalone);
-  document.body.classList.toggle("body-mobile-compact", mobile && state.mobileCompact);
+  // '집중 보기'는 데스크톱에서도 동작한다(보조 카드 접기). 상태 스트립 토글은 모바일 전용.
+  document.body.classList.toggle("body-mobile-compact", state.mobileCompact);
   document.body.classList.toggle("body-mobile-utility-open", mobile && state.mobileUtilityOpen);
   document.body.classList.toggle("body-mobile", mobile);
   const toggle = document.querySelector("#mobile-focus-toggle");
   const utilityToggle = document.querySelector("#mobile-utility-toggle");
   if (toggle) {
-    toggle.hidden = !mobile;
+    toggle.hidden = false;
     toggle.textContent = state.mobileCompact ? "전체 보기" : "집중 보기";
   }
   if (utilityToggle) {
@@ -1834,10 +1235,32 @@ async function initAuth() {
 async function registerServiceWorker() {
   if (!("serviceWorker" in navigator)) return;
 
+  // 새 서비스워커가 제어권을 넘겨받으면(=새 배포가 활성화되면) 열려 있는 탭도
+  // 자동으로 최신 번들로 새로고침한다. 수동 새로고침/pwa-reset 의존을 없앤다.
+  let reloadingForUpdate = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloadingForUpdate) return;
+    // 최초 등록(제어권 없던 상태 → 제어 시작)에서는 리로드하지 않는다.
+    if (!navigator.serviceWorker.controller) return;
+    reloadingForUpdate = true;
+    window.location.reload();
+  });
+
   try {
     const buildVersion = document.documentElement.dataset.buildVersion || "dev";
+    const hadController = Boolean(navigator.serviceWorker.controller);
     const registration = await navigator.serviceWorker.register(`./service-worker.js?v=${encodeURIComponent(buildVersion)}`, {
       updateViaCache: "none",
+    });
+    // 이미 제어 중인 탭에서 새 워커가 대기 상태로 잡히면 즉시 활성화를 유도한다.
+    registration.addEventListener("updatefound", () => {
+      const installing = registration.installing;
+      if (!installing) return;
+      installing.addEventListener("statechange", () => {
+        if (installing.state === "installed" && hadController && registration.waiting) {
+          registration.waiting.postMessage({ type: "SKIP_WAITING" });
+        }
+      });
     });
     registration.update().catch(() => null);
   } catch (error) {
@@ -2044,11 +1467,11 @@ function renderTrackChoiceGroup(trackNumber, noteKey, label, selectedChoices, wi
               <button
                 class="track-choice-button${selected.has(choice) ? " is-selected" : ""}"
                 type="button"
-                data-track-number="${trackNumber}"
-                data-note-key="${noteKey}"
-                data-track-choice="${choice}"
+                data-track-number="${escapeHtml(trackNumber)}"
+                data-note-key="${escapeHtml(noteKey)}"
+                data-track-choice="${escapeHtml(choice)}"
               >
-                ${choice}
+                ${escapeHtml(choice)}
               </button>
             `
           )
@@ -2070,9 +1493,9 @@ function renderTrackActivityList(trackNumber) {
         .map(
           (entry) => `
             <li class="track-activity-item">
-              <span class="track-activity-kind">${entry.category}</span>
+              <span class="track-activity-kind">${escapeHtml(entry.category)}</span>
               <div>
-                <strong>${entry.text}</strong>
+                <strong>${escapeHtml(entry.text)}</strong>
                 <span>${formatTrackActivityTimestamp(entry.createdAt)}</span>
               </div>
             </li>
@@ -2110,9 +1533,9 @@ function renderTrackFollowupSection(track) {
                         <span>다시 할 일정</span>
                       </div>
                       <div class="track-followup-controls">
-                        <input type="date" value="${followup.date}" data-track-followup-date="${followup.id}" />
-                        <button class="opportunity-action" type="button" data-track-followup-action="complete" data-track-followup-id="${followup.id}">완료</button>
-                        <button class="opportunity-action is-danger" type="button" data-track-followup-action="remove" data-track-followup-id="${followup.id}">삭제</button>
+                        <input type="date" value="${escapeHtml(followup.date)}" data-track-followup-date="${escapeHtml(followup.id)}" />
+                        <button class="opportunity-action" type="button" data-track-followup-action="complete" data-track-followup-id="${escapeHtml(followup.id)}">완료</button>
+                        <button class="opportunity-action is-danger" type="button" data-track-followup-action="remove" data-track-followup-id="${escapeHtml(followup.id)}">삭제</button>
                       </div>
                     </li>
                   `;
@@ -2481,11 +1904,51 @@ function renderPhaseFilters() {
   });
 }
 
+// 아직 완료한 작업이 없고 안내를 닫지 않은 사용자에게 기본 흐름을 1회 안내한다.
+function renderOnboardingHint() {
+  const host = document.querySelector("#onboarding-hint");
+  if (!host) return;
+  let dismissed = false;
+  try {
+    dismissed = localStorage.getItem(ONBOARDING_KEY) === "true";
+  } catch {
+    dismissed = false;
+  }
+  const fresh = state.completed.size === 0;
+  if (dismissed || !fresh) {
+    host.hidden = true;
+    host.innerHTML = "";
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="onboarding-head">
+      <strong>처음 오셨나요? 3단계로 시작하세요</strong>
+      <button id="onboarding-dismiss" class="text-button" type="button" aria-label="안내 닫기">닫기</button>
+    </div>
+    <ol class="onboarding-steps">
+      <li><b>공모전</b> 탭에서 후보를 <b>수락</b>하거나, 아래 후보에서 이번 주 작업을 당겨오세요.</li>
+      <li><b>이번 주 핵심 작업</b>에 뜬 항목을 하나씩 진행하세요.</li>
+      <li>끝내면 <b>곡별 진행</b> 탭에서 곡을 골라 체크하고 <b>완료</b> 처리하세요.</li>
+    </ol>
+  `;
+  document.querySelector("#onboarding-dismiss")?.addEventListener("click", () => {
+    try {
+      localStorage.setItem(ONBOARDING_KEY, "true");
+    } catch {
+      // Ignore storage errors for local previews.
+    }
+    host.hidden = true;
+    host.innerHTML = "";
+  });
+}
+
 function renderDashboard() {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
   const weeklyFocusItems = getWeeklyFocusItems();
   const acceptedFocus = weeklyFocusItems.map(({ event }) => event);
+  renderOnboardingHint();
   const heldEvents = getHeldEvents();
   const dismissedEvents = getDismissedEvents();
   const urgencyEvents = getPullForwardCandidates();
@@ -2495,7 +1958,7 @@ function renderDashboard() {
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
   document.querySelector("#app-home-panel").innerHTML = `
     <div class="app-home-copy">
-      <strong>${user ? `안녕하세요, ${user.email}` : "앱처럼 바로 확인하세요"}</strong>
+      <strong>${user ? `안녕하세요, ${escapeHtml(user.email)}` : "앱처럼 바로 확인하세요"}</strong>
       <p>${user
         ? "지금 잡고 있는 작업, 보류한 작업, 캘린더를 이 화면에서 바로 이어서 볼 수 있습니다."
         : "로그인하면 폰과 PC에서 같은 작업 상태를 이어서 볼 수 있습니다."}</p>
@@ -2515,7 +1978,7 @@ function renderDashboard() {
     </div>
     <div class="app-home-actions">
       <strong>바로가기</strong>
-      <p>${acceptedFocus[0] ? acceptedFocus[0].title : "아직 수락한 작업이 없습니다. 아래 후보에서 하나를 수락해보세요."}</p>
+      <p>${acceptedFocus[0] ? escapeHtml(acceptedFocus[0].title) : "아직 수락한 작업이 없습니다. 아래 후보에서 하나를 수락해보세요."}</p>
       <div class="app-home-quick">
         <button class="quick-link" type="button" data-quick-action="tracks">곡별 현황</button>
         <button class="quick-link" type="button" data-quick-action="roadmap">전체 일정</button>
@@ -2554,23 +2017,42 @@ function renderDashboard() {
       detail: demoSpotlight ? demoSpotlight.bullets[0] : "설정된 포인트 없음",
       detailList: demoSpotlight?.bullets || [],
       wide: true,
+      trackNumber: demoSpotlight ? demoSpotlight.track.number : null,
     },
   ]
-    .map(
-      (item) => `
-        <article class="overview-card${item.wide ? " overview-card-wide" : ""}">
-          <strong>${item.value}</strong>
-          <p>${item.label}</p>
-          <p>${item.detail}</p>
+    .map((item) => {
+      const clickableClass = item.trackNumber ? " overview-card-clickable" : "";
+      const clickableAttrs = item.trackNumber
+        ? ` role="button" tabindex="0" data-overview-track="${escapeHtml(item.trackNumber)}" aria-label="${escapeHtml(item.value)} 곡 작업 열기"`
+        : "";
+      return `
+        <article class="overview-card${item.wide ? " overview-card-wide" : ""}${clickableClass}"${clickableAttrs}>
+          <strong>${escapeHtml(item.value)}</strong>
+          <p>${escapeHtml(item.label)}</p>
+          <p>${escapeHtml(item.detail)}</p>
           ${
             item.detailList?.length
-              ? `<ul class="overview-list">${item.detailList.map((detail) => `<li>${detail}</li>`).join("")}</ul>`
+              ? `<ul class="overview-list">${item.detailList.map((detail) => `<li>${escapeHtml(detail)}</li>`).join("")}</ul>`
               : ""
           }
         </article>
-      `
-    )
+      `;
+    })
     .join("");
+
+  document.querySelectorAll("#today-overview [data-overview-track]").forEach((card) => {
+    const go = () => {
+      setActiveView("tracks", { focusPanel: false });
+      setActiveTrack(card.dataset.overviewTrack, { scroll: true });
+    };
+    card.addEventListener("click", go);
+    card.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+        keyEvent.preventDefault();
+        go();
+      }
+    });
+  });
 
   document.querySelector("#weekly-focus-list").innerHTML = acceptedFocus.length
     ? weeklyFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
@@ -2597,7 +2079,7 @@ function renderDashboard() {
   const recentDone = getRecentCompletedEvents();
   document.querySelector("#recent-done-list").innerHTML = recentDone.length
     ? recentDone
-        .map((event) => `<li>${event.title} · ${formatShortDate(event.date)}</li>`)
+        .map((event) => `<li>${escapeHtml(event.title)} · ${formatShortDate(event.date)}</li>`)
         .join("")
     : '<li>아직 완료한 작업이 없습니다. 오늘 끝낸 작업 하나부터 체크해보세요.</li>';
 
@@ -2679,29 +2161,29 @@ function renderDashboardTaskCard(event, mode) {
               ? "지연 중"
               : "다음 후보";
   const restoreButton = isPulled
-    ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">원래 일정</button>`
+    ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">원래 일정</button>`
     : "";
   const primaryButton =
     mode === "accepted" || mode === "current"
-      ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${event.id}">보류</button>`
-      : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${event.id}">수락</button>`;
+      ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${escapeHtml(event.id)}">보류</button>`
+      : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">수락</button>`;
   const dismissButton =
     mode === "dismissed"
-      ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${event.id}">다시 후보로</button>`
-      : `<button class="opportunity-action is-danger" type="button" data-dashboard-action="dismiss" data-event-id="${event.id}">이번 주 안 함</button>`;
+      ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">다시 후보로</button>`
+      : `<button class="opportunity-action is-danger" type="button" data-dashboard-action="dismiss" data-event-id="${escapeHtml(event.id)}">이번 주 안 함</button>`;
   const completeButton =
     mode === "dismissed"
       ? ""
-      : `<button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${event.id}">완료</button>`;
+      : `<button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`;
   const pullButton =
     mode === "dismissed"
       ? ""
-      : `<button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${event.id}">이번 주로 당겨오기</button>`;
+      : `<button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${escapeHtml(event.id)}">이번 주로 당겨오기</button>`;
 
   return `
     <article class="focus-item">
-      <strong>${event.title}</strong>
-      <p>${event.detail}</p>
+      <strong>${escapeHtml(event.title)}</strong>
+      <p>${escapeHtml(event.detail)}</p>
       <div class="focus-meta">
         <span class="meta-pill">${modeLabel}</span>
         <span class="meta-pill">${formatDateRange(event)}</span>
@@ -2752,29 +2234,29 @@ function renderOpportunityCard(opportunity, options = {}) {
   const compactClass = options.compact ? " compact" : "";
 
   return `
-    <article class="${classes.join(" ")}${compactClass ? compactClass : ""}" data-opportunity-id="${opportunity.id}">
+    <article class="${classes.join(" ")}${compactClass ? compactClass : ""}" data-opportunity-id="${escapeHtml(opportunity.id)}">
       <div class="opportunity-card-top">
         <div>
           <button class="opportunity-title-button" type="button" data-opportunity-open="true">
-            ${opportunity.title}
+            ${escapeHtml(opportunity.title)}
           </button>
-          <p>${opportunity.host}</p>
+          <p>${escapeHtml(opportunity.host)}</p>
         </div>
         <div class="opportunity-meta">
           <span class="${statusClasses}">${formatOpportunityStatus(opportunity.status)}</span>
           ${acceptedBadge}
         </div>
       </div>
-      <div class="opportunity-body" data-opportunity-open="true" role="button" tabindex="0" aria-label="${opportunity.title} 상세 보기">
-        <p>${opportunity.summary}</p>
+      <div class="opportunity-body" data-opportunity-open="true" role="button" tabindex="0" aria-label="${escapeHtml(opportunity.title)} 상세 보기">
+        <p>${escapeHtml(opportunity.summary)}</p>
       </div>
       <div class="opportunity-meta">
         <span class="meta-pill">${formatOpportunityDateLabel(opportunity)}</span>
-        <span class="meta-pill">적합도 ${opportunity.fitLabel}</span>
+        <span class="meta-pill">적합도 ${escapeHtml(opportunity.fitLabel)}</span>
         <span class="meta-pill">현재 판단 ${reviewLabel}</span>
       </div>
       <div class="opportunity-meta">
-        <span class="meta-pill">준비: ${opportunity.preparation}</span>
+        <span class="meta-pill">준비: ${escapeHtml(opportunity.preparation)}</span>
       </div>
       <div class="opportunity-actions">
         <button class="opportunity-action is-primary${review.status === "accepted" ? " is-current" : ""}" type="button" data-action="accepted">
@@ -2786,10 +2268,15 @@ function renderOpportunityCard(opportunity, options = {}) {
         <button class="opportunity-action is-danger${review.status === "dismissed" ? " is-current" : ""}" type="button" data-action="dismissed">
           제외
         </button>
+        ${
+          canUseAdminMode()
+            ? '<button class="opportunity-action opportunity-edit-button" type="button" data-opportunity-edit="true">편집</button>'
+            : ""
+        }
       </div>
       <div class="opportunity-links">
-        <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
-        <span class="summary-label">${opportunity.sourceNote} · ${checkedAt}</span>
+        <a href="${safeUrl(opportunity.officialUrl)}" target="_blank" rel="noreferrer">공식 공고 열기</a>
+        <span class="summary-label">${escapeHtml(opportunity.sourceNote)} · ${checkedAt}</span>
       </div>
     </article>
   `;
@@ -2801,6 +2288,11 @@ function bindOpportunityControls() {
     const opportunity = state.opportunities.find((item) => item.id === opportunityId);
     card.querySelectorAll("[data-action]").forEach((button) => {
       button.addEventListener("click", () => setOpportunityReview(opportunityId, button.dataset.action));
+    });
+    card.querySelectorAll("[data-opportunity-edit]").forEach((button) => {
+      button.addEventListener("click", () => {
+        if (opportunity) fillAdminOpportunityForm(opportunity);
+      });
     });
     card.querySelectorAll("[data-opportunity-open]").forEach((button) => {
       const open = () => {
@@ -2848,7 +2340,16 @@ function renderOpportunities() {
   updateAdminChrome();
 }
 
+// 적합도 라벨 → 점수. 시드 데이터(5단계)와 관리자 편집 저장이 동일 매핑을 쓰게 한다.
+const FIT_LABEL_SCORES = {
+  "아주 잘 맞음": 5,
+  "잘 맞음": 4,
+  "보통": 3,
+  "낮음": 2,
+};
+
 function readAdminOpportunityForm() {
+  const fitLabel = document.querySelector("#admin-fit-label").value.trim();
   return {
     id: document.querySelector("#admin-id").value.trim(),
     title: document.querySelector("#admin-title").value.trim(),
@@ -2856,12 +2357,8 @@ function readAdminOpportunityForm() {
     status: document.querySelector("#admin-status").value,
     application_open: document.querySelector("#admin-open-date").value || null,
     deadline: document.querySelector("#admin-deadline").value || null,
-    fit_label: document.querySelector("#admin-fit-label").value.trim(),
-    fit_score: ["아주 잘 맞음", "잘 맞음", "보통", "낮음"].includes(
-      document.querySelector("#admin-fit-label").value.trim()
-    )
-      ? 4
-      : 3,
+    fit_label: fitLabel,
+    fit_score: FIT_LABEL_SCORES[fitLabel] ?? 3,
     summary: document.querySelector("#admin-summary").value.trim(),
     preparation: document.querySelector("#admin-preparation").value.trim(),
     official_url: document.querySelector("#admin-url").value.trim(),
@@ -2928,6 +2425,153 @@ async function deleteAdminOpportunity() {
   resetAdminOpportunityForm();
   await refreshSupabaseData();
   document.querySelector("#auth-status-detail").textContent = `${id} 삭제 완료`;
+}
+
+// 관리자 편집 패널로 이동해 스크롤. (일정/곡 편집 버튼에서 호출)
+function openAdminPanel() {
+  setActiveView("opportunities", { focusPanel: false });
+  document.querySelector("#admin-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ── 일정(album_events) 편집 ──────────────────────────────────────────────
+function readAdminEventForm() {
+  const sortRaw = document.querySelector("#admin-event-sort-order").value;
+  return {
+    id: document.querySelector("#admin-event-id").value.trim(),
+    date: document.querySelector("#admin-event-date").value,
+    end: document.querySelector("#admin-event-end").value || null,
+    title: document.querySelector("#admin-event-title").value.trim(),
+    phase: document.querySelector("#admin-event-phase").value,
+    duration: document.querySelector("#admin-event-duration").value.trim() || "미정",
+    result: document.querySelector("#admin-event-result").value.trim() || "미정",
+    detail: document.querySelector("#admin-event-detail").value.trim(),
+    track: document.querySelector("#admin-event-track").value.trim() || null,
+    document: document.querySelector("#admin-event-document").value.trim() || null,
+    lyrics: document.querySelector("#admin-event-lyrics").value.trim() || null,
+    milestone: document.querySelector("#admin-event-milestone").checked,
+    sort_order: sortRaw === "" ? null : Number(sortRaw),
+  };
+}
+
+function fillAdminEventForm(event) {
+  if (!event) return;
+  document.querySelector("#admin-event-id").value = event.id || "";
+  document.querySelector("#admin-event-title").value = event.title || "";
+  document.querySelector("#admin-event-date").value = event.originalDate || event.date || "";
+  document.querySelector("#admin-event-end").value = event.originalEnd || event.end || "";
+  document.querySelector("#admin-event-phase").value = event.phase || "demo";
+  document.querySelector("#admin-event-duration").value = event.duration || "";
+  document.querySelector("#admin-event-result").value = event.result || "";
+  document.querySelector("#admin-event-detail").value = event.detail || "";
+  document.querySelector("#admin-event-track").value = event.track || "";
+  document.querySelector("#admin-event-document").value = event.document || "";
+  document.querySelector("#admin-event-lyrics").value = event.lyrics || "";
+  document.querySelector("#admin-event-milestone").checked = Boolean(event.milestone);
+  document.querySelector("#admin-event-sort-order").value = event.sortOrder ?? "";
+  openAdminPanel();
+}
+
+function resetAdminEventForm() {
+  document.querySelector("#admin-event-form").reset();
+}
+
+async function saveAdminEvent(submitEvent) {
+  submitEvent.preventDefault();
+  if (!canUseAdminMode()) return;
+  const payload = readAdminEventForm();
+  const { error } = await state.authClient.from("album_events").upsert(payload, { onConflict: "id" });
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "일정 저장 실패";
+    return;
+  }
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${payload.title} 일정 저장 완료`;
+}
+
+async function deleteAdminEvent() {
+  if (!canUseAdminMode()) return;
+  const id = document.querySelector("#admin-event-id").value.trim();
+  if (!id) return;
+
+  // album_tracks.event_id 는 on delete cascade 라서, 연결 곡이 있는 이벤트를 지우면
+  // 곡까지 조용히 삭제된다(런타임 소스 데이터 손실). 삭제 전에 막는다.
+  const linkedTracks = state.tracks.filter((track) => track.eventId === id);
+  if (linkedTracks.length > 0) {
+    const names = linkedTracks.map((track) => `${track.number} ${track.title}`).join(", ");
+    document.querySelector("#auth-status-detail").textContent =
+      `이 일정에 연결된 곡(${names})이 있어 삭제할 수 없습니다. 곡을 먼저 삭제하거나 다른 일정으로 옮기세요.`;
+    return;
+  }
+
+  const { error } = await state.authClient.from("album_events").delete().eq("id", id);
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "일정 삭제 실패";
+    return;
+  }
+  resetAdminEventForm();
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${id} 일정 삭제 완료`;
+}
+
+// ── 곡(album_tracks) 편집 ────────────────────────────────────────────────
+function readAdminTrackForm() {
+  const sortRaw = document.querySelector("#admin-track-sort-order").value;
+  return {
+    number: document.querySelector("#admin-track-number").value.trim(),
+    title: document.querySelector("#admin-track-title").value.trim(),
+    due: document.querySelector("#admin-track-due").value,
+    event_id: document.querySelector("#admin-track-event-id").value.trim(),
+    document: document.querySelector("#admin-track-document").value.trim(),
+    lyrics: document.querySelector("#admin-track-lyrics").value.trim(),
+    sort_order: sortRaw === "" ? null : Number(sortRaw),
+  };
+}
+
+function fillAdminTrackForm(track) {
+  if (!track) return;
+  document.querySelector("#admin-track-number").value = track.number || "";
+  document.querySelector("#admin-track-title").value = track.title || "";
+  document.querySelector("#admin-track-due").value = track.due || "";
+  document.querySelector("#admin-track-event-id").value = track.eventId || "";
+  document.querySelector("#admin-track-document").value = track.document || "";
+  document.querySelector("#admin-track-lyrics").value = track.lyrics || "";
+  document.querySelector("#admin-track-sort-order").value = track.sortOrder ?? "";
+  openAdminPanel();
+}
+
+function resetAdminTrackForm() {
+  document.querySelector("#admin-track-form").reset();
+}
+
+async function saveAdminTrack(submitEvent) {
+  submitEvent.preventDefault();
+  if (!canUseAdminMode()) return;
+  const payload = readAdminTrackForm();
+  const { error } = await state.authClient.from("album_tracks").upsert(payload, { onConflict: "number" });
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "곡 저장 실패 (연결 이벤트 ID가 존재해야 함)";
+    return;
+  }
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${payload.title} 곡 저장 완료`;
+}
+
+async function deleteAdminTrack() {
+  if (!canUseAdminMode()) return;
+  const number = document.querySelector("#admin-track-number").value.trim();
+  if (!number) return;
+  const { error } = await state.authClient.from("album_tracks").delete().eq("number", number);
+  if (error) {
+    console.error(error);
+    document.querySelector("#auth-status-detail").textContent = "곡 삭제 실패";
+    return;
+  }
+  resetAdminTrackForm();
+  await refreshSupabaseData();
+  document.querySelector("#auth-status-detail").textContent = `${number} 곡 삭제 완료`;
 }
 
 function eventOccursOnDate(event, iso) {
@@ -3072,9 +2716,9 @@ function renderCalendar() {
                 ${overlapEntries
                   .map(
                     (entry) => `
-                      <button class="overlap-summary-item" type="button" data-jump-date="${entry.iso}">
+                      <button class="overlap-summary-item" type="button" data-jump-date="${escapeHtml(entry.iso)}">
                         <strong>${entry.day}일 · ${entry.count}개</strong>
-                        <span>${entry.titles.join(" · ")}</span>
+                        <span>${entry.titles.map(escapeHtml).join(" · ")}</span>
                       </button>
                     `
                   )
@@ -3128,7 +2772,7 @@ function renderEvent(event, iso = event.date) {
         : "";
 
   return `
-    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${event.id}">
+    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}">
       <div class="event-badges">
         <span class="event-badge">${phaseLabel}</span>
         ${presentation.badge ? `<span class="event-badge is-slot">${presentation.badge}</span>` : ""}
@@ -3138,13 +2782,13 @@ function renderEvent(event, iso = event.date) {
         <input
           class="event-check"
           type="checkbox"
-          aria-label="${event.title} 완료"
+          aria-label="${escapeHtml(event.title)} 완료"
           ${complete ? "checked" : ""}
         />
-        <button class="event-title-button" type="button">${presentation.title}</button>
+        <button class="event-title-button" type="button">${escapeHtml(presentation.title)}</button>
       </div>
-      ${presentation.helper ? `<p class="event-helper">${presentation.helper}</p>` : ""}
-      <p class="event-meta">${presentation.meta}</p>
+      ${presentation.helper ? `<p class="event-helper">${escapeHtml(presentation.helper)}</p>` : ""}
+      <p class="event-meta">${escapeHtml(presentation.meta)}</p>
       <p class="event-submeta">${formatDayLabel(iso)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
     </div>
   `;
@@ -3280,8 +2924,8 @@ function renderTrackSummaryBoard() {
     <section class="track-hero-card">
       <div>
         <p class="section-kicker">CURRENT TRACK FOCUS</p>
-        <h3>${currentFocus ? `${currentFocus.number}. ${currentFocus.title}` : "진행 중인 곡 없음"}</h3>
-        <p>${currentEvent?.detail || "아직 곡이 선택되지 않았습니다."}</p>
+        <h3>${currentFocus ? `${escapeHtml(currentFocus.number)}. ${escapeHtml(currentFocus.title)}` : "진행 중인 곡 없음"}</h3>
+        <p>${escapeHtml(currentEvent?.detail) || "아직 곡이 선택되지 않았습니다."}</p>
       </div>
       <div class="track-hero-meta">
         ${currentStatus ? `<span class="status-pill ${currentStatus.className}">${currentStatus.label}</span>` : ""}
@@ -3303,54 +2947,82 @@ function renderTrackSummaryBoard() {
   `;
 }
 
-function renderTracks() {
-  renderTrackSummaryBoard();
-  const body = document.querySelector("#track-table-body");
-  body.innerHTML = state.tracks
-    .map((track) => {
-      const status = getTrackStatus(track.number, track.eventId);
-      const progress = getTrackChecklistProgress(track.number);
-      return `
-        <tr>
-          <td class="track-number" data-label="번호">${track.number}</td>
-          <td class="track-name" data-label="곡">${track.title}</td>
-          <td data-label="데모 마감">${formatShortDate(track.due)}</td>
-          <td data-label="상태">
-            <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
-            <span class="table-progress-copy">${progress.completed}/${progress.total}</span>
-          </td>
-          <td data-label="문서">
-            <div class="document-links">
-              <a href="${track.document}" target="_blank">작업</a>
-              <a href="${track.lyrics}" target="_blank">가사</a>
-            </div>
-          </td>
-        </tr>
-      `;
-    })
-    .join("");
+// 활성(포커스) 곡 결정: 명시 선택 > 진행 중 곡 > 첫 미완료 곡 > 첫 곡.
+function getActiveTrack() {
+  const explicit = state.tracks.find((track) => track.number === state.activeTrackNumber);
+  if (explicit) return explicit;
+  const statuses = state.tracks.map((track) => ({ track, status: getTrackStatus(track.number, track.eventId) }));
+  const inProgress = statuses.find(
+    ({ status }) => status.className === "is-active" || status.className === "is-review"
+  );
+  if (inProgress) return inProgress.track;
+  const incomplete = state.tracks.find((track) => !state.completed.has(track.eventId));
+  return incomplete || state.tracks[0] || null;
+}
 
-  document.querySelector("#track-detail-list").innerHTML = state.tracks
-    .map((track) => {
-      const checklist = getTrackChecklist(track.number);
-      const progress = getTrackChecklistProgress(track.number);
-      const stage = getTrackStageProgress(track.number);
-      const event = findEvent(track.eventId);
-      const notes = getTrackNotes(track.number);
-      const status = getTrackStatus(track.number, track.eventId);
-      const groupedSteps = trackStepGroups
-        .map((group) => ({
-          ...group,
-          steps: defaultTrackSteps.filter((step) => step.group === group.id),
-        }))
-        .filter((group) => group.steps.length > 0);
+function getFilteredTracks() {
+  const query = state.trackSearch.trim().toLowerCase();
+  if (!query) return state.tracks;
+  return state.tracks.filter(
+    (track) => track.title.toLowerCase().includes(query) || track.number.includes(query)
+  );
+}
 
-      return `
-        <article class="track-detail-card">
+function setActiveTrack(trackNumber, { scroll = false, updateHash = true } = {}) {
+  const track = state.tracks.find((item) => item.number === trackNumber);
+  if (!track) return;
+  state.activeTrackNumber = track.number;
+  if (updateHash) {
+    const nextHash = `#track-${track.number}`;
+    if (window.location.hash !== nextHash) {
+      history.replaceState(null, "", nextHash);
+    }
+  }
+  renderTracks();
+  if (scroll) {
+    const card = document.querySelector(`#track-card-${track.number}`);
+    if (card) card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+}
+
+// 대시보드/달력 등에서 곡으로 딥링크. eventId 또는 곡 이름으로 포커스 이동.
+function focusTrackByEventId(eventId) {
+  const track = state.tracks.find((item) => item.eventId === eventId);
+  if (!track) return false;
+  setActiveView("tracks", { focusPanel: false });
+  setActiveTrack(track.number, { scroll: true });
+  return true;
+}
+
+function focusTrackByName(name) {
+  if (!name) return false;
+  const track = state.tracks.find((item) => item.title === name);
+  if (!track) return false;
+  setActiveView("tracks", { focusPanel: false });
+  setActiveTrack(track.number, { scroll: true });
+  return true;
+}
+
+function renderTrackDetailCard(track) {
+  const checklist = getTrackChecklist(track.number);
+  const progress = getTrackChecklistProgress(track.number);
+  const stage = getTrackStageProgress(track.number);
+  const event = findEvent(track.eventId);
+  const notes = getTrackNotes(track.number);
+  const status = getTrackStatus(track.number, track.eventId);
+  const groupedSteps = trackStepGroups
+    .map((group) => ({
+      ...group,
+      steps: defaultTrackSteps.filter((step) => step.group === group.id),
+    }))
+    .filter((group) => group.steps.length > 0);
+
+  return `
+        <article class="track-detail-card" id="track-card-${escapeHtml(track.number)}">
           <div class="track-detail-top">
             <div>
-              <h3>${track.number}. ${track.title}</h3>
-              <p>${event?.detail || "이번 곡의 데모 준비를 진행합니다."}</p>
+              <h3>${escapeHtml(track.number)}. ${escapeHtml(track.title)}</h3>
+              <p>${escapeHtml(event?.detail) || "이번 곡의 데모 준비를 진행합니다."}</p>
               <div class="focus-meta">
                 <span class="meta-pill">데모 마감 ${formatShortDate(track.due)}</span>
                 <span class="meta-pill">세션 ${stage.sessionCompleted}/${stage.sessionTotal}</span>
@@ -3364,17 +3036,22 @@ function renderTracks() {
             </div>
           </div>
           <div class="track-action-row">
-            <button class="opportunity-action is-primary" type="button" data-track-action="focus" data-track-event-id="${track.eventId}">
+            <button class="opportunity-action is-primary" type="button" data-track-action="focus" data-track-event-id="${escapeHtml(track.eventId)}">
               오늘 보드에 올리기
             </button>
-            <button class="opportunity-action" type="button" data-track-action="complete" data-track-event-id="${track.eventId}">
+            <button class="opportunity-action" type="button" data-track-action="complete" data-track-event-id="${escapeHtml(track.eventId)}">
               ${state.completed.has(track.eventId) ? "완료 해제" : "데모 완료"}
             </button>
-            <button class="opportunity-action is-secondary" type="button" data-track-action="hold" data-track-event-id="${track.eventId}">
+            <button class="opportunity-action is-secondary" type="button" data-track-action="hold" data-track-event-id="${escapeHtml(track.eventId)}">
               보류
             </button>
+            ${
+              canUseAdminMode()
+                ? `<button class="opportunity-action opportunity-edit-button" type="button" data-track-edit="${escapeHtml(track.number)}">관리자: 곡 편집</button>`
+                : ""
+            }
           </div>
-          <div class="track-checklist" data-track-number="${track.number}">
+          <div class="track-checklist" data-track-number="${escapeHtml(track.number)}">
             ${groupedSteps
               .map(
                 (group) => `
@@ -3390,7 +3067,7 @@ function renderTracks() {
                             </label>
                             ${
                               step.repeatable
-                                ? `<button class="track-repeat-inline" type="button" data-track-repeat-add="${step.id}" data-track-number="${track.number}">다시 일정</button>`
+                                ? `<button class="track-repeat-inline" type="button" data-track-repeat-add="${step.id}" data-track-number="${escapeHtml(track.number)}">다시 일정</button>`
                                 : ""
                             }
                           </div>
@@ -3420,18 +3097,100 @@ function renderTracks() {
             ${renderTrackFollowupSection(track)}
           </div>
           <div class="track-links">
-            <a href="${track.document}" target="_blank">곡 문서 열기</a>
-            <a href="${track.lyrics}" target="_blank">가사 열기</a>
+            <a href="${safeUrl(track.document)}" target="_blank">곡 문서 열기</a>
+            <a href="${safeUrl(track.lyrics)}" target="_blank">가사 열기</a>
           </div>
         </article>
       `;
-    })
-    .join("");
+}
 
+function renderTracks() {
+  renderTrackSummaryBoard();
+
+  const kicker = document.querySelector("#tracks-kicker");
+  if (kicker) kicker.textContent = `${state.tracks.length} CANDIDATE TRACKS`;
+
+  const activeTrack = getActiveTrack();
+  const activeNumber = activeTrack ? activeTrack.number : null;
+  const filtered = getFilteredTracks();
+
+  // 브라우즈용 표 — 행을 클릭하면 해당 곡 워크플로로 포커스 이동.
+  const body = document.querySelector("#track-table-body");
+  body.innerHTML =
+    filtered
+      .map((track) => {
+        const status = getTrackStatus(track.number, track.eventId);
+        const progress = getTrackChecklistProgress(track.number);
+        const isActive = track.number === activeNumber;
+        return `
+        <tr class="track-row${isActive ? " is-active" : ""}" data-track-number="${escapeHtml(track.number)}" tabindex="0" role="button" aria-label="${escapeHtml(track.title)} 작업 열기">
+          <td class="track-number" data-label="번호">${escapeHtml(track.number)}</td>
+          <td class="track-name" data-label="곡">${escapeHtml(track.title)}</td>
+          <td data-label="데모 마감">${formatShortDate(track.due)}</td>
+          <td data-label="상태">
+            <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
+            <span class="table-progress-copy">${progress.completed}/${progress.total}</span>
+          </td>
+          <td data-label="문서">
+            <div class="document-links">
+              <a href="${safeUrl(track.document)}" target="_blank" rel="noreferrer">작업</a>
+              <a href="${safeUrl(track.lyrics)}" target="_blank" rel="noreferrer">가사</a>
+            </div>
+          </td>
+        </tr>
+      `;
+      })
+      .join("") || `<tr><td colspan="5" class="empty-copy">검색과 일치하는 곡이 없습니다.</td></tr>`;
+
+  // 곡 선택 칩 — 빠른 곡 전환.
+  const chipNav = document.querySelector("#track-chip-nav");
+  if (chipNav) {
+    chipNav.innerHTML = state.tracks
+      .map((track) => {
+        const isActive = track.number === activeNumber;
+        const isDone = state.completed.has(track.eventId);
+        return `<button class="track-chip${isActive ? " is-active" : ""}${isDone ? " is-done" : ""}" type="button" role="tab" aria-selected="${isActive}" data-track-chip="${escapeHtml(track.number)}">${escapeHtml(track.number)} · ${escapeHtml(track.title)}</button>`;
+      })
+      .join("");
+  }
+
+  // 선택된 곡 1개만 상세(포커스)로 렌더 — 11곡 전체 스택 제거.
+  document.querySelector("#track-detail-list").innerHTML = activeTrack
+    ? renderTrackDetailCard(activeTrack)
+    : `<p class="empty-copy">표시할 곡이 없습니다.</p>`;
+
+  bindTrackBrowseControls();
+  bindTrackDetailControls();
+}
+
+function bindTrackBrowseControls() {
+  document.querySelectorAll("#track-table-body .track-row").forEach((row) => {
+    const go = () => setActiveTrack(row.dataset.trackNumber, { scroll: true });
+    row.addEventListener("click", (clickEvent) => {
+      if (clickEvent.target.closest("a")) return; // 문서/가사 링크는 링크대로.
+      go();
+    });
+    row.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+        keyEvent.preventDefault();
+        go();
+      }
+    });
+  });
+
+  document.querySelectorAll("[data-track-chip]").forEach((chip) => {
+    chip.addEventListener("click", () => setActiveTrack(chip.dataset.trackChip, { scroll: true }));
+  });
+}
+
+function bindTrackDetailControls() {
   document.querySelectorAll(".track-checklist").forEach((container) => {
     const trackNumber = container.dataset.trackNumber;
     container.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
+        if (!state.trackChecklist[trackNumber]) {
+          state.trackChecklist[trackNumber] = Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false]));
+        }
         state.trackChecklist[trackNumber][input.dataset.stepId] = input.checked;
         const step = findTrackStep(input.dataset.stepId);
         addTrackActivity(
@@ -3453,6 +3212,13 @@ function renderTracks() {
       if (action === "focus") acceptEventForThisWeek(eventId);
       if (action === "hold") holdEvent(eventId);
       if (action === "complete") toggleCompleted(eventId, !state.completed.has(eventId));
+    });
+  });
+
+  document.querySelectorAll("[data-track-edit]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const track = state.tracks.find((item) => item.number === button.dataset.trackEdit);
+      if (track) fillAdminTrackForm(track);
     });
   });
 
@@ -3501,13 +3267,50 @@ function openTaskDialog(event) {
   ];
   if (event.track) meta.unshift(["곡", event.track]);
   document.querySelector("#dialog-meta").innerHTML = meta
-    .map(([term, value]) => `<dt>${term}</dt><dd>${value}</dd>`)
+    .map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd>`)
     .join("");
 
   const links = [];
-  if (event.document) links.push(`<a href="${event.document}" target="_blank">관련 문서 열기</a>`);
-  if (event.lyrics) links.push(`<a href="${event.lyrics}" target="_blank">가사 열기</a>`);
-  document.querySelector("#dialog-links").innerHTML = links.join("");
+  if (event.document) links.push(`<a href="${safeUrl(event.document)}" target="_blank">관련 문서 열기</a>`);
+  if (event.lyrics) links.push(`<a href="${safeUrl(event.lyrics)}" target="_blank">가사 열기</a>`);
+
+  // 일정 ↔ 곡 딥링크: 이 일정이 특정 곡과 연결되면 곡 워크플로로 바로 이동.
+  const linkedTrack = event.trackNumber
+    ? state.tracks.find((track) => track.number === event.trackNumber)
+    : event.track
+      ? state.tracks.find((track) => track.title === event.track)
+      : null;
+  if (linkedTrack) {
+    links.push(
+      `<button class="opportunity-action is-secondary" type="button" data-dialog-track="${escapeHtml(linkedTrack.number)}">이 곡 작업으로 이동</button>`
+    );
+  }
+
+  // 관리자: 이 일정이 편집 가능한 기본 일정이면 편집 버튼 노출.
+  const editableBaseEvent = canUseAdminMode() && state.baseEvents.find((base) => base.id === event.id);
+  if (editableBaseEvent) {
+    links.push(
+      '<button class="opportunity-action opportunity-edit-button" type="button" data-dialog-edit-event="true">관리자: 일정 편집</button>'
+    );
+  }
+
+  const linksHost = document.querySelector("#dialog-links");
+  linksHost.innerHTML = links.join("");
+  const trackButton = linksHost.querySelector("[data-dialog-track]");
+  if (trackButton) {
+    trackButton.addEventListener("click", () => {
+      dialog.close();
+      setActiveView("tracks", { focusPanel: false });
+      setActiveTrack(trackButton.dataset.dialogTrack, { scroll: true });
+    });
+  }
+  const editEventButton = linksHost.querySelector("[data-dialog-edit-event]");
+  if (editEventButton && editableBaseEvent) {
+    editEventButton.addEventListener("click", () => {
+      dialog.close();
+      fillAdminEventForm(editableBaseEvent);
+    });
+  }
   dialog.showModal();
 }
 
@@ -3531,28 +3334,38 @@ function openOpportunityDialog(opportunity) {
     ["갱신", opportunity.lastCheckedAt ? formatSyncTimestamp(new Date(opportunity.lastCheckedAt)) : "최근 확인 기록 없음"],
   ];
   document.querySelector("#dialog-meta").innerHTML = meta
-    .map(([term, value]) => `<dt>${term}</dt><dd>${value}</dd>`)
+    .map(([term, value]) => `<dt>${escapeHtml(term)}</dt><dd>${escapeHtml(value)}</dd>`)
     .join("");
 
   document.querySelector("#dialog-links").innerHTML = `
-    <a href="${opportunity.officialUrl}" target="_blank" rel="noreferrer">공식 공고 열기</a>
-    <span class="summary-label">${opportunity.sourceNote || "출처 메모 없음"}</span>
+    <a href="${safeUrl(opportunity.officialUrl)}" target="_blank" rel="noreferrer">공식 공고 열기</a>
+    <span class="summary-label">${escapeHtml(opportunity.sourceNote || "출처 메모 없음")}</span>
   `;
   dialog.showModal();
 }
 
-function setActiveView(view) {
+function setActiveView(view, { focusPanel = true } = {}) {
+  const changed = state.activeView !== view;
   state.activeView = view;
   document.querySelectorAll(".tab-button").forEach((button) => {
     const active = button.dataset.view === view;
     button.classList.toggle("is-active", active);
     button.setAttribute("aria-selected", String(active));
   });
+  let activePanel = null;
   document.querySelectorAll(".view-panel").forEach((panel) => {
     const active = panel.id === `${view}-view`;
     panel.classList.toggle("is-active", active);
     panel.hidden = !active;
+    if (active) activePanel = panel;
   });
+  // 탭을 실제로 바꿀 때만 새 패널로 포커스를 옮기고 상단으로 스크롤한다.
+  // (키보드/스크린리더 사용자가 이전 탭의 스크롤 위치에 갇히지 않게)
+  if (changed && focusPanel && activePanel) {
+    activePanel.focus({ preventScroll: true });
+    const main = document.querySelector("#main-content");
+    (main || activePanel).scrollIntoView({ block: "start" });
+  }
 }
 
 function jumpToCurrentWeek() {
@@ -3601,6 +3414,24 @@ document.querySelectorAll(".tab-button").forEach((button) => {
   button.addEventListener("click", () => setActiveView(button.dataset.view));
 });
 
+// 곡 검색은 정적 입력이라 한 번만 바인딩(재렌더로 포커스를 잃지 않게).
+document.querySelector("#track-search")?.addEventListener("input", (searchEvent) => {
+  state.trackSearch = searchEvent.target.value || "";
+  renderTracks();
+});
+
+// #track-NN 딥링크 지원: 공유/재방문 시 해당 곡 포커스를 복원한다.
+function applyTrackHash() {
+  const match = /^#track-(.+)$/.exec(window.location.hash || "");
+  if (!match) return;
+  const number = decodeURIComponent(match[1]);
+  const track = state.tracks.find((item) => item.number === number);
+  if (!track) return;
+  setActiveView("tracks", { focusPanel: false });
+  setActiveTrack(track.number, { scroll: true, updateHash: false });
+}
+window.addEventListener("hashchange", applyTrackHash);
+
 document.querySelector("#jump-today").addEventListener("click", jumpToCurrentWeek);
 document.querySelector("#refresh-data").addEventListener("click", refreshSupabaseData);
 document.querySelectorAll("[data-app-refresh]").forEach((element) => {
@@ -3621,6 +3452,12 @@ document.querySelector("#mobile-utility-toggle").addEventListener("click", toggl
 document.querySelector("#admin-opportunity-form")?.addEventListener("submit", saveAdminOpportunity);
 document.querySelector("#admin-reset")?.addEventListener("click", resetAdminOpportunityForm);
 document.querySelector("#admin-delete")?.addEventListener("click", deleteAdminOpportunity);
+document.querySelector("#admin-event-form")?.addEventListener("submit", saveAdminEvent);
+document.querySelector("#admin-event-reset")?.addEventListener("click", resetAdminEventForm);
+document.querySelector("#admin-event-delete")?.addEventListener("click", deleteAdminEvent);
+document.querySelector("#admin-track-form")?.addEventListener("submit", saveAdminTrack);
+document.querySelector("#admin-track-reset")?.addEventListener("click", resetAdminTrackForm);
+document.querySelector("#admin-track-delete")?.addEventListener("click", deleteAdminTrack);
 document.querySelectorAll("[data-mobile-jump]").forEach((button) => {
   button.addEventListener("click", () => {
     const target = button.dataset.mobileJump;
@@ -3643,6 +3480,7 @@ document.querySelector("#task-dialog").addEventListener("click", (event) => {
 });
 
 renderAll();
+applyTrackHash();
 refreshSupabaseData();
 initAuth();
 bindPwaInstall();

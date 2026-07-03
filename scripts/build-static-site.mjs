@@ -71,7 +71,7 @@ async function stampServiceWorker(buildVersion) {
 await rm(distDir, { recursive: true, force: true });
 await ensureDir(distDir);
 
-for (const file of ["index.html", "styles.css", "app.js", "manifest.webmanifest", "service-worker.js", "pwa-reset.html"]) {
+for (const file of ["index.html", "styles.css", "app.js", "schedule-data.js", "manifest.webmanifest", "service-worker.js", "pwa-reset.html"]) {
   await copyFile(file);
 }
 

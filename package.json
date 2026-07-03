@@ -1,10 +1,14 @@
 {
   "name": "album-release-schedule",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
+    "schedule:sql": "node scripts/build-schedule-sql.mjs",
+    "schedule:sync": "bash scripts/update-schedule.sh",
     "opportunities:grounz": "bash scripts/update-grounz-opportunities.sh",
     "serve": "python3 -m http.server 4173",
-    "supabase:sync": "bash scripts/supabase-sync.sh"
+    "supabase:sync": "bash scripts/supabase-sync.sh",
+    "deploy": "npm run build"
   }
 }

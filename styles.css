@@ -206,6 +206,46 @@ input:focus-visible {
   font-size: 14px;
 }
 
+/* 동기화 상태를 색으로 구분: 로딩(중립 강조)·완료(초록)·실패(경고). */
+.sync-strip[data-sync-status="loading"] {
+  background:
+    linear-gradient(135deg, rgba(75, 111, 168, 0.16), transparent 52%),
+    var(--paper);
+}
+
+.sync-strip[data-sync-status="ready"] {
+  background:
+    linear-gradient(135deg, rgba(39, 117, 82, 0.16), transparent 52%),
+    var(--paper);
+}
+
+.sync-strip[data-sync-status="error"] {
+  background:
+    linear-gradient(135deg, rgba(182, 80, 67, 0.2), transparent 55%),
+    var(--paper);
+  border-bottom-color: var(--danger);
+}
+
+.sync-strip[data-sync-status="error"] #sync-status-text {
+  color: var(--danger);
+}
+
+.sync-strip[data-sync-status="error"] #sync-status-text::before {
+  content: "⚠ ";
+}
+
+.mobile-sync-banner {
+  grid-column: 1 / -1;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--danger);
+  border-radius: 10px;
+  background: rgba(182, 80, 67, 0.12);
+  color: var(--danger);
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .sync-actions {
   display: flex;
   align-items: center;
@@ -632,6 +672,49 @@ input:focus-visible {
   font-size: 24px;
 }
 
+.overview-card-clickable {
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.overview-card-clickable:hover {
+  border-color: var(--demo);
+  transform: translateY(-1px);
+}
+
+.overview-card-clickable:focus-visible {
+  outline: 2px solid var(--demo);
+  outline-offset: 2px;
+}
+
+.onboarding-hint {
+  margin-bottom: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--demo);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(47, 125, 105, 0.1), transparent 60%),
+    #fbfcfb;
+}
+
+.onboarding-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.onboarding-steps {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--ink);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .overview-card p {
   margin: 0;
   color: var(--muted);
@@ -665,8 +748,59 @@ input:focus-visible {
   grid-column: 1 / -1;
 }
 
-.mobile-focus-toggle {
+/* 회고(보류/제외/완료)는 기본 접힘으로 첫 화면 밀도를 낮춘다. */
+.dashboard-retro {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fbfcfb;
+}
+
+.dashboard-retro-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 18px;
+}
+
+.dashboard-retro-summary::-webkit-details-marker {
   display: none;
+}
+
+.dashboard-retro-summary::after {
+  content: "▾";
+  margin-left: auto;
+  color: var(--muted);
+  transition: transform 0.15s ease;
+}
+
+.dashboard-retro[open] .dashboard-retro-summary::after {
+  transform: rotate(180deg);
+}
+
+.dashboard-retro-title {
+  font-weight: 700;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.dashboard-retro-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+  padding: 0 14px 16px;
+}
+
+.dashboard-retro-grid .dashboard-card {
+  background: var(--paper);
+}
+
+/* 데스크톱·모바일 모두에서 보조 카드를 접어 '지금 할 일'에 집중할 수 있게 한다. */
+.mobile-focus-toggle {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
 }
 
 .body-mobile-compact .dashboard-secondary-card {
@@ -835,6 +969,110 @@ input:focus-visible {
   gap: 10px;
 }
 
+.admin-panel {
+  margin: 18px 0;
+  padding: 16px 18px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background:
+    linear-gradient(135deg, rgba(75, 111, 168, 0.08), transparent 60%),
+    #fbfcfb;
+  display: grid;
+  gap: 16px;
+}
+
+.admin-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-panel-head h3 {
+  margin: 2px 0 0;
+}
+
+.admin-form-title {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.admin-field {
+  display: grid;
+  gap: 6px;
+}
+
+.admin-field > span {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+
+.admin-input {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fcfdfc;
+  color: var(--ink);
+  font: inherit;
+}
+
+textarea.admin-input {
+  min-height: 84px;
+  padding: 10px 12px;
+  resize: vertical;
+  line-height: 1.5;
+}
+
+.admin-input:focus-visible,
+.admin-select:focus-visible {
+  outline: 2px solid var(--arrangement);
+  outline-offset: 1px;
+}
+
+.opportunity-edit-button {
+  margin-top: 8px;
+}
+
+.admin-divider {
+  grid-column: 1 / -1;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 4px 0;
+}
+
+.admin-checkbox-field {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-checkbox {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+.admin-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.admin-note code {
+  padding: 1px 5px;
+  border-radius: 6px;
+  background: #eef4f1;
+  font-size: 11px;
+}
+
 .prompt-preview {
   margin: 0;
   padding: 14px;
@@ -845,6 +1083,92 @@ input:focus-visible {
   font-size: 12px;
   line-height: 1.6;
   white-space: pre-wrap;
+}
+
+.track-browse-head {
+  margin-top: 16px;
+}
+
+.track-search {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fcfdfc;
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.track-search:focus-visible {
+  outline: 2px solid var(--demo);
+  outline-offset: 1px;
+}
+
+.track-row {
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.track-row:hover {
+  background: #eef4f1;
+}
+
+.track-row.is-active {
+  background: #e4f0ea;
+  box-shadow: inset 3px 0 0 var(--demo);
+}
+
+.track-row:focus-visible {
+  outline: 2px solid var(--demo);
+  outline-offset: -2px;
+}
+
+.track-chip-nav {
+  margin-top: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.track-chip {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 7px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fbfcfb;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-chip:hover {
+  border-color: var(--line-strong);
+  color: var(--ink);
+}
+
+.track-chip.is-done {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.track-chip.is-active {
+  background: var(--demo);
+  border-color: var(--demo);
+  color: #fff;
+  opacity: 1;
+  text-decoration: none;
+}
+
+.track-chip:focus-visible {
+  outline: 2px solid var(--demo);
+  outline-offset: 1px;
 }
 
 .track-detail-list {

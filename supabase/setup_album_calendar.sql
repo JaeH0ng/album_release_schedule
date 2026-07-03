@@ -14,12 +14,16 @@ create table if not exists public.album_events (
   milestone boolean not null default false
 );
 
+-- 참고: 이 파일은 "기본 테이블 + 시드(읽기 전용)"만 담는다.
+-- 관리자 쓰기 RLS(admin_users 기반)와 이후 변경은 supabase/migrations 를
+-- `supabase db push`(npm run supabase:sync)로 적용하는 것이 정식 전체 초기화 경로다.
+-- FK는 마이그레이션 최종 상태(on delete restrict)와 일치시킨다.
 create table if not exists public.album_tracks (
   number text primary key,
   sort_order integer,
   title text not null,
   due date not null,
-  event_id text not null references public.album_events(id) on delete cascade,
+  event_id text not null references public.album_events(id) on delete restrict,
   document text not null,
   lyrics text not null
 );

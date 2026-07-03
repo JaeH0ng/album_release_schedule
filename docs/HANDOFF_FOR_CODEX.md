@@ -17,6 +17,93 @@
 
 ## 변경 로그
 
+### 2026-07-03 (리뷰 반영 2차) — Codex 2차 리뷰 지적 4건 처리 (Major 3 + Minor 1)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+`docs/REVIEW_FROM_CODEX.md` 2차 리뷰 지적 4건을 모두 반영하고 `[resolved]`로 표시했다.
+
+- **[Major] 연결 실패(catch) 시 표시 데이터 불일치** — `refreshSupabaseData` catch에서 `setScheduleData(defaults)`+`setOpportunityData`+`updateChrome`+`renderAll` 후 error. 이전에 Supabase 로드 후 실패해도 화면과 "기본 일정" 문구가 일치(app.js:719~).
+- **[Major] 초기화 경로 불일치** — `supabase/setup_album_calendar.sql` FK를 `on delete restrict`로, 주석으로 "기본 테이블+시드(읽기 전용)" 명시. README를 고쳐 정식 전체 초기화는 migrations `db push`로 안내.
+- **[Major] renderTrackChoiceGroup escape 누락** — `data-track-number`(및 noteKey/choice)를 `escapeHtml`로 일괄 처리(app.js:1464~).
+- **[Minor] README 곡 수** — 바로가기 "10곡"→"11곡" 등 현재 기준으로.
+
+**바꾼 파일**
+- `app.js`, `README.md`, `supabase/setup_album_calendar.sql`, `docs/REVIEW_FROM_CODEX.md`(상태 갱신).
+
+**커밋·배포 여부**
+- 브랜치 `improve/ux-and-data-consistency` 스테이징, 커밋/푸시 안 함. `node --check`·`npm run build` 통과, 미리보기 콘솔 오류 0.
+
+**Codex가 봐줬으면 하는 곳 (재리뷰)**
+- catch 폴백이 initial/refresh 실패 양쪽에서 데이터·문구 일치를 보장하는지.
+- setup SQL/migrations 초기화 경로 안내가 이제 일관적인지.
+
+### 2026-07-03 (리뷰 반영 1차) — Codex 리뷰 지적 4건 처리 (Blocker 2 + Major 2)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+`docs/REVIEW_FROM_CODEX.md`의 2026-07-03 리뷰 지적 4건을 모두 반영하고 `[resolved]`로 표시했다.
+
+- **[Blocker] 이벤트 삭제 cascade** — `deleteAdminEvent`가 삭제 전 연결 곡을 검사해 있으면 차단(app.js). FK를 `on delete restrict`로 바꾸는 마이그레이션 `supabase/migrations/20260703130000_tracks_fk_restrict.sql` 추가.
+- **[Blocker] deploy가 라이브 편집 prune** — `package.json`의 `deploy`를 `npm run build`만으로 변경(schedule:sync 제거). `schedule:sync`는 명시적 reset로 유지, README에 덮어쓰기 경고 추가.
+- **[Major] 부분 시드 error 미표면화** — `refreshSupabaseData` 재구조화: `partialSchedule` 최우선 처리(기본값 폴백+error), 빈 테이블도 `setScheduleData(defaults)` 명시.
+- **[Major] escape 누락** — overlap 요약 제목, `data-event-id`/`data-track-event-id`/`data-track-number`/followup 속성, track activity `category`/`text`를 `escapeHtml` 적용.
+
+**바꾼 파일**
+- `app.js`, `package.json`, `README.md`, `supabase/migrations/20260703130000_tracks_fk_restrict.sql`(신규), `docs/REVIEW_FROM_CODEX.md`(상태 갱신).
+- 리뷰 응답 형식(판정+인덱스)을 `docs/REVIEW_GUIDE.md`에 확정, `AGENTS.md`/`REVIEW_GUIDE.md`를 "Codex는 코드 직접 수정 안 함(리뷰 전용)"으로 조임.
+
+**커밋·배포 여부**
+- 브랜치 `improve/ux-and-data-consistency` 스테이징, 커밋/푸시 안 함. `node --check`·`npm run build` 통과, 미리보기 콘솔 오류 0.
+- 새 FK 마이그레이션(20260703130000)은 `npm run supabase:sync`로 push 필요.
+
+**Codex가 봐줬으면 하는 곳 (재리뷰)**
+- `refreshSupabaseData` 재구조화가 세 소스(부분/완전빈/정상) 분기를 빠짐없이 덮는지.
+- `deleteAdminEvent` 가드 + FK restrict 조합이 데이터 손실을 확실히 막는지.
+- escape 보강에서 놓친 `innerHTML`/속성 보간이 더 있는지.
+
+### 2026-07-03 — 사용성·데이터 정합·보안 대개편 + 관리자 편집 + 리뷰 프로세스 도입 (⭐ Codex 리뷰 요청)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+사용자 불만 3가지(사용 편의성 부족, 곡별 워크플로 찾기 어려움, UI 수정이 Supabase에 일관되게 반영 안 됨)를 다각도 감사 후 개선했다. 핵심 원인은 (1) 일정/곡 데이터가 `app.js` 하드코딩 + 시드 SQL + localStorage 3중으로 손 관리되어 어긋남, (2) 곡 선택 상태 부재로 11곡을 통째 렌더, (3) 첫 화면 카드 과부하였다.
+
+- **P0 데이터/안정/보안**
+  - `sortEvents`/`sortTracks`를 날짜 → `sort_order` 정렬로 바꾸고 정규화가 `sort_order`를 보존하도록 수정. 기본 데이터에도 인덱스 `sortOrder` 주입.
+  - `refreshSupabaseData`의 폴백을 **원자화**(events/tracks는 둘 다 Supabase이거나 둘 다 기본값), 부분 시드 시 error 상태 표면화, `validateScheduleIntegrity`로 dangling `eventId` 경고.
+  - `ensureTrackState`로 Supabase가 새 곡을 내려줘도 체크박스 클릭 시 크래시하지 않게 가드.
+  - `escapeHtml`/`safeUrl` 유틸 추가 후 사용자·DB·인증 유래 값의 `innerHTML`/`href`에 적용(저장형 XSS 방지).
+  - 서비스워커가 `.js/.css`도 강제 최신화 + `controllerchange` 자동 새로고침 + 빌드 미경유 캐시 버전 폴백.
+- **P1 곡 워크플로:** `state.activeTrackNumber` 도입, 단일 곡 포커스 뷰 + 곡 칩 + 검색 + 표 행 클릭 + 일정 dialog/대시보드 딥링크 + `#track-NN` 해시 복원.
+- **P1 단일 소스(경로 B):** 일정/곡 데이터를 `schedule-data.js`로 추출해 브라우저(app.js)와 SQL 생성기가 공유. `scripts/build-schedule-sql.mjs`가 upsert+prune SQL 생성, `npm run schedule:sync`로 반영.
+- **P2 사용성:** 탭 재배치(오늘→곡별 진행→달력→전체 일정→공모전) + ARIA 탭 패턴 + 전환 시 포커스/스크롤, 동기화 상태 색상+`aria-live`+모바일 에러 배너, 데스크톱 집중 토글, 회고 카드 접이식(`<details>`), 온보딩 카드.
+- **관리자 편집(경로 A):** 죽어 있던 공모전 관리자 폼 HTML 복구 + 일정/곡 편집 폼·CRUD 추가(`album_events`/`album_tracks` admin write RLS 마이그레이션 포함). Supabase=런타임 소스, `schedule-data.js`=시드/폴백으로 정리.
+- **협업/리뷰 프로세스:** `CLAUDE.md`, `docs/REVIEW_GUIDE.md`, `docs/REVIEW_FROM_CODEX.md` 신설, `AGENTS.md`에 Codex=리뷰어 역할 명시.
+
+**바꾼 파일**
+- `app.js` — 정렬·폴백·무결성·크래시 가드·XSS·SW 등록·곡 포커스 뷰·딥링크·관리자 CRUD·온보딩·탭 포커스.
+- `index.html` — 곡 검색/칩 컨테이너, 탭 재배치+ARIA, 관리자 패널(공모전/일정/곡 폼), 온보딩 컨테이너, 회고 `<details>`, sync-strip `aria-live`.
+- `styles.css` — 곡 칩/검색/행, 동기화 상태, 관리자 폼, 온보딩, 회고 섹션.
+- `service-worker.js` — `.js/.css` 강제 최신화, SKIP_WAITING, 캐시 버전 폴백.
+- `schedule-data.js`(신규) — 일정/곡 단일 소스. `scripts/build-schedule-sql.mjs`(신규), `scripts/update-schedule.sh`(신규).
+- `supabase/migrations/20260703120000_add_schedule_admin_write.sql`(신규) — 일정/곡 admin write RLS.
+- `scripts/build-static-site.mjs` — `schedule-data.js` 빌드 복사. `package.json` — `type:module` + `schedule:sql`/`schedule:sync`/`deploy` 스크립트.
+- `CLAUDE.md`·`docs/REVIEW_GUIDE.md`·`docs/REVIEW_FROM_CODEX.md`(신규), `AGENTS.md`·`README.md`(갱신).
+
+**커밋·배포 여부**
+- 브랜치 `improve/ux-and-data-consistency`에 **스테이징만, 커밋/푸시 안 함**. `npm run build` 통과, 브라우저 미리보기 콘솔 오류 0건.
+- **아직 반영 안 됨:** 새 RLS 마이그레이션은 `npm run supabase:sync`로 push 필요. `admin_users`에 운영자 이메일 등록 전에는 관리자 편집이 실제 write되지 않는다. 관리자 저장/삭제의 실제 Supabase write는 인증·프로덕션 변경이 필요해 구조·배선까지만 검증했다.
+
+**Codex가 특히 봐줬으면 하는 곳 (리뷰 요청)**
+- `app.js` `refreshSupabaseData` 원자적 폴백/에러 표면화, `sortEvents`/정규화의 `sort_order` 처리.
+- `escapeHtml`/`safeUrl` 적용 누락 지점(놓친 `innerHTML` 보간이 있는지).
+- 관리자 CRUD의 RLS 가정·payload(특히 `album_events`의 `"end"` 컬럼, `album_tracks.event_id` FK)와 `schedule-data.js` 단일 소스 관계.
+- 서비스워커 캐시 전략이 오프라인 폴백을 깨지 않는지.
+- 지적은 `docs/REVIEW_FROM_CODEX.md`에 남겨주세요(형식: `docs/REVIEW_GUIDE.md`).
+
 ### 2026-06-29 — 달력에서 전곡 데모를 녹음/리뷰 슬롯으로 보이게 하고 Supabase 게시 일정도 동기화
 
 **작업자:** Codex (GPT-5, macOS)

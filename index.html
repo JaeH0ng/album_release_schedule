@@ -96,7 +96,7 @@
       </div>
     </section>
 
-    <section class="sync-strip" aria-label="데이터 동기화 상태">
+    <section class="sync-strip" aria-label="데이터 동기화 상태" aria-live="polite">
       <div>
         <p class="sync-label">게시 일정</p>
         <strong id="sync-status-text">로컬 일정 사용 중</strong>
@@ -119,21 +119,21 @@
       </div>
     </section>
 
-    <nav class="view-tabs" aria-label="일정 보기 방식">
-      <button class="tab-button is-active" type="button" data-view="dashboard" aria-selected="true">
+    <nav class="view-tabs" role="tablist" aria-label="일정 보기 방식">
+      <button class="tab-button is-active" type="button" role="tab" data-view="dashboard" aria-controls="dashboard-view" aria-selected="true">
         오늘
       </button>
-      <button class="tab-button" type="button" data-view="opportunities" aria-selected="false">
-        공모전
+      <button class="tab-button" type="button" role="tab" data-view="tracks" aria-controls="tracks-view" aria-selected="false">
+        곡별 진행
       </button>
-      <button class="tab-button" type="button" data-view="calendar" aria-selected="false">
+      <button class="tab-button" type="button" role="tab" data-view="calendar" aria-controls="calendar-view" aria-selected="false">
         달력
       </button>
-      <button class="tab-button desktop-only-tab" type="button" data-view="roadmap" aria-selected="false">
+      <button class="tab-button desktop-only-tab" type="button" role="tab" data-view="roadmap" aria-controls="roadmap-view" aria-selected="false">
         전체 제작 일정
       </button>
-      <button class="tab-button" type="button" data-view="tracks" aria-selected="false">
-        곡 체크
+      <button class="tab-button" type="button" role="tab" data-view="opportunities" aria-controls="opportunities-view" aria-selected="false">
+        공모전
       </button>
     </nav>
 
@@ -172,7 +172,7 @@
       </aside>
 
       <section class="content-panel">
-        <div id="dashboard-view" class="view-panel is-active" aria-labelledby="dashboard-title">
+        <div id="dashboard-view" class="view-panel is-active" role="tabpanel" tabindex="-1" aria-labelledby="dashboard-title">
           <div class="panel-heading dashboard-heading">
             <div>
               <p class="section-kicker">TODAY BOARD</p>
@@ -182,6 +182,7 @@
               집중 보기
             </button>
           </div>
+          <div id="onboarding-hint" class="onboarding-hint" hidden></div>
           <div class="dashboard-grid">
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
               <div class="card-heading">
@@ -245,40 +246,48 @@
               <div id="app-home-panel" class="app-home-panel"></div>
             </section>
 
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="hold-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">ON HOLD</p>
-                  <h3 id="hold-title">보류 중인 작업</h3>
-                </div>
-              </div>
-              <div id="hold-list" class="urgency-list"></div>
-            </section>
+            <details class="dashboard-retro dashboard-card-wide">
+              <summary class="dashboard-retro-summary">
+                <span class="section-kicker">REVIEW</span>
+                <span class="dashboard-retro-title">보류 · 이번 주 안 함 · 최근 끝낸 것</span>
+              </summary>
+              <div class="dashboard-retro-grid">
+                <section class="dashboard-card" aria-labelledby="hold-title">
+                  <div class="card-heading">
+                    <div>
+                      <p class="section-kicker">ON HOLD</p>
+                      <h3 id="hold-title">보류 중인 작업</h3>
+                    </div>
+                  </div>
+                  <div id="hold-list" class="urgency-list"></div>
+                </section>
 
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="dismissed-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">NOT THIS WEEK</p>
-                  <h3 id="dismissed-title">이번 주 안 하는 것</h3>
-                </div>
-              </div>
-              <div id="dismissed-list" class="urgency-list"></div>
-            </section>
+                <section class="dashboard-card" aria-labelledby="dismissed-title">
+                  <div class="card-heading">
+                    <div>
+                      <p class="section-kicker">NOT THIS WEEK</p>
+                      <h3 id="dismissed-title">이번 주 안 하는 것</h3>
+                    </div>
+                  </div>
+                  <div id="dismissed-list" class="urgency-list"></div>
+                </section>
 
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="done-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">MOMENTUM</p>
-                  <h3 id="done-title">최근 끝낸 것</h3>
-                </div>
+                <section class="dashboard-card" aria-labelledby="done-title">
+                  <div class="card-heading">
+                    <div>
+                      <p class="section-kicker">MOMENTUM</p>
+                      <h3 id="done-title">최근 끝낸 것</h3>
+                    </div>
+                  </div>
+                  <ul id="recent-done-list" class="compact-list"></ul>
+                </section>
               </div>
-              <ul id="recent-done-list" class="compact-list"></ul>
-            </section>
+            </details>
 
           </div>
         </div>
 
-        <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
+        <div id="calendar-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="calendar-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">2026.06.15 - 2026.12.06</p>
@@ -293,7 +302,7 @@
           <div id="month-list" class="month-list"></div>
         </div>
 
-        <div id="opportunities-view" class="view-panel" aria-labelledby="opportunities-title" hidden>
+        <div id="opportunities-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="opportunities-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">WEEKLY SEARCH BOARD</p>
@@ -318,6 +327,199 @@
               <strong id="opportunity-accepted-count">0</strong>
             </article>
           </section>
+
+          <section id="admin-panel" class="admin-panel" aria-label="관리자 편집" hidden>
+            <div class="admin-panel-head">
+              <div>
+                <p class="section-kicker">ADMIN EDIT</p>
+                <h3>관리자 편집</h3>
+              </div>
+              <span id="admin-status-badge" class="card-chip">관리자 확인 중</span>
+            </div>
+
+            <form id="admin-opportunity-form" class="admin-form">
+              <p class="admin-form-title">공모전 추가 / 수정</p>
+              <label class="admin-field">
+                <span>ID (슬러그, 고유)</span>
+                <input id="admin-id" class="admin-input" type="text" placeholder="예: grounz-2026-fall" required />
+              </label>
+              <label class="admin-field">
+                <span>제목</span>
+                <input id="admin-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>주최</span>
+                <input id="admin-host" class="admin-input" type="text" />
+              </label>
+              <label class="admin-field">
+                <span>상태</span>
+                <select id="admin-status" class="admin-select">
+                  <option value="open">접수 중</option>
+                  <option value="watch">지켜보는 중</option>
+                  <option value="closed">마감</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>접수 시작</span>
+                <input id="admin-open-date" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>마감</span>
+                <input id="admin-deadline" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>적합도</span>
+                <select id="admin-fit-label" class="admin-select">
+                  <option value="아주 잘 맞음">아주 잘 맞음</option>
+                  <option value="잘 맞음">잘 맞음</option>
+                  <option value="보통">보통</option>
+                  <option value="낮음">낮음</option>
+                  <option value="확인 필요">확인 필요</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-sort-order" class="admin-input" type="number" placeholder="예: 10" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>요약</span>
+                <textarea id="admin-summary" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>준비 사항</span>
+                <textarea id="admin-preparation" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>공식 링크</span>
+                <input id="admin-url" class="admin-input" type="url" placeholder="https://" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>출처 메모</span>
+                <input id="admin-source-note" class="admin-input" type="text" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <hr class="admin-divider" />
+
+            <form id="admin-event-form" class="admin-form">
+              <p class="admin-form-title">일정(이벤트) 추가 / 수정</p>
+              <label class="admin-field">
+                <span>ID (슬러그, 고유)</span>
+                <input id="admin-event-id" class="admin-input" type="text" placeholder="예: demo-psyche" required />
+              </label>
+              <label class="admin-field">
+                <span>제목</span>
+                <input id="admin-event-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>시작일</span>
+                <input id="admin-event-date" class="admin-input" type="date" required />
+              </label>
+              <label class="admin-field">
+                <span>종료일 (선택, 여러 날)</span>
+                <input id="admin-event-end" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>단계</span>
+                <select id="admin-event-phase" class="admin-select">
+                  <option value="demo">판단용 데모</option>
+                  <option value="structure">키·구조 확정</option>
+                  <option value="arrangement">편곡 테스트</option>
+                  <option value="recording">본녹음</option>
+                  <option value="post">편집·믹스·마스터</option>
+                  <option value="delivery">유통 준비</option>
+                  <option value="release">발매</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>예상 시간</span>
+                <input id="admin-event-duration" class="admin-input" type="text" placeholder="예: 60분" />
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-event-sort-order" class="admin-input" type="number" placeholder="예: 40" />
+              </label>
+              <label class="admin-field admin-checkbox-field">
+                <input id="admin-event-milestone" class="admin-checkbox" type="checkbox" />
+                <span>고정 마감(마일스톤)</span>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>완료 결과</span>
+                <input id="admin-event-result" class="admin-input" type="text" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>상세 설명</span>
+                <textarea id="admin-event-detail" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field">
+                <span>연결 곡 이름 (선택)</span>
+                <input id="admin-event-track" class="admin-input" type="text" placeholder="예: Psyche" />
+              </label>
+              <label class="admin-field">
+                <span>문서 경로 (선택)</span>
+                <input id="admin-event-document" class="admin-input" type="text" placeholder="docs/…" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>가사 경로 (선택)</span>
+                <input id="admin-event-lyrics" class="admin-input" type="text" placeholder="lyrics/…" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-event-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-event-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <hr class="admin-divider" />
+
+            <form id="admin-track-form" class="admin-form">
+              <p class="admin-form-title">곡(트랙) 추가 / 수정</p>
+              <label class="admin-field">
+                <span>번호 (예: 01)</span>
+                <input id="admin-track-number" class="admin-input" type="text" placeholder="01" required />
+              </label>
+              <label class="admin-field">
+                <span>곡 제목</span>
+                <input id="admin-track-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>데모 마감</span>
+                <input id="admin-track-due" class="admin-input" type="date" required />
+              </label>
+              <label class="admin-field">
+                <span>연결 이벤트 ID</span>
+                <input id="admin-track-event-id" class="admin-input" type="text" placeholder="예: demo-psyche" required />
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-track-sort-order" class="admin-input" type="number" placeholder="예: 10" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>곡 문서 경로</span>
+                <input id="admin-track-document" class="admin-input" type="text" placeholder="tracks/…/README.md" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>가사 경로</span>
+                <input id="admin-track-lyrics" class="admin-input" type="text" placeholder="lyrics/…" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-track-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-track-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <p class="admin-note">
+              화면 편집은 원격 Supabase에 바로 반영됩니다. <code>schedule-data.js</code>는 오프라인 폴백·초기 시드용이며,
+              대량 재설정이 필요할 때만 <code>npm run schedule:sync</code>로 맞춥니다.
+            </p>
+          </section>
+
           <section class="opportunity-board">
             <div class="opportunity-board-section">
               <div class="card-heading">
@@ -358,7 +560,7 @@
           </section>
         </div>
 
-        <div id="roadmap-view" class="view-panel" aria-labelledby="roadmap-title" hidden>
+        <div id="roadmap-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="roadmap-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">RELEASE PIPELINE</p>
@@ -368,14 +570,24 @@
           <div id="roadmap-list" class="roadmap-list"></div>
         </div>
 
-        <div id="tracks-view" class="view-panel" aria-labelledby="tracks-title" hidden>
+        <div id="tracks-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="tracks-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">10 CANDIDATE TRACKS</p>
+              <p class="section-kicker" id="tracks-kicker">CANDIDATE TRACKS</p>
               <h2 id="tracks-title">곡별 데모 진행 보드</h2>
             </div>
           </div>
           <div id="track-summary-board" class="track-summary-board"></div>
+          <div class="track-browse-head">
+            <input
+              id="track-search"
+              class="track-search"
+              type="search"
+              placeholder="곡 이름·번호로 찾기"
+              aria-label="곡 검색"
+              autocomplete="off"
+            />
+          </div>
           <div class="track-table-wrap">
             <table class="track-table">
               <thead>
@@ -390,6 +602,7 @@
               <tbody id="track-table-body"></tbody>
             </table>
           </div>
+          <div id="track-chip-nav" class="track-chip-nav" role="tablist" aria-label="곡 선택"></div>
           <div id="track-detail-list" class="track-detail-list"></div>
         </div>
       </section>
