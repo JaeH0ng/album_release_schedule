@@ -292,9 +292,26 @@ function escapeHtml(value) {
 function safeUrl(value) {
   if (!value) return "#";
   const raw = String(value).trim();
-  // 제어문자가 섞이면 스킴 검사 우회(브라우저가 앞쪽 제어문자를 무시) 시도로 보고 거부.
-  if ([...raw].some((ch) => ch.charCodeAt(0) <= 31 || ch.charCodeAt(0) === 127)) return "#";
+  // 제어문자·제로폭·BOM·NBSP 등 보이지 않는 문자가 섞이면 스킴 검사 우회(브라우저가
+  // 앞쪽 문자를 무시/정규화)나 파서 차이 위험이 있어 거부한다.
+  if (
+    [...raw].some((ch) => {
+      const code = ch.charCodeAt(0);
+      return (
+        code <= 31 ||
+        code === 127 ||
+        code === 0x00a0 ||
+        code === 0xfeff ||
+        (code >= 0x200b && code <= 0x200d)
+      );
+    })
+  ) {
+    return "#";
+  }
   if (/^(https?:|mailto:)/i.test(raw)) return escapeHtml(raw);
+  // 이하 스킴 없는 값은 저장소 내부 상대경로로 간주한다.
+  // 백슬래시는 브라우저가 / 로 바꿔 //host(외부)로 샐 수 있으므로 거부.
+  if (raw.includes("\\")) return "#";
   // //host 형태(프로토콜 상대)는 외부로 나갈 수 있으므로 거부.
   if (/^\/\//.test(raw)) return "#";
   // 명시 스킴이 붙은 값(javascript:, data:, vbscript: …)은 거부.

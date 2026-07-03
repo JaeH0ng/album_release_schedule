@@ -17,6 +17,22 @@
 
 ## 변경 로그
 
+### 2026-07-03 (자체 적대 검증) — safeUrl 백슬래시 우회 + 스크립트 명령 인젝션 방어
+
+**작업자:** Claude (Claude Code, Windows) — Claude가 돌린 3-에이전트 적대적 검증 워크플로의 지적을 반영(Codex 리뷰와 별개).
+
+**무엇을 / 왜**
+- **[Major] safeUrl 백슬래시 우회** — `\\evil.com`, `/\evil.com`, `\/evil.com`이 `//host` 차단을 우회(브라우저가 `\`→`/` 정규화 → 외부 호스트). `new URL` 검증으로 확인. safeUrl에 백슬래시 포함 값 거부 + 제로폭/BOM/NBSP 거부(코드포인트 검사) 추가. `target=_blank`인 admin 편집 링크의 오픈리다이렉트 차단. 공격 벡터 17종 단위 테스트 통과.
+- **[Major] projectRef 명령 인젝션** — `supabase link --project-ref ${projectRef}`를 `shell:true`로 실행해 오염된 ref가 셸 명령이 될 수 있었다. `supabaseCmd`를 **args 배열 + shell:false**로 리팩터(Windows에서 supabase.exe 직접 실행 확인)해 셸 보간 자체를 제거. 추가로 projectRef를 `^[a-z0-9]{20}$`로 검증. tmpPath 셸 확장 위험(minor)도 함께 해소.
+- **[Minor] .env.local 파싱** — 따옴표 없는 값의 인라인 주석(` # ...`) 제거 추가(따옴표 값은 공백 보존).
+- escape 커버리지 감사(별도 에이전트)는 지적 0건 — app.js innerHTML/속성 이스케이프는 완전.
+
+**바꾼 파일**
+- `app.js`(safeUrl), `scripts/lib/supabase-run.mjs`(supabaseCmd 시그니처·projectRef 검증·env 파싱), `scripts/supabase-sync.mjs`(배열 호출).
+
+**커밋·배포 여부**
+- 브랜치 스테이징, 커밋 예정. `node --check` 전부·`npm run build` 통과, 미리보기 콘솔 오류 0, 가사 링크 정상, safeUrl 공격벡터 테스트/스크립트 가드 테스트 통과.
+
 ### 2026-07-03 (리뷰 반영 3차 + 스크립트 크로스플랫폼) — Codex 3차 지적 3건 + Windows bash 의존 제거
 
 **작업자:** Claude (Claude Code, Windows)

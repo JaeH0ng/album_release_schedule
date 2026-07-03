@@ -7,6 +7,6 @@ import { requireSupabaseEnv, supabaseCmd } from "./lib/supabase-run.mjs";
 const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { projectRef, childEnv } = requireSupabaseEnv(rootDir);
 
-supabaseCmd(`supabase link --project-ref ${projectRef}`, childEnv);
-supabaseCmd(`supabase db push`, childEnv);
+supabaseCmd(["link", "--project-ref", projectRef], childEnv);
+supabaseCmd(["db", "push"], childEnv);
 console.log("[supabase] db push 완료");
