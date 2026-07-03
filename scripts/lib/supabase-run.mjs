@@ -37,7 +37,9 @@ export function loadEnvLocal(rootDir) {
 // 필요한 3개 값을 확보하고, child 프로세스에 넘길 env를 만든다. 없으면 명확히 안내 후 종료.
 export function requireSupabaseEnv(rootDir) {
   const fromFile = loadEnvLocal(rootDir);
-  const pick = (key) => process.env[key] || fromFile[key];
+  // .env.local 을 우선한다. 셸 세션에 남은 예전 $env:SUPABASE_* 값이 파일을 덮어써
+  // 혼란을 주는 것을 막는다(.env.local 에 없을 때만 process.env 로 폴백).
+  const pick = (key) => fromFile[key] || process.env[key];
   const accessToken = pick("SUPABASE_ACCESS_TOKEN");
   const dbPassword = pick("SUPABASE_DB_PASSWORD");
   const projectRef = pick("SUPABASE_PROJECT_REF");
