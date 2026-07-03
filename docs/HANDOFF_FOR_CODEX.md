@@ -17,6 +17,24 @@
 
 ## 변경 로그
 
+### 2026-07-03 (배포 전 최종 리뷰 반영) — .env.example 비밀값 유출 제거 + 마이그레이션 반영 확인
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+Codex 최종 배포 전 리뷰 지적 2건 처리.
+
+- **[Blocker] `.env.example`에 실제 Supabase access token·DB 비밀번호가 커밋됨** — `git add -A`가 사용자가 실수로 실값을 넣은 `.env.example`을 커밋(cce6b3a)했다. `.env.example`을 placeholder로 복구하고, **`git filter-branch`로 브랜치 4커밋 전체의 `.env.example`을 placeholder로 재작성**해 히스토리에서 비밀값을 제거했다(각 커밋 검증 + `sbp_` 검색 0건, refs/original 삭제·reflog expire·gc). GitHub push는 안 된 상태라 노출은 로컬 한정. ⚠️ **자격증명 회전(access token revoke + DB 비번 reset)은 사용자가 Supabase 콘솔에서 조치**해야 안전(권장). 앞으로 실값은 `.env.local`(gitignore됨)에만.
+- **[Major] 마이그레이션 반영** — 지적의 전제(미반영)는 이미 해소됨. 사용자가 `npm run supabase:sync`를 성공시켜 `20260703120000`(admin write RLS)·`20260703130000`(FK restrict)가 **운영 DB에 반영됨**. (아래 3차 항목의 "미반영" 문구는 과거 시점 기록.)
+
+**바꾼 파일**
+- `.env.example`(placeholder 복구 + 히스토리 재작성), `docs/REVIEW_FROM_CODEX.md`·`docs/HANDOFF_FOR_CODEX.md`(상태 갱신).
+- ⚠️ 히스토리 재작성으로 d6b61be 이후 커밋 해시가 바뀜(d1821fb·d053a7b·5e50f79). 미push 상태라 문제 없음.
+
+**남은 조치(사용자)**
+- Supabase access token revoke/재발급 + DB 비밀번호 reset → `.env.local` 갱신(권장).
+- 그 뒤 배포: `main` 병합 → `npm run build` → `npx gh-pages -d dist`.
+
 ### 2026-07-03 (자체 적대 검증) — safeUrl 백슬래시 우회 + 스크립트 명령 인젝션 방어
 
 **작업자:** Claude (Claude Code, Windows) — Claude가 돌린 3-에이전트 적대적 검증 워크플로의 지적을 반영(Codex 리뷰와 별개).
