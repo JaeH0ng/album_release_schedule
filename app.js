@@ -286,17 +286,21 @@ function escapeHtml(value) {
     .replaceAll("'", "&#39;");
 }
 
-// href에 들어갈 링크는 http(s)와 저장소 내부 상대경로만 허용한다.
-// javascript: 등 위험한 스킴을 차단.
+// href에 들어갈 링크는 http(s)/mailto와 저장소 내부 상대경로만 허용한다.
+// 위험한 스킴(javascript:, data: 등)과 protocol-relative(//host)는 차단.
+// 상대경로는 한글 등 유니코드 파일명(lyrics/02_괜한_말.txt)도 그대로 허용한다.
 function safeUrl(value) {
   if (!value) return "#";
   const raw = String(value).trim();
+  // 제어문자가 섞이면 스킴 검사 우회(브라우저가 앞쪽 제어문자를 무시) 시도로 보고 거부.
+  if ([...raw].some((ch) => ch.charCodeAt(0) <= 31 || ch.charCodeAt(0) === 127)) return "#";
   if (/^(https?:|mailto:)/i.test(raw)) return escapeHtml(raw);
-  // 상대경로(docs/…, tracks/…, lyrics/…, #앵커)만 허용, 스킴 포함 값은 거부.
-  if (/^[#./]/.test(raw) || /^[\w./-]+$/.test(raw)) {
-    if (!/^[a-z][a-z0-9+.-]*:/i.test(raw)) return escapeHtml(raw);
-  }
-  return "#";
+  // //host 형태(프로토콜 상대)는 외부로 나갈 수 있으므로 거부.
+  if (/^\/\//.test(raw)) return "#";
+  // 명시 스킴이 붙은 값(javascript:, data:, vbscript: …)은 거부.
+  if (/^[a-z][a-z0-9+.-]*:/i.test(raw)) return "#";
+  // 그 외는 저장소 내부 상대경로(#앵커, ./, ../, docs/…, lyrics/한글.txt)로 보고 허용.
+  return escapeHtml(raw);
 }
 
 function addDays(date, days) {
@@ -2494,8 +2498,8 @@ async function deleteAdminEvent() {
   const id = document.querySelector("#admin-event-id").value.trim();
   if (!id) return;
 
-  // album_tracks.event_id 는 on delete cascade 라서, 연결 곡이 있는 이벤트를 지우면
-  // 곡까지 조용히 삭제된다(런타임 소스 데이터 손실). 삭제 전에 막는다.
+  // 연결 곡이 있는 이벤트 삭제는 UI에서 먼저 막아 명확히 안내한다(1차 방어).
+  // DB FK는 on delete restrict(마이그레이션 20260703130000)로 곡 동반 삭제를 거부하는 최후 방어선.
   const linkedTracks = state.tracks.filter((track) => track.eventId === id);
   if (linkedTracks.length > 0) {
     const names = linkedTracks.map((track) => `${track.number} ${track.title}`).join(", ");

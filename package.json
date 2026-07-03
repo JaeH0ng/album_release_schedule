@@ -5,10 +5,10 @@
   "scripts": {
     "build": "node scripts/build-static-site.mjs",
     "schedule:sql": "node scripts/build-schedule-sql.mjs",
-    "schedule:sync": "bash scripts/update-schedule.sh",
-    "opportunities:grounz": "bash scripts/update-grounz-opportunities.sh",
+    "schedule:sync": "node scripts/update-schedule.mjs",
+    "opportunities:grounz": "node scripts/update-grounz-opportunities.mjs",
     "serve": "python3 -m http.server 4173",
-    "supabase:sync": "bash scripts/supabase-sync.sh",
+    "supabase:sync": "node scripts/supabase-sync.mjs",
     "deploy": "npm run build"
   }
 }

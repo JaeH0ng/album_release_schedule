@@ -17,6 +17,28 @@
 
 ## 변경 로그
 
+### 2026-07-03 (리뷰 반영 3차 + 스크립트 크로스플랫폼) — Codex 3차 지적 3건 + Windows bash 의존 제거
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+- **[Major] `safeUrl`이 한글 가사 링크를 깨뜨림** — 이전 XSS 수정에서 `\w`가 한글을 배제해 `lyrics/…한글.txt` 가 `#`로 떨어졌다. `safeUrl`을 "스킴/`//host`/제어문자 거부 → 그 외 상대경로(유니코드 포함) 허용 + escapeHtml"로 재작성(app.js:292~). 가사 링크 복구 확인.
+- **[Major] SUPABASE_WEB_PLAN 초기화 안내 불일치** — `docs/SUPABASE_WEB_PLAN.md`를 migrations(`supabase:sync`) 정식 초기화 + setup SQL 읽기전용 + `schedule-data.js` 단일소스로 갱신.
+- **[Nit] deleteAdminEvent 주석** — cascade 전제 → FK restrict 최후방어선 + UI 1차 가드로 수정.
+- **[Windows] `npm run supabase:sync` 등이 PowerShell에서 실패** — npm 스크립트가 `bash *.sh`를 호출하는데 PowerShell PATH에 bash가 없었다. 3개 스크립트를 크로스플랫폼 Node(.mjs)로 전환(`scripts/lib/supabase-run.mjs` 공용 헬퍼). 비밀값은 셸 인자가 아니라 child env로만 전달(Supabase CLI가 env 자동 사용). `.sh` 3개 삭제.
+
+**바꾼 파일**
+- `app.js`(safeUrl, deleteAdminEvent 주석), `docs/SUPABASE_WEB_PLAN.md`, `docs/REVIEW_FROM_CODEX.md`(상태 갱신).
+- `scripts/lib/supabase-run.mjs`·`scripts/supabase-sync.mjs`·`scripts/update-schedule.mjs`·`scripts/update-grounz-opportunities.mjs`(신규), `scripts/*.sh` 3개 삭제, `package.json` 스크립트 갱신.
+
+**커밋·배포 여부**
+- 브랜치 스테이징 예정, 커밋/푸시 안 함. `node --check`·`npm run build` 통과, 미리보기 콘솔 오류 0, 가사 링크 복구 확인.
+- 참고: 로컬 `.env.local`은 존재하나 DB 비밀번호가 SASL auth 거부 상태 → 실제 `supabase db push`는 아직 안 됨(마이그레이션 미반영). 스크립트 자체는 크로스플랫폼으로 정상 실행됨.
+
+**Codex가 봐줬으면 하는 곳 (재리뷰)**
+- `safeUrl`에 남은 XSS 우회(스킴/제어문자/유니코드 정규화)가 있는지.
+- 크로스플랫폼 스크립트의 비밀값 취급·임시파일·projectRef 인젝션 여부.
+
 ### 2026-07-03 (리뷰 반영 2차) — Codex 2차 리뷰 지적 4건 처리 (Major 3 + Minor 1)
 
 **작업자:** Claude (Claude Code, Windows)
