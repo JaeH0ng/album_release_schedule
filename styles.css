@@ -579,54 +579,6 @@ input:focus-visible {
   gap: 12px;
 }
 
-.app-home-card {
-  background:
-    radial-gradient(circle at top left, rgba(181, 132, 24, 0.12), transparent 28%),
-    linear-gradient(135deg, rgba(24, 37, 31, 0.02), transparent 55%),
-    var(--paper);
-}
-
-.app-home-panel {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 16px;
-}
-
-.app-home-copy,
-.app-home-actions {
-  padding: 16px;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: #fbfcfb;
-}
-
-.app-home-copy strong {
-  display: block;
-  margin-bottom: 6px;
-  font-size: 22px;
-}
-
-.app-home-copy p {
-  margin: 0;
-  color: var(--muted);
-  font-size: 13px;
-}
-
-.app-home-pills,
-.app-home-quick {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-
-.app-home-cta {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 14px;
-}
-
 .quick-link {
   display: inline-flex;
   align-items: center;
@@ -648,8 +600,8 @@ input:focus-visible {
   color: var(--success);
 }
 
-.body-standalone .topbar,
-.body-standalone .view-tabs {
+/* 설치형(PWA)에서도 모바일 하단 탭바는 유지한다. topbar만 스크롤과 함께 흘려보냄. */
+.body-standalone .topbar {
   position: static;
 }
 
@@ -1645,11 +1597,71 @@ textarea.admin-input {
 }
 
 .month-header {
+  /* 긴 세로 스크롤 중에도 지금 몇 월인지 항상 보이게 고정 */
+  position: sticky;
+  top: 50px;
+  z-index: 5;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+  margin: -18px -18px 12px;
+  padding: 14px 18px 10px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+/* 지난 달 접힘: 요약 한 줄만 보이고 펼치면 그리드가 나온다 */
+.month-collapsed > .month-collapsed-summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 44px;
+}
+
+.month-collapsed-summary::-webkit-details-marker {
+  display: none;
+}
+
+.month-collapsed-summary h3 {
+  margin: 0;
+  font-size: 17px;
+  color: var(--muted);
+}
+
+.month-collapsed-summary::after {
+  content: "▾";
+  color: var(--muted);
+  margin-left: 4px;
+}
+
+.month-collapsed[open] > .month-collapsed-summary {
   margin-bottom: 12px;
+}
+
+.month-collapsed[open] > .month-collapsed-summary::after {
+  transform: rotate(180deg);
+}
+
+/* 달력 우하단 '오늘' 복귀 버튼 (오늘 셀이 보이면 JS가 숨김) */
+.calendar-today-fab {
+  position: fixed;
+  right: 18px;
+  bottom: calc(18px + env(safe-area-inset-bottom));
+  z-index: 30;
+  min-height: 48px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--header);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 8px 22px rgba(24, 33, 29, 0.28);
 }
 
 .month-summary-chips {
@@ -1745,6 +1757,11 @@ textarea.admin-input {
 .month-cell.is-overlap {
   border-color: rgba(181, 132, 24, 0.28);
   box-shadow: inset 0 3px 0 rgba(181, 132, 24, 0.65);
+}
+
+/* 일정 없는 날은 납작하게 — 일정 있는 날이 지도처럼 도드라진다 */
+.month-cell.is-empty {
+  min-height: 44px;
 }
 
 .month-cell.is-empty .day-events {
@@ -1951,6 +1968,16 @@ textarea.admin-input {
   min-height: 84px;
   padding: 16px 0;
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.roadmap-row:hover {
+  background: #f7faf8;
+}
+
+.roadmap-row:focus-visible {
+  outline: 2px solid var(--demo);
+  outline-offset: -2px;
 }
 
 .roadmap-phase {
@@ -2284,7 +2311,6 @@ footer {
   .opportunity-summary-grid,
   .admin-form,
   .dashboard-overview,
-  .app-home-panel,
   .track-note-grid,
   .track-log-grid {
     grid-template-columns: 1fr;
@@ -2447,9 +2473,13 @@ footer {
     padding: 13px 12px;
   }
 
+  /* 하단 탭바: nav가 문서 상단에 있어 sticky bottom은 절대 발동하지 않는다.
+     fixed로 뷰포트 하단에 고정하고, body에 그만큼 하단 여백을 준다. */
   .view-tabs {
-    position: sticky;
+    position: fixed;
     bottom: 0;
+    left: 0;
+    right: 0;
     top: auto;
     z-index: 40;
     min-height: 58px;
@@ -2460,6 +2490,10 @@ footer {
     background: rgba(255, 255, 255, 0.98);
     border-top: 1px solid var(--line);
     box-shadow: 0 -10px 24px rgba(24, 33, 29, 0.08);
+  }
+
+  body {
+    padding-bottom: calc(76px + env(safe-area-inset-bottom));
   }
 
   .tab-button {
@@ -2506,24 +2540,10 @@ footer {
     border-radius: 16px;
   }
 
-  .body-mobile .app-home-actions {
-    display: none;
-  }
-
-  .body-mobile .dashboard-card .section-kicker {
-    font-size: 10px;
-  }
-
   .body-mobile-utility-open .sync-strip {
     display: flex;
   }
 
-  .app-home-copy strong {
-    font-size: 18px;
-  }
-
-  .app-home-copy,
-  .app-home-actions,
   .overview-card {
     padding: 13px;
     border-radius: 14px;
@@ -2555,6 +2575,15 @@ footer {
 
   .month-header {
     align-items: flex-start;
+    /* 모바일은 탭바가 하단이므로 월 헤더는 최상단에 붙는다 */
+    top: 0;
+    margin: -14px -14px 12px;
+    padding: 12px 14px 8px;
+  }
+
+  /* 모바일 FAB는 하단 탭바 위로 올린다 */
+  .calendar-today-fab {
+    bottom: calc(78px + env(safe-area-inset-bottom));
   }
 
   .month-grid {
@@ -2606,7 +2635,61 @@ footer {
 
   .event-meta,
   .event-submeta {
-    font-size: 11px;
+    font-size: 12px;
+  }
+
+  /* 폰 터치 타깃: 완료 체크는 조준 없이 성공해야 하는 핵심 반복 동작. */
+  .event-check {
+    width: 22px;
+    height: 22px;
+    flex: 0 0 22px;
+  }
+
+  .event-title-button {
+    min-height: 30px;
+    font-size: 12px;
+  }
+
+  .meta-pill {
+    min-height: 28px;
+    font-size: 12px;
+  }
+
+  .card-chip {
+    font-size: 12px;
+  }
+
+  .text-button {
+    min-height: 44px;
+    padding: 6px 10px;
+  }
+
+  .track-step-row label {
+    min-height: 44px;
+    align-items: center;
+  }
+
+  .track-step-row input[type="checkbox"],
+  .track-checklist input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+  }
+
+  .track-chip {
+    min-height: 44px;
+  }
+
+  .opportunity-action {
+    min-height: 44px;
+  }
+
+  .sync-button {
+    min-height: 44px;
+  }
+
+  .opportunity-title-button {
+    min-height: 32px;
+    padding: 4px 0;
   }
 
   .roadmap-row {

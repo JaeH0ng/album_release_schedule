@@ -175,7 +175,6 @@
         <div id="dashboard-view" class="view-panel is-active" role="tabpanel" tabindex="-1" aria-labelledby="dashboard-title">
           <div class="panel-heading dashboard-heading">
             <div>
-              <p class="section-kicker">TODAY BOARD</p>
               <h2 id="dashboard-title">오늘 해야 할 일 보드</h2>
             </div>
             <button id="mobile-focus-toggle" class="sync-button mobile-focus-toggle" type="button">
@@ -187,7 +186,6 @@
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">TOP PRIORITY</p>
                   <h3 id="weekly-focus-title">이번 주 핵심 작업</h3>
                 </div>
                 <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
@@ -198,7 +196,6 @@
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="today-at-a-glance-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">AT A GLANCE</p>
                   <h3 id="today-at-a-glance-title">오늘 한눈에 보기</h3>
                 </div>
               </div>
@@ -208,7 +205,6 @@
             <section class="dashboard-card dashboard-secondary-card" aria-labelledby="fallback-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">FALLBACK</p>
                   <h3 id="fallback-title">30분만 가능할 때</h3>
                 </div>
               </div>
@@ -218,7 +214,6 @@
             <section class="dashboard-card" aria-labelledby="overdue-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">MISSED OR NEXT</p>
                   <h3 id="overdue-title">지난주에서 넘어온 것과 다음 준비</h3>
                 </div>
               </div>
@@ -228,7 +223,6 @@
             <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="opportunity-dashboard-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">SINGER-SONGWRITER CALLS</p>
                   <h3 id="opportunity-dashboard-title">이번 주 확인할 공모전</h3>
                 </div>
                 <span id="opportunity-last-updated" class="card-chip">업데이트 전</span>
@@ -236,26 +230,14 @@
               <div id="dashboard-opportunity-list" class="opportunity-list"></div>
             </section>
 
-            <section class="dashboard-card dashboard-card-wide app-home-card dashboard-secondary-card" aria-labelledby="app-home-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">APP HOME</p>
-                  <h3 id="app-home-title">앱처럼 바로 쓰기</h3>
-                </div>
-              </div>
-              <div id="app-home-panel" class="app-home-panel"></div>
-            </section>
-
             <details class="dashboard-retro dashboard-card-wide">
               <summary class="dashboard-retro-summary">
-                <span class="section-kicker">REVIEW</span>
                 <span class="dashboard-retro-title">보류 · 이번 주 안 함 · 최근 끝낸 것</span>
               </summary>
               <div class="dashboard-retro-grid">
                 <section class="dashboard-card" aria-labelledby="hold-title">
                   <div class="card-heading">
                     <div>
-                      <p class="section-kicker">ON HOLD</p>
                       <h3 id="hold-title">보류 중인 작업</h3>
                     </div>
                   </div>
@@ -265,7 +247,6 @@
                 <section class="dashboard-card" aria-labelledby="dismissed-title">
                   <div class="card-heading">
                     <div>
-                      <p class="section-kicker">NOT THIS WEEK</p>
                       <h3 id="dismissed-title">이번 주 안 하는 것</h3>
                     </div>
                   </div>
@@ -275,7 +256,6 @@
                 <section class="dashboard-card" aria-labelledby="done-title">
                   <div class="card-heading">
                     <div>
-                      <p class="section-kicker">MOMENTUM</p>
                       <h3 id="done-title">최근 끝낸 것</h3>
                     </div>
                   </div>
@@ -300,12 +280,12 @@
             </div>
           </div>
           <div id="month-list" class="month-list"></div>
+          <button id="calendar-today-fab" class="calendar-today-fab" type="button" hidden>오늘</button>
         </div>
 
         <div id="opportunities-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="opportunities-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">WEEKLY SEARCH BOARD</p>
               <h2 id="opportunities-title">싱어송라이터 공모전 보드</h2>
             </div>
             <div class="calendar-legend" aria-label="공모전 상태">
@@ -331,7 +311,6 @@
           <section id="admin-panel" class="admin-panel" aria-label="관리자 편집" hidden>
             <div class="admin-panel-head">
               <div>
-                <p class="section-kicker">ADMIN EDIT</p>
                 <h3>관리자 편집</h3>
               </div>
               <span id="admin-status-badge" class="card-chip">관리자 확인 중</span>
@@ -524,7 +503,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ACCEPTED</p>
                   <h3>캘린더에 넣은 공모전</h3>
                 </div>
               </div>
@@ -533,7 +511,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ON HOLD</p>
                   <h3>보류 중인 공모전</h3>
                 </div>
               </div>
@@ -542,7 +519,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ALL CANDIDATES</p>
                   <h3>지금 검토할 후보</h3>
                 </div>
               </div>
@@ -551,7 +527,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">DISMISSED</p>
                   <h3>이번엔 넘긴 공모전</h3>
                 </div>
               </div>
@@ -563,7 +538,6 @@
         <div id="roadmap-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="roadmap-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">RELEASE PIPELINE</p>
               <h2 id="roadmap-title">전체 제작 일정</h2>
             </div>
           </div>

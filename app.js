@@ -1534,7 +1534,6 @@ function renderTrackFollowupSection(track) {
     <section class="track-log-card">
       <div class="track-log-header">
         <div>
-          <span class="track-log-eyebrow">REPEATABLE</span>
           <h4>다시 잡아둘 작업</h4>
         </div>
         <span class="card-chip">${followups.length}개</span>
@@ -1975,38 +1974,8 @@ function renderDashboard() {
   const urgencyEvents = getPullForwardCandidates();
   const activeDemoTracks = getDashboardActiveDemoTracks();
   const demoSpotlight = getDashboardDemoSpotlight();
-  const user = getAuthUser();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
-  document.querySelector("#app-home-panel").innerHTML = `
-    <div class="app-home-copy">
-      <strong>${user ? `안녕하세요, ${escapeHtml(user.email)}` : "앱처럼 바로 확인하세요"}</strong>
-      <p>${user
-        ? "지금 잡고 있는 작업, 보류한 작업, 캘린더를 이 화면에서 바로 이어서 볼 수 있습니다."
-        : "로그인하면 폰과 PC에서 같은 작업 상태를 이어서 볼 수 있습니다."}</p>
-      <div class="app-home-pills">
-        <span class="meta-pill">오늘 집중 ${acceptedFocus.length}개</span>
-        <span class="meta-pill">보류 ${heldEvents.length}개</span>
-        <span class="meta-pill">이번 주 안 함 ${dismissedEvents.length}개</span>
-        <span class="meta-pill">다음 후보 ${urgencyEvents.length}개</span>
-      </div>
-      <div class="app-home-cta">
-        ${user
-          ? '<button class="quick-link is-primary" type="button" data-quick-action="calendar">캘린더 열기</button>'
-          : '<button class="quick-link is-primary" type="button" data-quick-action="google-login">Google 로그인</button>'}
-        <button class="quick-link" type="button" data-quick-action="today">오늘 할 일 보기</button>
-        <button class="quick-link" type="button" data-quick-action="opportunities">공모전 보기</button>
-      </div>
-    </div>
-    <div class="app-home-actions">
-      <strong>바로가기</strong>
-      <p>${acceptedFocus[0] ? escapeHtml(acceptedFocus[0].title) : "아직 수락한 작업이 없습니다. 아래 후보에서 하나를 수락해보세요."}</p>
-      <div class="app-home-quick">
-        <button class="quick-link" type="button" data-quick-action="tracks">곡별 현황</button>
-        <button class="quick-link" type="button" data-quick-action="roadmap">전체 일정</button>
-        <button class="quick-link" type="button" data-quick-action="refresh">새로고침</button>
-      </div>
-    </div>
-  `;
+  // 한눈에 카드: 값이 없는 항목(0건/미설정)은 렌더하지 않아 화면을 짧게 유지한다.
   document.querySelector("#today-overview").innerHTML = [
     {
       value: acceptedFocus.length,
@@ -2041,6 +2010,7 @@ function renderDashboard() {
       trackNumber: demoSpotlight ? demoSpotlight.track.number : null,
     },
   ]
+    .filter((item) => item.value !== 0 && item.value !== "-")
     .map((item) => {
       const clickableClass = item.trackNumber ? " overview-card-clickable" : "";
       const clickableAttrs = item.trackNumber
@@ -2121,46 +2091,8 @@ function renderDashboard() {
     : "업데이트 전";
 
   bindDashboardTaskControls();
-  bindAppHomeControls();
   populateWeeklyCheckinForm();
   updateCheckinPromptPreview();
-}
-
-function bindAppHomeControls() {
-  document.querySelectorAll("[data-quick-action]").forEach((button) => {
-    button.addEventListener("click", async () => {
-      const action = button.dataset.quickAction;
-      if (action === "google-login") {
-        await handleAuthSubmit(new Event("submit"));
-        return;
-      }
-      if (action === "calendar") {
-        setActiveView("calendar");
-        jumpToCurrentWeek();
-        return;
-      }
-      if (action === "today") {
-        setActiveView("dashboard");
-        document.querySelector("#weekly-focus-list")?.scrollIntoView({ behavior: "smooth", block: "start" });
-        return;
-      }
-      if (action === "opportunities") {
-        setActiveView("opportunities");
-        return;
-      }
-      if (action === "tracks") {
-        setActiveView("tracks");
-        return;
-      }
-      if (action === "roadmap") {
-        setActiveView("roadmap");
-        return;
-      }
-      if (action === "refresh") {
-        refreshSupabaseData();
-      }
-    });
-  });
 }
 
 function renderDashboardTaskCard(event, mode) {
@@ -2714,11 +2646,51 @@ function renderCalendar() {
       `);
     }
 
+    const monthKey = `${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}`;
+    const isPastMonth = monthEnd < today;
+    const completedCount = monthEvents.filter((event) => state.completed.has(event.id)).length;
+    const overlapMarkup = overlapEntries.length
+      ? `
+          <div class="month-overlap-summary">
+            ${overlapEntries
+              .map(
+                (entry) => `
+                  <button class="overlap-summary-item" type="button" data-jump-date="${escapeHtml(entry.iso)}">
+                    <strong>${entry.day}일 · ${entry.count}개</strong>
+                    <span>${entry.titles.map(escapeHtml).join(" · ")}</span>
+                  </button>
+                `
+              )
+              .join("")}
+          </div>
+        `
+      : "";
+    const gridMarkup = `
+        <div class="month-weekdays">
+          ${dayNames.map((dayName) => `<span>${dayName}</span>`).join("")}
+        </div>
+        <div class="month-grid">${cells.join("")}</div>
+    `;
+
+    if (isPastMonth) {
+      // 지난 달은 접힘 처리 — 발매가 가까워질수록 커지는 '지난 달 통과 스크롤'을 없앤다.
+      monthMarkup.push(`
+      <details class="month-section month-collapsed" data-month="${monthKey}">
+        <summary class="month-collapsed-summary">
+          <h3>${monthStart.getFullYear()}년 ${monthStart.getMonth() + 1}월</h3>
+          <span class="card-chip">일정 ${monthEvents.length}개 · 완료 ${completedCount}개</span>
+        </summary>
+        ${overlapMarkup}
+        ${gridMarkup}
+      </details>
+    `);
+      continue;
+    }
+
     monthMarkup.push(`
-      <section class="month-section" data-month="${monthStart.getFullYear()}-${String(monthStart.getMonth() + 1).padStart(2, "0")}">
+      <section class="month-section" data-month="${monthKey}">
         <header class="month-header">
           <div>
-            <p class="section-kicker">MONTH VIEW</p>
             <h3>${monthStart.getFullYear()}년 ${monthStart.getMonth() + 1}월</h3>
           </div>
           <div class="month-summary-chips">
@@ -2730,28 +2702,8 @@ function renderCalendar() {
             }
           </div>
         </header>
-        ${
-          overlapEntries.length
-            ? `
-              <div class="month-overlap-summary">
-                ${overlapEntries
-                  .map(
-                    (entry) => `
-                      <button class="overlap-summary-item" type="button" data-jump-date="${escapeHtml(entry.iso)}">
-                        <strong>${entry.day}일 · ${entry.count}개</strong>
-                        <span>${entry.titles.map(escapeHtml).join(" · ")}</span>
-                      </button>
-                    `
-                  )
-                  .join("")}
-              </div>
-            `
-            : ""
-        }
-        <div class="month-weekdays">
-          ${dayNames.map((dayName) => `<span>${dayName}</span>`).join("")}
-        </div>
-        <div class="month-grid">${cells.join("")}</div>
+        ${overlapMarkup}
+        ${gridMarkup}
       </section>
     `);
   }
@@ -2762,13 +2714,53 @@ function renderCalendar() {
 
   bindEventControls();
   bindCalendarOverlapJumps();
+  setupCalendarTodayFab();
+}
+
+// 날짜 셀로 스크롤. 접힌 지난 달 안에 있으면 먼저 펼친다.
+function revealDateCell(dateIso, block = "start") {
+  const cell = document.querySelector(`[data-date="${dateIso}"]`);
+  if (!cell) return null;
+  const collapsed = cell.closest("details.month-collapsed");
+  if (collapsed) collapsed.open = true;
+  cell.scrollIntoView({ behavior: "smooth", block });
+  return cell;
+}
+
+// 우하단 '오늘' 플로팅 버튼: 오늘 셀이 화면에 보이면 숨긴다.
+// (IntersectionObserver 대신 스크롤 리스너 — 임베디드 뷰 등 IO가 조용히 죽는 환경 회피)
+function updateCalendarFabVisibility() {
+  const fab = document.querySelector("#calendar-today-fab");
+  if (!fab) return;
+  if (state.activeView !== "calendar") {
+    fab.hidden = true;
+    return;
+  }
+  const todayCell = document.querySelector(`[data-date="${toIso(today)}"]`);
+  if (!todayCell) {
+    fab.hidden = true;
+    return;
+  }
+  const rect = todayCell.getBoundingClientRect();
+  fab.hidden = rect.top < window.innerHeight && rect.bottom > 0;
+}
+
+function setupCalendarTodayFab() {
+  const fab = document.querySelector("#calendar-today-fab");
+  if (!fab) return;
+  if (!fab.dataset.bound) {
+    fab.dataset.bound = "true";
+    fab.addEventListener("click", () => revealDateCell(toIso(today)));
+    // 스크롤당 gBCR 1회 — 스로틀이 필요 없을 만큼 싸다.
+    window.addEventListener("scroll", updateCalendarFabVisibility, { passive: true });
+  }
+  updateCalendarFabVisibility();
 }
 
 function bindCalendarOverlapJumps() {
   document.querySelectorAll("[data-jump-date]").forEach((button) => {
     button.addEventListener("click", () => {
-      const cell = document.querySelector(`[data-date="${button.dataset.jumpDate}"]`);
-      cell?.scrollIntoView({ behavior: "smooth", block: "center" });
+      revealDateCell(button.dataset.jumpDate, "center");
     });
   });
 }
@@ -2904,8 +2896,10 @@ function renderRoadmap() {
       const phaseEvents = state.events.filter((event) => event.phase === item.phase);
       const completed = phaseEvents.filter((event) => state.completed.has(event.id)).length;
       const progress = phaseEvents.length ? Math.round((completed / phaseEvents.length) * 100) : 0;
+      const firstDate = phaseEvents[0]?.date || "";
       return `
-        <article class="roadmap-row" style="--phase-color:${phase.color}">
+        <article class="roadmap-row" style="--phase-color:${phase.color}" role="button" tabindex="0"
+          data-roadmap-date="${escapeHtml(firstDate)}" aria-label="${phase.label} 구간을 달력에서 보기">
           <div class="roadmap-phase"><span class="swatch" aria-hidden="true"></span>${phase.label}</div>
           <div class="roadmap-dates">${item.dates}</div>
           <div class="roadmap-detail">
@@ -2920,6 +2914,23 @@ function renderRoadmap() {
       `;
     })
     .join("");
+
+  // 로드맵 행 클릭 → 달력의 해당 구간으로 점프 (왕복 3단계 → 1클릭).
+  container.querySelectorAll("[data-roadmap-date]").forEach((row) => {
+    const go = () => {
+      const date = row.dataset.roadmapDate;
+      if (!date) return;
+      setActiveView("calendar", { focusPanel: false });
+      revealDateCell(date);
+    };
+    row.addEventListener("click", go);
+    row.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+        keyEvent.preventDefault();
+        go();
+      }
+    });
+  });
 }
 
 function renderTrackSummaryBoard() {
@@ -2944,7 +2955,6 @@ function renderTrackSummaryBoard() {
   container.innerHTML = `
     <section class="track-hero-card">
       <div>
-        <p class="section-kicker">CURRENT TRACK FOCUS</p>
         <h3>${currentFocus ? `${escapeHtml(currentFocus.number)}. ${escapeHtml(currentFocus.title)}` : "진행 중인 곡 없음"}</h3>
         <p>${escapeHtml(currentEvent?.detail) || "아직 곡이 선택되지 않았습니다."}</p>
       </div>
@@ -3109,7 +3119,6 @@ function renderTrackDetailCard(track) {
             <section class="track-log-card">
               <div class="track-log-header">
                 <div>
-                  <span class="track-log-eyebrow">RECENT WORK</span>
                   <h4>최근 작업</h4>
                 </div>
               </div>
@@ -3129,7 +3138,7 @@ function renderTracks() {
   renderTrackSummaryBoard();
 
   const kicker = document.querySelector("#tracks-kicker");
-  if (kicker) kicker.textContent = `${state.tracks.length} CANDIDATE TRACKS`;
+  if (kicker) kicker.textContent = `후보곡 ${state.tracks.length}곡`;
 
   const activeTrack = getActiveTrack();
   const activeNumber = activeTrack ? activeTrack.number : null;
@@ -3365,8 +3374,12 @@ function openOpportunityDialog(opportunity) {
   dialog.showModal();
 }
 
+// 탭별 스크롤 위치 기억: 달력 10월을 보다가 다른 탭에 다녀와도 그 자리로 돌아온다.
+const viewScrollPositions = {};
+
 function setActiveView(view, { focusPanel = true } = {}) {
   const changed = state.activeView !== view;
+  if (changed) viewScrollPositions[state.activeView] = window.scrollY;
   state.activeView = view;
   document.querySelectorAll(".tab-button").forEach((button) => {
     const active = button.dataset.view === view;
@@ -3380,13 +3393,23 @@ function setActiveView(view, { focusPanel = true } = {}) {
     panel.hidden = !active;
     if (active) activePanel = panel;
   });
-  // 탭을 실제로 바꿀 때만 새 패널로 포커스를 옮기고 상단으로 스크롤한다.
-  // (키보드/스크린리더 사용자가 이전 탭의 스크롤 위치에 갇히지 않게)
+  // 탭을 실제로 바꿀 때만 포커스를 옮기고, 저장된 위치가 있으면 복원한다.
+  // 복원/착지는 애니메이션 없이(instant) — 위치 회복은 눈에 띄지 않아야 한다.
   if (changed && focusPanel && activePanel) {
     activePanel.focus({ preventScroll: true });
-    const main = document.querySelector("#main-content");
-    (main || activePanel).scrollIntoView({ block: "start" });
+    const saved = viewScrollPositions[view];
+    if (saved !== undefined) {
+      window.scrollTo({ top: saved, behavior: "instant" });
+    } else if (view === "calendar") {
+      // 달력 첫 진입은 6월 1일이 아니라 '오늘'에 착지한다.
+      const todayCell = document.querySelector(`[data-date="${toIso(today)}"]`);
+      (todayCell || document.querySelector("#main-content"))?.scrollIntoView({ block: "start", behavior: "instant" });
+    } else {
+      const main = document.querySelector("#main-content");
+      (main || activePanel).scrollIntoView({ block: "start", behavior: "instant" });
+    }
   }
+  updateCalendarFabVisibility();
 }
 
 function jumpToCurrentWeek() {
