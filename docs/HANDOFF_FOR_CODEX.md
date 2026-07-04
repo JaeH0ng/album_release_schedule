@@ -17,7 +17,35 @@
 
 ## 변경 로그
 
-### 2026-07-04 — 시각 편안함·사용성 대개편: 단일 헤더 + 히어로 카드 + 이번 주 스트립 (⭐ Codex 리뷰 요청, 브랜치 improve/visual-calm)
+### 2026-07-04 — 능동 계획 기능 4종: 날짜 자유 이동·가져오기 시트·수동 순서·달력 DnD + 개인 계획 계정 동기화 (⭐ Codex 리뷰 요청, 브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+사용자 피드백 "작성된 일정을 능동적으로 끌어와서 할 수가 없다"에 대해, 기존 `eventPlan` 오버레이(focusStatus + overrideDate)를 재사용해 4단계로 확장했다. 원본 일정(Supabase `album_events`/시드)은 어느 단계에서도 건드리지 않는다.
+
+- **plan(1/4) `20e28e4` — 날짜 자유 이동 + 작업 가져오기 시트**
+  - `moveEventToDate(eventId, iso)`: overrideDate로 임의 날짜 이동. 보류/안 함은 이동 시 `none`으로 해제, 이번 주 밖으로 나가면 `accepted`도 해제. **고정 마감(milestone)·공모전은 이동 불가**(`canMoveEventDate`), 팔로우업은 `updateTrackFollowupDate` 경로로 위임.
+  - 이벤트 다이얼로그에 "날짜 옮기기" 섹션(`renderDialogSchedule`): 오늘/내일/이번 주말/다음 주 퀵 칩(중복 날짜 칩·현재 날짜 칩은 자동 제외) + date input(min/max=달력 범위) + override 시 "원래 날짜로 되돌리기". 공모전 다이얼로그에서는 섹션 비움.
+  - 작업 가져오기 시트(`#picker-dialog`): 미완료 이동 가능 작업 **전체**(기존 후보 5개 잘림 해소)를 검색(제목·곡·상세)+단계 칩 필터로 표시. [오늘 하기]=`pullEventIntoThisWeek`, 제목 클릭=상세 다이얼로그(중첩 모달). 대시보드("전체에서 가져오기")·달력("작업 가져오기")에서 진입. `renderAll`에서 시트가 열려 있으면 목록 동기 갱신.
+- **plan(2/4) `928495e` — 이번 주 수동 순서**: `eventPlan.order` 추가(빈 항목 정리 조건·`resetEventPlan`에 반영). `getWeeklyFocusItems`가 `compareByPlanOrder`(order 지정 항목 우선, 나머지 날짜순) 정렬. `reorderWeeklyFocus`는 보이는 목록 순서 전체를 order(10,20,…)로 저장. UI: 이번 주 카드 ↑/↓, 히어로 "뒤로 미루기" ↓(2개 이상일 때).
+- **plan(3/4) `8b80d15` — 달력 드래그 앤 드롭**: 문서 레벨 위임(`initCalendarDragAndDrop`, 재렌더 무관). 데스크톱 HTML5 DnD(dragover 셀 하이라이트→drop). 모바일 0.5초 long-press 리프트(진동)→고스트+`elementFromPoint` 셀 하이라이트→놓으면 이동. 리프트 전 8px 이상 이동은 스크롤로 취급, 리프트 후에만 touchmove preventDefault(passive:false). 가장자리 자동 스크롤, 드롭 직후 잔여 click 1회 캡처로 삼킴. draggable은 `canMoveEventDate` 카드만.
+- **plan(4/4) `c5fd23b` — 개인 계획 계정 동기화**: 마이그레이션 `20260704090000_add_user_event_plans.sql`(user_id+event_id PK, focus_status/override_date/plan_order/is_completed/completed_at, RLS 본인 행만 — opportunity_reviews와 동일 패턴, event_id는 합성 id 포함이라 FK 없음). 첫 로그인 backfill(로컬 전용 기록을 지우지 않고 원격 업로드), 45초 폴링은 원격 기준 수렴(기존 reviewSyncTimer 합류). 변경 즉시 upsert(빈 항목은 행 삭제): `updateEventPlan`/순서 변경/완료 토글/팔로우업 생성·제거. 실패는 콘솔 기록 후 폴링 수렴(UI 비차단). 로그아웃 시 localStorage 복원. 로그인 안내·푸터 문구 갱신.
+
+**바꾼 파일**
+- `app.js`(moveEventToDate/canMoveEventDate/getQuickMoveTargets/renderDialogSchedule/피커 4함수/compareByPlanOrder/reorderWeeklyFocus/initCalendarDragAndDrop/loadRemoteEventPlans·applyRemoteEventPlans·syncEventPlanRow·queueEventPlanSync + 훅), `index.html`(#dialog-schedule, #picker-dialog, 진입 버튼 2개), `styles.css`(schedule-chip/picker/DnD 고스트·드롭 타깃·reorder 버튼), `supabase/migrations/20260704090000_add_user_event_plans.sql`(신규), `.claude/launch.json`(미리보기 포트 대체 구성 — 앱 무관).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning`(main에서 분기) 4커밋. main 병합·push·gh-pages 발행 안 함.
+- ⚠️ **마이그레이션 미반영**: `npm run supabase:sync`는 운영 DB 변경이라 실행하지 않았다(권한 정책상 차단, 리뷰 전 배포 방지). 리뷰 통과 후 사용자가 실행해야 로그인 동기화가 동작한다. 테이블이 없는 동안에도 앱은 동작하며, 로그인 시 `user_event_plans` 조회 실패가 콘솔 error로만 남는다(기능 저하: 동기화만 건너뜀).
+- 검증: `node --check` 3파일·`npm run build` 통과. 브라우저(데스크톱+375px 모바일) 콘솔 오류/경고 0. 확인한 플로우 — 가져오기 시트 43건 표시→[오늘 하기]로 6/18 지연 작업이 7/4로 이동(기간 3일 유지, 이번 주 칩, 버튼 '오늘 잡음' 비활성)→상세의 "원래 날짜로 되돌리기"로 plan 항목 삭제·원위치, 퀵 칩 구성(오늘·주말 중복 자동 제외, 다음 주=월요일), 히어로 ↓로 강등·↑로 복귀(order 10~50 저장), 달력 DnD 합성 이벤트로 dragover 하이라이트→drop 시 7/10 이동·잔여 하이라이트 0, milestone 25건 draggable 0건·다이얼로그 잠금 문구. 스크린샷 도구는 이 임베디드 미리보기에서 타임아웃(기존 IntersectionObserver 이슈와 같은 환경 한계, 기능 검증은 DOM 검사로 대체).
+
+**Codex가 특히 봐줬으면 하는 곳 (리뷰 요청)**
+- `moveEventToDate`의 focusStatus 전이 규칙(보류/안 함 해제, 주 밖 이동 시 수락 해제)이 getEventPlan 상태기계·기존 다이얼로그 액션(accept/pull/hold/dismiss/restore)과 모순이 없는지.
+- `applyRemoteEventPlans`의 backfill 병합: 첫 로그인 시 로컬 기록 보존 + 이후 폴링 원격 기준 수렴 — 두 기기 동시 편집·행 삭제 시나리오에서 유령 부활/유실 케이스.
+- 모바일 long-press DnD: pointercancel/터치 스크롤과의 상호작용, 드롭 직후 click 삼킴(350ms 캡처)이 다른 클릭 흐름을 방해할 가능성.
+- 중첩 모달(picker 위 task-dialog)의 백드롭 클릭 닫기·ESC 동작.
+- 피커 innerHTML 보간의 escapeHtml 누락 여부(제목/메타/칩), plan_order 등 원격 값 신뢰 처리.
 
 **작업자:** Claude (Claude Code, Windows)
 
