@@ -1999,9 +1999,17 @@ function renderDashboard() {
     });
   });
 
-  document.querySelector("#weekly-focus-list").innerHTML = acceptedFocus.length
-    ? weeklyFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
-    : '<p class="empty-copy">이번 주 핵심 작업이 비었습니다. 아래 후보에서 하나를 바로 수락하거나 다음 작업을 당겨오세요.</p>';
+  // 히어로: '오늘의 다음 액션 1개'를 크게 지목한다. 잡은 작업이 없으면 첫 후보를 제안.
+  const heroFocus = weeklyFocusItems[0] || null;
+  const heroCandidate = !heroFocus ? urgencyEvents[0] || null : null;
+  renderHeroCard(heroFocus ? heroFocus.event : heroCandidate, heroFocus ? "focus" : heroCandidate ? "candidate" : "none");
+
+  const restFocusItems = weeklyFocusItems.slice(1);
+  document.querySelector("#weekly-focus-list").innerHTML = restFocusItems.length
+    ? restFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
+    : heroFocus
+      ? '<p class="empty-copy">위 작업 하나에 집중하면 됩니다.</p>'
+      : '<p class="empty-copy">이번 주 핵심 작업이 비었습니다. 위 제안을 수락하거나 아래 후보에서 당겨오세요.</p>';
 
   document.querySelector("#fallback-list").innerHTML = weeklyFocus.fallback30
     .map((item) => `<li>${item}</li>`)
@@ -2049,10 +2057,41 @@ function renderDashboard() {
   updateCheckinPromptPreview();
 }
 
+// 오늘 보드 최상단 히어로: 큰 제목 + 주 행동 1개 + ⋯(상세/다른 처리).
+function renderHeroCard(event, mode) {
+  const host = document.querySelector("#hero-card");
+  if (!host) return;
+  host.hidden = false;
+
+  if (!event) {
+    host.innerHTML = `
+      <p class="hero-kicker">오늘의 다음 액션</p>
+      <h3 class="hero-title">이번 주 잡은 작업이 없습니다</h3>
+      <p class="hero-meta">달력에서 다음 일정을 확인하거나, 오늘은 쉬어가도 됩니다.</p>
+    `;
+    return;
+  }
+
+  const delayed = parseDate(event.date) < today;
+  const metaParts = [`${formatDateRange(event)}${delayed ? " · 지연" : ""}`];
+  if (event.duration) metaParts.push(event.duration);
+  host.innerHTML = `
+    <p class="hero-kicker">${mode === "candidate" ? "이걸 이번 주로 수락할까요?" : "오늘의 다음 액션"}</p>
+    <h3 class="hero-title">${escapeHtml(event.title)}</h3>
+    <p class="hero-meta${delayed ? " is-delayed" : ""}">${escapeHtml(metaParts.join(" · "))}</p>
+    <div class="hero-actions">
+      ${
+        mode === "candidate"
+          ? `<button class="hero-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">이번 주로 수락</button>`
+          : `<button class="hero-primary" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`
+      }
+      <button class="hero-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
+    </div>
+  `;
+}
+
 function renderDashboardTaskCard(event, mode) {
   const delayed = parseDate(event.date) < today;
-  const isPulled = Boolean(event.overrideDate);
-  const plan = getEventPlan(event.id);
   const modeLabel =
     mode === "accepted"
       ? "직접 수락"
@@ -2067,25 +2106,15 @@ function renderDashboardTaskCard(event, mode) {
             : delayed
               ? "지연 중"
               : "다음 후보";
-  const restoreButton = isPulled
-    ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">원래 일정</button>`
-    : "";
+  // 버튼 다이어트: 문맥상 주 행동 1개 + ⋯(나머지는 상세 다이얼로그에서).
   const primaryButton =
     mode === "accepted" || mode === "current"
-      ? `<button class="opportunity-action is-secondary" type="button" data-dashboard-action="hold" data-event-id="${escapeHtml(event.id)}">보류</button>`
-      : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">수락</button>`;
-  const dismissButton =
-    mode === "dismissed"
-      ? `<button class="opportunity-action" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">다시 후보로</button>`
-      : `<button class="opportunity-action is-danger" type="button" data-dashboard-action="dismiss" data-event-id="${escapeHtml(event.id)}">이번 주 안 함</button>`;
-  const completeButton =
-    mode === "dismissed"
-      ? ""
-      : `<button class="opportunity-action" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`;
-  const pullButton =
-    mode === "dismissed"
-      ? ""
-      : `<button class="opportunity-action" type="button" data-dashboard-action="pull" data-event-id="${escapeHtml(event.id)}">이번 주로 당겨오기</button>`;
+      ? `<button class="opportunity-action is-primary" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`
+      : mode === "hold"
+        ? `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">다시 진행</button>`
+        : mode === "dismissed"
+          ? `<button class="opportunity-action is-primary" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">다시 후보로</button>`
+          : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">수락</button>`;
 
   return `
     <article class="focus-item">
@@ -2093,16 +2122,11 @@ function renderDashboardTaskCard(event, mode) {
       <p>${escapeHtml(event.detail)}</p>
       <div class="focus-meta">
         <span class="meta-pill">${modeLabel}</span>
-        <span class="meta-pill">${formatDateRange(event)}</span>
-        ${isPulled ? `<span class="meta-pill">원래 ${formatShortDate(event.originalDate)}</span>` : ""}
-        ${plan.focusStatus === "accepted" ? '<span class="meta-pill">직접 수락함</span>' : ""}
+        <span class="meta-pill">${formatDateRange(event)}${delayed ? " · 지연" : ""}</span>
       </div>
       <div class="focus-actions">
         ${primaryButton}
-        ${pullButton}
-        ${dismissButton}
-        ${completeButton}
-        ${restoreButton}
+        <button class="opportunity-action task-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
       </div>
     </article>
   `;
@@ -2113,6 +2137,11 @@ function bindDashboardTaskControls() {
     button.addEventListener("click", () => {
       const eventId = button.dataset.eventId;
       const action = button.dataset.dashboardAction;
+      if (action === "menu") {
+        const target = findEvent(eventId);
+        if (target) openTaskDialog(target);
+        return;
+      }
       if (action === "accept") acceptEventForThisWeek(eventId);
       if (action === "hold") holdEvent(eventId);
       if (action === "dismiss") dismissEvent(eventId);
@@ -2662,8 +2691,42 @@ function renderCalendar() {
     `);
   }
 
+  // '이번 주에 뭐하지'가 탭 진입 0초에 답해지도록, 월 그리드 위에 이번 주 스트립을 얹는다.
+  const weekStart = startOfWeek(today);
+  const weekEnd = addDays(weekStart, 6);
+  const weekEvents = filteredEvents
+    .filter((event) => parseDate(event.date) <= weekEnd && parseDate(event.end || event.date) >= weekStart)
+    .sort((a, b) => parseDate(a.date) - parseDate(b.date));
+  const nextUpcoming = filteredEvents
+    .filter((event) => parseDate(event.date) > weekEnd && !state.completed.has(event.id))
+    .sort((a, b) => parseDate(a.date) - parseDate(b.date))[0];
+  const weekStripMarkup = `
+    <section class="week-strip" aria-label="이번 주 일정">
+      <div class="week-strip-head">
+        <h3>이번 주</h3>
+        <span class="card-chip">${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}</span>
+      </div>
+      ${
+        weekEvents.length
+          ? `<div class="week-strip-list">${weekEvents
+              .map(
+                (event) => `
+                  <div class="week-strip-item">
+                    <span class="week-strip-day">${dayNames[parseDate(event.date).getDay()]} · ${formatShortDate(event.date)}</span>
+                    ${renderEvent(event, toIso(parseDate(event.date) < weekStart ? weekStart : parseDate(event.date)))}
+                  </div>
+                `
+              )
+              .join("")}</div>`
+          : `<p class="empty-copy">이번 주 일정이 없습니다.${
+              nextUpcoming ? ` 다음 일정: ${formatShortDate(nextUpcoming.date)} ${escapeHtml(nextUpcoming.title)}` : ""
+            }</p>`
+      }
+    </section>
+  `;
+
   monthList.innerHTML = monthMarkup.length
-    ? monthMarkup.join("")
+    ? weekStripMarkup + monthMarkup.join("")
     : '<div class="empty-week">선택한 단계의 일정이 없습니다.</div>';
 
   bindEventControls();
@@ -2728,7 +2791,6 @@ function renderEvent(event, iso = event.date) {
   if (complete) classes.push("is-complete");
   if (presentation.className) classes.push(presentation.className);
   const plan = getEventPlan(event.id);
-  const phaseLabel = phase?.label || "일정";
   const focusBadge =
     plan.focusStatus === "accepted"
       ? '<span class="event-badge is-focus">이번 주</span>'
@@ -2737,14 +2799,21 @@ function renderEvent(event, iso = event.date) {
         : plan.focusStatus === "dismissed"
           ? '<span class="event-badge is-dismissed">안 함</span>'
         : "";
+  // 셀 카드 다이어트: 단계는 좌측 색 바가, 요일은 그리드 위치가 이미 말해준다.
+  // 배지는 슬롯(녹음/리뷰)·계획 상태만, 본문은 [체크+제목]+[메타 1줄].
+  const badgesRow =
+    presentation.badge || focusBadge
+      ? `<div class="event-badges">
+        ${presentation.badge ? `<span class="event-badge is-slot">${presentation.badge}</span>` : ""}
+        ${focusBadge}
+      </div>`
+      : "";
+  const metaParts = [presentation.meta];
+  if (event.overrideDate) metaParts.push(`원래 ${formatShortDate(event.originalDate)}`);
 
   return `
     <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}">
-      <div class="event-badges">
-        <span class="event-badge">${phaseLabel}</span>
-        ${presentation.badge ? `<span class="event-badge is-slot">${presentation.badge}</span>` : ""}
-        ${focusBadge}
-      </div>
+      ${badgesRow}
       <div class="event-topline">
         <input
           class="event-check"
@@ -2754,9 +2823,7 @@ function renderEvent(event, iso = event.date) {
         />
         <button class="event-title-button" type="button">${escapeHtml(presentation.title)}</button>
       </div>
-      ${presentation.helper ? `<p class="event-helper">${escapeHtml(presentation.helper)}</p>` : ""}
-      <p class="event-meta">${escapeHtml(presentation.meta)}</p>
-      <p class="event-submeta">${formatDayLabel(iso)}${event.overrideDate ? ` · 원래 ${formatShortDate(event.originalDate)}` : ""}</p>
+      <p class="event-meta">${escapeHtml(metaParts.join(" · "))}</p>
     </div>
   `;
 }
@@ -3287,6 +3354,44 @@ function openTaskDialog(event) {
       fillAdminEventForm(editableBaseEvent);
     });
   }
+
+  // ⋯ 의 목적지: 카드에서 뺀 보조 처리(보류/안 함/당겨오기/원래 일정/완료 해제)를 여기서.
+  const actionsHost = document.querySelector("#dialog-actions");
+  if (actionsHost) {
+    const plan = getEventPlan(event.id);
+    const completed = state.completed.has(event.id);
+    const actionButtons = [
+      `<button class="opportunity-action is-primary" type="button" data-dialog-action="complete">${completed ? "완료 해제" : "완료"}</button>`,
+    ];
+    if (plan.focusStatus !== "accepted") {
+      actionButtons.push('<button class="opportunity-action" type="button" data-dialog-action="accept">이번 주로 수락</button>');
+    }
+    if (!event.overrideDate && plan.focusStatus !== "accepted") {
+      actionButtons.push('<button class="opportunity-action" type="button" data-dialog-action="pull">이번 주로 당겨오기</button>');
+    }
+    if (plan.focusStatus !== "hold") {
+      actionButtons.push('<button class="opportunity-action is-secondary" type="button" data-dialog-action="hold">보류</button>');
+    }
+    if (plan.focusStatus !== "dismissed") {
+      actionButtons.push('<button class="opportunity-action is-danger" type="button" data-dialog-action="dismiss">이번 주 안 함</button>');
+    }
+    if (event.overrideDate || plan.focusStatus !== "none") {
+      actionButtons.push('<button class="opportunity-action" type="button" data-dialog-action="restore">원래 상태로</button>');
+    }
+    actionsHost.innerHTML = actionButtons.join("");
+    actionsHost.querySelectorAll("[data-dialog-action]").forEach((button) => {
+      button.addEventListener("click", () => {
+        const action = button.dataset.dialogAction;
+        if (action === "complete") toggleCompleted(event.id, !completed);
+        if (action === "accept") acceptEventForThisWeek(event.id);
+        if (action === "pull") pullEventIntoThisWeek(event.id);
+        if (action === "hold") holdEvent(event.id);
+        if (action === "dismiss") dismissEvent(event.id);
+        if (action === "restore") resetEventPlan(event.id);
+        dialog.close();
+      });
+    });
+  }
   dialog.showModal();
 }
 
@@ -3317,6 +3422,8 @@ function openOpportunityDialog(opportunity) {
     <a href="${safeUrl(opportunity.officialUrl)}" target="_blank" rel="noreferrer">공식 공고 열기</a>
     <span class="summary-label">${escapeHtml(opportunity.sourceNote || "출처 메모 없음")}</span>
   `;
+  const opportunityActionsHost = document.querySelector("#dialog-actions");
+  if (opportunityActionsHost) opportunityActionsHost.innerHTML = "";
   dialog.showModal();
 }
 
