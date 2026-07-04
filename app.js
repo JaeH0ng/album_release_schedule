@@ -232,6 +232,9 @@ const state = {
   completed: completionState.completed,
   completedMeta: completionState.completedMeta,
   eventPlan: loadEventPlanState(),
+  // 아직 원격에 반영되지 않은 로컬 변경(eventId → 큐잉 시각). 폴링 병합이
+  // 이 항목을 원격 값으로 덮어쓰지 않도록 보호한다.
+  eventPlanPending: new Map(),
   trackChecklist: loadTrackChecklistState(),
   trackNotes: loadTrackNotesState(),
   trackActivity: loadTrackActivityState(),
@@ -987,11 +990,18 @@ function updateAuthChrome() {
   const dot = document.querySelector("#sync-dot");
   if (dot) dot.classList.toggle("is-authed", Boolean(user));
 
+  const footerStorageNote = document.querySelector("#footer-storage-note");
+  if (footerStorageNote) {
+    footerStorageNote.textContent = user
+      ? "체크·계획 상태가 계정에 동기화됨"
+      : "체크 상태는 이 브라우저에 저장됨";
+  }
+
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
     authStatusDetail.textContent = state.isAdmin
-      ? "공모전 판단 상태와 개인 동기화가 활성화됨"
-      : "공모전 판단 상태가 Supabase로 동기화됨";
+      ? "완료·계획·공모전 판단이 계정에 동기화됨 (관리자)"
+      : "완료·계획·공모전 판단이 계정에 동기화됨";
     authGoogle.hidden = true;
     authSignout.hidden = false;
     installButton.hidden = !deferredInstallPrompt;
@@ -1097,6 +1107,210 @@ async function loadRemoteOpportunityReviews() {
   renderAll();
 }
 
+// ---- 개인 계획(끌어오기·순서·완료) 계정 동기화 ----
+// 로그인하면 user_event_plans(RLS: 본인 행만)와 localStorage를 양쪽으로 맞춘다.
+// 규칙:
+// - 최초 연결(backfill이면서 원격이 완전히 비어 있을 때)에만 이 브라우저의 기록을
+//   원격에 올린다. 원격에 행이 하나라도 있으면 다른 기기가 이미 동기화를 시작한
+//   것이므로 로컬 전용 id를 되살리지 않고 원격 삭제를 존중한다.
+// - 폴링(45초)은 원격을 기준으로 수렴하되, 아직 원격에 반영되지 않은 로컬 변경
+//   (eventPlanPending)과 로컬 전용 id는 덮어쓰지 않는다.
+// - 트랙 팔로우업(track-followup-*)은 재구성 정보(trackNumber·stepId·date)가
+//   localStorage에만 있어 원격 row만으로는 다른 기기에서 복원할 수 없다. 유령 완료
+//   row를 만들지 않도록 원격 sync에서 제외하고 로컬 전용으로 둔다.
+
+// 원격 계정 동기화에서 제외하는 로컬 전용 계획 id.
+function isLocalOnlyPlanId(eventId) {
+  return typeof eventId === "string" && eventId.startsWith("track-followup-");
+}
+
+async function loadRemoteEventPlans({ backfill = false } = {}) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  // SELECT를 보내는 시점의 pending을 스냅샷으로 잡아 둔다. 이 SELECT 응답이 도착하기
+  // 전에 삭제(DELETE) 재시도가 성공해 pending이 풀려도, 스냅샷에 있던 tombstone은
+  // apply에서 계속 보존해 '삭제 전 원격 row'가 다시 채워지는 경합을 막는다.
+  const protectIds = new Set(state.eventPlanPending.keys());
+  const { data, error } = await state.authClient
+    .from("user_event_plans")
+    .select("event_id, focus_status, override_date, plan_order, is_completed, completed_at")
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  applyRemoteEventPlans(data || [], { backfill, protectIds });
+}
+
+function applyRemoteEventPlans(rows, { backfill = false, protectIds = new Set() } = {}) {
+  // 원격 전용 id는 로컬 전용(track-followup)을 스킵한다 — 방어적. 서버에 남아 있는
+  // 구버전 유령 row가 있어도 무시하고 로컬 배열을 기준으로 렌더한다.
+  const remoteRows = rows.filter((row) => !isLocalOnlyPlanId(row.event_id));
+  const nextPlan = {};
+  const nextCompleted = new Set();
+  const nextCompletedMeta = new Map();
+
+  remoteRows.forEach((row) => {
+    const plan = {
+      focusStatus: row.focus_status || "none",
+      overrideDate: row.override_date || null,
+      order: typeof row.plan_order === "number" ? row.plan_order : null,
+    };
+    if (plan.focusStatus !== "none" || plan.overrideDate || plan.order != null) {
+      nextPlan[row.event_id] = plan;
+    }
+    if (row.is_completed) {
+      nextCompleted.add(row.event_id);
+      nextCompletedMeta.set(row.event_id, { completedAt: row.completed_at || null });
+    }
+  });
+
+  // 최초 연결(원격이 비어 있을 때)에만 이 브라우저의 기록 전체를 원격에 올린다.
+  const firstConnect = backfill && remoteRows.length === 0;
+
+  // 항상 로컬 값으로 보존해야 하는 id: 로컬 전용(track-followup) + 아직 원격에
+  // 반영되지 않은 로컬 변경(pending) + 최초 연결 시 로컬 기록 전체.
+  // pending에는 로컬 plan/completed에서 이미 빠진 '삭제 tombstone' id도 있으므로
+  // eventPlan·completed key뿐 아니라 eventPlanPending key까지 함께 순회해야
+  // 원격에 남아 있는 예전 row가 다시 채워지지 않는다.
+  const uploadIds = [];
+  const preserveIds = new Set();
+  new Set([
+    ...Object.keys(state.eventPlan),
+    ...state.completed,
+    ...state.eventPlanPending.keys(),
+    ...protectIds,
+  ]).forEach((id) => {
+    const localOnly = isLocalOnlyPlanId(id);
+    const pending = state.eventPlanPending.has(id);
+    // protect = 지금 pending이거나, 이 SELECT를 보낸 시점에 pending이던 id(경합 방어).
+    const protect = pending || protectIds.has(id);
+    if (localOnly || protect || firstConnect) {
+      preserveIds.add(id);
+      // 원격에 올릴 대상은 로컬 전용을 제외한다(queueEventPlanSync도 재차 막는다).
+      if (!localOnly && (pending || firstConnect)) uploadIds.push(id);
+    }
+  });
+
+  preserveIds.forEach((id) => {
+    if (state.eventPlan[id]) nextPlan[id] = { ...getEventPlan(id) };
+    else delete nextPlan[id]; // 로컬에서 지운 항목(pending 삭제)은 로컬 기준으로 없앤다.
+    if (state.completed.has(id)) {
+      nextCompleted.add(id);
+      nextCompletedMeta.set(id, state.completedMeta.get(id) || { completedAt: null });
+    } else {
+      nextCompleted.delete(id);
+      nextCompletedMeta.delete(id);
+    }
+  });
+
+  state.eventPlan = nextPlan;
+  state.completed = nextCompleted;
+  state.completedMeta = nextCompletedMeta;
+  saveEventPlanState();
+  saveCompletedTasks();
+  rebuildEventState();
+  renderAll();
+
+  // 최초 연결 시 로컬 기록을 원격에 올린다(상태 반영 후). pending은 이미 큐에 있으므로
+  // 중복 큐잉을 피하려 최초 연결 케이스만 여기서 올린다.
+  if (firstConnect) uploadIds.forEach((id) => queueEventPlanSync(id));
+}
+
+function buildEventPlanPayload(eventId, userId) {
+  const plan = getEventPlan(eventId);
+  const completed = state.completed.has(eventId);
+  return {
+    user_id: userId,
+    event_id: eventId,
+    focus_status: plan.focusStatus || "none",
+    override_date: plan.overrideDate || null,
+    plan_order: typeof plan.order === "number" ? plan.order : null,
+    is_completed: completed,
+    completed_at: completed ? state.completedMeta.get(eventId)?.completedAt || null : null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// 한 항목을 원격에 반영한다(빈 항목은 행 삭제). 실패는 콘솔에 남기고
+// 다음 폴링에서 원격 기준으로 수렴한다 — UI를 막지 않는다.
+async function syncEventPlanRow(eventId, stamp, queuedUserId, queuedGeneration) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  // 큐잉 시점 이후 세션 경계가 있었으면(로그아웃·계정 전환·같은 계정 재로그인) 이 write를
+  // 폐기한다. userId만으로는 같은 계정 재로그인을 못 걸러내므로, 세션 경계마다 증가하는
+  // generation까지 대조한다. 이미 스케줄된 체인 콜백을 막는 최종 방어선.
+  if (!user || user.id !== queuedUserId || queuedGeneration !== eventPlanSyncGeneration) return;
+  const payload = buildEventPlanPayload(eventId, user.id);
+  const empty =
+    payload.focus_status === "none" && !payload.override_date && payload.plan_order == null && !payload.is_completed;
+  const query = empty
+    ? state.authClient.from("user_event_plans").delete().eq("user_id", user.id).eq("event_id", eventId)
+    : state.authClient.from("user_event_plans").upsert(payload, { onConflict: "user_id,event_id" });
+
+  const { error } = await query;
+  if (error) {
+    console.error(error);
+    return; // 실패하면 pending을 유지해 다음 폴링이 로컬 변경을 덮지 않게 둔다.
+  }
+  // 이 write 이후 추가 변경이 없었을 때만 pending 해제(그 사이 재큐되면 최신 stamp가 처리).
+  if (state.eventPlanPending.get(eventId) === stamp) {
+    state.eventPlanPending.delete(eventId);
+  }
+}
+
+// 같은 tick에 같은 항목을 여러 번 큐잉해도 최신 write를 구분하도록 단조 증가 시퀀스.
+let eventPlanSyncSeq = 0;
+// 세션 경계(로그아웃·계정 전환·같은 계정 재로그인)마다 증가한다. 큐잉 시점의 generation을
+// 캡처해 실행 시점과 대조하면, 세션이 한 번이라도 바뀐 뒤의 stale 체인 콜백을 걸러낼 수 있다.
+let eventPlanSyncGeneration = 0;
+// eventId별 원격 write 직렬화 체인. 같은 항목의 write는 항상 큐잉 순서대로 실행돼,
+// 먼저 보낸 오래된 request가 늦게 성공해 최신 상태를 덮는 out-of-order 문제를 막는다.
+// 각 write는 실행 시점의 현재 로컬 값을 읽으므로(buildEventPlanPayload), 마지막 write가
+// 항상 최신 로컬 상태를 원격에 반영한다.
+const eventPlanSyncChains = new Map();
+
+function queueEventPlanSync(eventId) {
+  // 로컬 전용 id(track-followup)는 원격에 올리지 않는다.
+  if (isLocalOnlyPlanId(eventId)) return Promise.resolve();
+  // 비로그인 상태에서는 원격 큐잉을 하지 않는다. 로컬 편집은 localStorage에 남아 있고,
+  // 로그인 시 backfill이 (원격이 비었을 때) 그 기록을 올린다. 큐잉 시점의 계정+generation을
+  // 캡처해 실행 시점에 대조하므로, 지연 실행되는 체인이 다른 계정/다른 세션에 쓰이지 않는다.
+  const user = getAuthUser();
+  if (!user) return Promise.resolve();
+  const queuedUserId = user.id;
+  const queuedGeneration = eventPlanSyncGeneration;
+  const stamp = ++eventPlanSyncSeq;
+  state.eventPlanPending.set(eventId, stamp);
+  const prev = eventPlanSyncChains.get(eventId) || Promise.resolve();
+  // 앞선 write가 끝난 뒤에 실행(직렬화). catch로 항상 resolve시켜 체인이 끊기지 않게 한다.
+  const next = prev
+    .then(() => syncEventPlanRow(eventId, stamp, queuedUserId, queuedGeneration))
+    .catch((error) => console.error(error));
+  eventPlanSyncChains.set(eventId, next);
+  // 체인 꼬리가 이 write에서 끝났으면 맵에서 제거(무한 성장 방지).
+  next.finally(() => {
+    if (eventPlanSyncChains.get(eventId) === next) eventPlanSyncChains.delete(eventId);
+  });
+  return next;
+}
+
+// 아직 원격에 반영되지 않은 로컬 변경(pending)을 재시도한다. 인증 전에 쌓였거나
+// 네트워크로 실패한 write, 삭제 tombstone까지 현재 로컬 값(빈 항목이면 행 삭제)으로
+// 다시 올린다. 로그인 직후와 45초 폴링에서 호출해 pending이 활성 write 없이 원격과
+// 영구 분기하지 않게 한다. 성공하면 syncEventPlanRow가 해당 pending을 해제한다.
+// queueEventPlanSync를 통해 eventId별 직렬화 체인을 타므로 진행 중인 write와 순서가
+// 뒤엉키지 않는다. Promise를 반환해 호출부가 재시도 완료를 기다린 뒤 원격을 다시 읽게 한다.
+function flushPendingEventPlans() {
+  if (!canUseRemoteReviewSync()) return Promise.resolve();
+  const ids = [...state.eventPlanPending.keys()];
+  return Promise.all(ids.map((id) => queueEventPlanSync(id)));
+}
+
 async function syncOpportunityReview(opportunityId, status) {
   if (!canUseRemoteReviewSync()) return;
 
@@ -1156,16 +1370,32 @@ function stopRemoteReviewPolling() {
 function startRemoteReviewPolling() {
   stopRemoteReviewPolling();
   if (!canUseRemoteReviewSync()) return;
-  state.reviewSyncTimer = window.setInterval(() => {
+  state.reviewSyncTimer = window.setInterval(async () => {
     loadRemoteOpportunityReviews();
+    // 순서 보장: 실패·인증 전에 쌓인 pending write(삭제 tombstone 포함)를 먼저
+    // 끝내 원격을 수렴시킨 뒤에 원격을 다시 읽는다. flush를 await하지 않고 SELECT와
+    // 동시에 돌리면 삭제 성공→pending 해제와 삭제 전 SELECT 응답이 역전돼 부활할 수 있다.
+    await flushPendingEventPlans();
+    await loadRemoteEventPlans();
   }, 45000);
 }
 
 async function setAuthSession(session) {
+  const prevUserId = getAuthUser()?.id || null;
   state.session = session;
   state.authReady = true;
   state.adminLoaded = false;
   state.isAdmin = false;
+  // 세션 경계(로그아웃·계정 전환·같은 계정 재로그인)마다 pending과 직렬화 체인 맵을 비우고
+  // generation을 증가시킨다. 맵 clear는 새 콜백이 옛 tail 뒤에 붙는 것만 막고 이미 스케줄된
+  // 콜백은 취소하지 못하므로, syncEventPlanRow의 generation 검사가 stale 콜백을 막는 최종
+  // 방어선이다(userId만으로는 같은 계정 재로그인을 못 걸러낸다).
+  const nextUserId = getAuthUser()?.id || null;
+  if (prevUserId !== nextUserId) {
+    state.eventPlanPending.clear();
+    eventPlanSyncChains.clear();
+    eventPlanSyncGeneration += 1;
+  }
   updateAuthChrome();
   updateAdminChrome();
 
@@ -1173,11 +1403,20 @@ async function setAuthSession(session) {
     await loadAdminAccess();
     startRemoteReviewPolling();
     await loadRemoteOpportunityReviews();
+    // 첫 로그인: 이 브라우저에만 쌓인 계획/완료 기록을 지우지 않고 원격과 합친다.
+    await loadRemoteEventPlans({ backfill: true });
+    // 로그인 전/실패로 쌓인 pending write를 이 시점에 밀어 넣는다(폴링 45초를 안 기다림).
+    await flushPendingEventPlans();
     return;
   }
 
   stopRemoteReviewPolling();
+  // pending·체인은 위 계정 변경 감지에서 이미 비웠다. 로컬 기준으로 복원한다.
   state.opportunityReview = loadOpportunityReviewState();
+  state.eventPlan = loadEventPlanState();
+  const localCompletion = loadCompletionState();
+  state.completed = localCompletion.completed;
+  state.completedMeta = localCompletion.completedMeta;
   rebuildEventState();
   renderAll();
 }
@@ -1368,6 +1607,7 @@ function createTrackFollowup(trackNumber, stepId) {
   addTrackActivity(trackNumber, "일정 추가", `${step.label} 다시 일정에 추가 (${formatShortDate(date)})`);
   saveTrackFollowupsState();
   saveEventPlanState();
+  queueEventPlanSync(id);
   rebuildEventState();
   renderAll();
 }
@@ -1404,6 +1644,7 @@ function removeTrackFollowup(followupId) {
   saveTrackFollowupsState();
   saveEventPlanState();
   saveCompletedTasks();
+  queueEventPlanSync(followupId);
   rebuildEventState();
   renderAll();
 }
@@ -1640,7 +1881,7 @@ function formatOpportunityReview(reviewStatus) {
 }
 
 function getEventPlan(eventId) {
-  return state.eventPlan[eventId] || { focusStatus: "none", overrideDate: null };
+  return state.eventPlan[eventId] || { focusStatus: "none", overrideDate: null, order: null };
 }
 
 function updateEventPlan(eventId, patch) {
@@ -1650,11 +1891,13 @@ function updateEventPlan(eventId, patch) {
     ...patch,
   };
 
-  if (state.eventPlan[eventId].focusStatus === "none" && !state.eventPlan[eventId].overrideDate) {
+  const next = state.eventPlan[eventId];
+  if (next.focusStatus === "none" && !next.overrideDate && next.order == null) {
     delete state.eventPlan[eventId];
   }
 
   saveEventPlanState();
+  queueEventPlanSync(eventId);
   rebuildEventState();
   renderAll();
 }
@@ -1672,13 +1915,71 @@ function dismissEvent(eventId) {
 }
 
 function resetEventPlan(eventId) {
-  updateEventPlan(eventId, { focusStatus: "none", overrideDate: null });
+  updateEventPlan(eventId, { focusStatus: "none", overrideDate: null, order: null });
 }
 
 function pullEventIntoThisWeek(eventId) {
+  const event = findEvent(eventId);
+  if (!canMoveEventDate(event)) return;
+  if (event.kind === "track-followup") {
+    // 팔로우업은 날짜가 항목 자체에 저장되므로 그쪽 경로로 옮긴 뒤 수락만 표시한다.
+    updateTrackFollowupDate(eventId, toIso(today));
+    updateEventPlan(eventId, { focusStatus: "accepted" });
+    return;
+  }
   updateEventPlan(eventId, {
     focusStatus: "accepted",
-    overrideDate: toIso(today),
+    overrideDate: toIso(today) === event.originalDate ? null : toIso(today),
+  });
+}
+
+// 날짜 자유 이동: 개인 오버레이(overrideDate)로만 옮기고 원본 일정(Supabase/시드)은
+// 건드리지 않는다. 고정 마감(milestone)과 공모전 마감은 옮길 수 없다.
+function canMoveEventDate(event) {
+  return Boolean(event) && event.kind !== "opportunity" && !event.milestone;
+}
+
+function moveEventToDate(eventId, nextIso) {
+  const event = findEvent(eventId);
+  if (!canMoveEventDate(event) || !nextIso) return;
+  if (event.kind === "track-followup") {
+    updateTrackFollowupDate(eventId, nextIso);
+    return;
+  }
+  const plan = getEventPlan(eventId);
+  const leavesWeek = !isIsoInCurrentWeek(nextIso);
+  const patch = { overrideDate: nextIso === event.originalDate ? null : nextIso };
+  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다.
+  // 보류/안 함이던 항목은 이번 주 보드 밖에 있었으므로 남아 있던 순서(order)는
+  // stale이다. 다시 잡을 때 초기화한다.
+  if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
+    patch.focusStatus = "none";
+    patch.order = null;
+  }
+  // 이번 주 밖으로 보내면 '직접 수락' 고정도 풀어 이번 주 목록에서 내린다.
+  if (plan.focusStatus === "accepted" && leavesWeek) patch.focusStatus = "none";
+  // 이번 주 밖으로 나가면 보드 순서는 의미가 없다. order를 비워 compareByPlanOrder가
+  // 이 항목을 날짜와 무관하게 보드 상단에 다시 고정하지 않도록 한다.
+  if (leavesWeek) patch.order = null;
+  updateEventPlan(eventId, patch);
+}
+
+// 다이얼로그·가져오기 시트에서 쓰는 빠른 이동 목적지. 같은 날짜가 겹치면 앞의 것만 남긴다.
+function getQuickMoveTargets() {
+  const weekStart = startOfWeek(today);
+  const saturday = addDays(weekStart, 5);
+  const weekend = saturday >= today ? saturday : addDays(weekStart, 6);
+  const targets = [
+    { iso: toIso(today), label: "오늘" },
+    { iso: toIso(addDays(today, 1)), label: "내일" },
+    { iso: toIso(weekend), label: "이번 주말" },
+    { iso: toIso(addDays(weekStart, 7)), label: "다음 주" },
+  ];
+  const seen = new Set();
+  return targets.filter((target) => {
+    if (seen.has(target.iso)) return false;
+    seen.add(target.iso);
+    return true;
   });
 }
 
@@ -1687,9 +1988,13 @@ function getAlbumPlanningEvents() {
 }
 
 function isEventInCurrentWeek(event) {
+  return isIsoInCurrentWeek(event.date);
+}
+
+function isIsoInCurrentWeek(iso) {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
-  const date = parseDate(event.date);
+  const date = parseDate(iso);
   return date >= weekStart && date <= weekEnd;
 }
 
@@ -1714,8 +2019,40 @@ function getWeeklyFocusItems() {
     .map((event) => ({ event, source: "next" }));
 
   return [...explicitAccepted, ...currentWeek, ...fallbackNext]
-    .sort((left, right) => parseDate(left.event.date) - parseDate(right.event.date))
+    .sort((left, right) => compareByPlanOrder(left.event, right.event))
     .slice(0, 5);
+}
+
+// 수동 순서(order)가 있는 항목이 그 순서대로 먼저, 나머지는 날짜순.
+function getPlanOrder(eventId) {
+  const order = getEventPlan(eventId).order;
+  return typeof order === "number" ? order : null;
+}
+
+function compareByPlanOrder(left, right) {
+  const leftOrder = getPlanOrder(left.id);
+  const rightOrder = getPlanOrder(right.id);
+  if (leftOrder !== null && rightOrder !== null) return leftOrder - rightOrder;
+  if (leftOrder !== null) return -1;
+  if (rightOrder !== null) return 1;
+  return parseDate(left.date) - parseDate(right.date);
+}
+
+// 이번 주 목록 안에서 위/아래 이동. 지금 보이는 순서 전체를 order로 저장해
+// 다음 렌더에서도 사용자가 정한 순서가 유지된다.
+function reorderWeeklyFocus(eventId, direction) {
+  const ids = getWeeklyFocusItems().map(({ event }) => event.id);
+  const index = ids.indexOf(eventId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= ids.length) return;
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  ids.forEach((id, position) => {
+    state.eventPlan[id] = { ...getEventPlan(id), order: (position + 1) * 10 };
+  });
+  saveEventPlanState();
+  ids.forEach((id) => queueEventPlanSync(id));
+  rebuildEventState();
+  renderAll();
 }
 
 function getHeldEvents() {
@@ -2006,7 +2343,7 @@ function renderDashboard() {
 
   const restFocusItems = weeklyFocusItems.slice(1);
   document.querySelector("#weekly-focus-list").innerHTML = restFocusItems.length
-    ? restFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
+    ? restFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source, { reorder: true })).join("")
     : heroFocus
       ? '<p class="empty-copy">위 작업 하나에 집중하면 됩니다.</p>'
       : '<p class="empty-copy">이번 주 핵심 작업이 비었습니다. 위 제안을 수락하거나 아래 후보에서 당겨오세요.</p>';
@@ -2075,6 +2412,8 @@ function renderHeroCard(event, mode) {
   const delayed = parseDate(event.date) < today;
   const metaParts = [`${formatDateRange(event)}${delayed ? " · 지연" : ""}`];
   if (event.duration) metaParts.push(event.duration);
+  // 잡은 작업이 2개 이상이면 히어로를 뒤로 미루고 다음 작업을 올릴 수 있다.
+  const canDemote = mode === "focus" && getWeeklyFocusItems().length > 1;
   host.innerHTML = `
     <p class="hero-kicker">${mode === "candidate" ? "이걸 이번 주로 수락할까요?" : "오늘의 다음 액션"}</p>
     <h3 class="hero-title">${escapeHtml(event.title)}</h3>
@@ -2085,12 +2424,17 @@ function renderHeroCard(event, mode) {
           ? `<button class="hero-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">이번 주로 수락</button>`
           : `<button class="hero-primary" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`
       }
+      ${
+        canDemote
+          ? `<button class="hero-more" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="이 작업을 뒤로 미루고 다음 작업 보기" title="뒤로 미루기">↓</button>`
+          : ""
+      }
       <button class="hero-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
     </div>
   `;
 }
 
-function renderDashboardTaskCard(event, mode) {
+function renderDashboardTaskCard(event, mode, options = {}) {
   const delayed = parseDate(event.date) < today;
   const modeLabel =
     mode === "accepted"
@@ -2126,6 +2470,12 @@ function renderDashboardTaskCard(event, mode) {
       </div>
       <div class="focus-actions">
         ${primaryButton}
+        ${
+          options.reorder
+            ? `<button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-up" data-event-id="${escapeHtml(event.id)}" aria-label="순서 위로">↑</button>
+              <button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="순서 아래로">↓</button>`
+            : ""
+        }
         <button class="opportunity-action task-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
       </div>
     </article>
@@ -2148,6 +2498,8 @@ function bindDashboardTaskControls() {
       if (action === "pull") pullEventIntoThisWeek(eventId);
       if (action === "restore") resetEventPlan(eventId);
       if (action === "complete") toggleCompleted(eventId, true);
+      if (action === "move-up") reorderWeeklyFocus(eventId, -1);
+      if (action === "move-down") reorderWeeklyFocus(eventId, 1);
     });
   });
 }
@@ -2790,6 +3142,9 @@ function renderEvent(event, iso = event.date) {
   if (event.milestone) classes.push("is-milestone");
   if (complete) classes.push("is-complete");
   if (presentation.className) classes.push(presentation.className);
+  // 옮길 수 있는 카드만 드래그 대상(데스크톱 DnD + 모바일 long-press).
+  const movable = canMoveEventDate(event);
+  if (movable) classes.push("is-draggable");
   const plan = getEventPlan(event.id);
   const focusBadge =
     plan.focusStatus === "accepted"
@@ -2812,7 +3167,7 @@ function renderEvent(event, iso = event.date) {
   if (event.overrideDate) metaParts.push(`원래 ${formatShortDate(event.originalDate)}`);
 
   return `
-    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}">
+    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}"${movable ? ' draggable="true"' : ""}>
       ${badgesRow}
       <div class="event-topline">
         <input
@@ -2856,6 +3211,7 @@ function toggleCompleted(eventId, complete) {
     );
   }
   saveCompletedTasks();
+  queueEventPlanSync(eventId);
   renderDashboard();
   renderSummary();
   renderCalendar();
@@ -3392,7 +3748,160 @@ function openTaskDialog(event) {
       });
     });
   }
+  renderDialogSchedule(event, dialog);
   dialog.showModal();
+}
+
+// 날짜 옮기기: 퀵 칩(오늘/내일/이번 주말/다음 주) + 날짜 직접 선택.
+// 개인 오버레이라 원본 일정은 그대로고, '원래 날짜로'로 언제든 복원된다.
+function renderDialogSchedule(event, dialog) {
+  const host = document.querySelector("#dialog-schedule");
+  if (!host) return;
+
+  if (!canMoveEventDate(event)) {
+    host.innerHTML = event?.milestone
+      ? '<p class="dialog-schedule-note">고정 마감이라 날짜를 옮길 수 없습니다.</p>'
+      : "";
+    host.hidden = !host.innerHTML;
+    return;
+  }
+
+  const chips = getQuickMoveTargets()
+    .filter((target) => target.iso !== event.date)
+    .map(
+      (target) =>
+        `<button class="schedule-chip" type="button" data-dialog-move="${escapeHtml(target.iso)}">${escapeHtml(target.label)}</button>`
+    )
+    .join("");
+  host.innerHTML = `
+    <p class="dialog-schedule-label">날짜 옮기기</p>
+    <div class="dialog-schedule-chips">${chips}</div>
+    <div class="dialog-schedule-custom">
+      <input
+        id="dialog-move-date"
+        class="schedule-date-input"
+        type="date"
+        value="${escapeHtml(event.date)}"
+        min="${CALENDAR_START}"
+        max="${CALENDAR_END}"
+        aria-label="옮길 날짜 선택"
+      />
+      <button class="schedule-chip is-confirm" type="button" data-dialog-move-custom="true">이 날짜로</button>
+    </div>
+    ${
+      event.overrideDate
+        ? `<p class="dialog-schedule-note">원래 일정 ${escapeHtml(formatShortDate(event.originalDate))} ·
+            <button class="text-button" type="button" data-dialog-move="${escapeHtml(event.originalDate)}">원래 날짜로 되돌리기</button></p>`
+        : ""
+    }
+  `;
+  host.hidden = false;
+  host.querySelectorAll("[data-dialog-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      moveEventToDate(event.id, button.dataset.dialogMove);
+      dialog.close();
+    });
+  });
+  host.querySelector("[data-dialog-move-custom]")?.addEventListener("click", () => {
+    const value = host.querySelector("#dialog-move-date")?.value;
+    if (!value) return;
+    moveEventToDate(event.id, value);
+    dialog.close();
+  });
+}
+
+// 작업 가져오기 시트: 남은 작업 전체(잘림 없음)를 검색·단계 필터와 함께 보여주고,
+// [오늘 하기]로 바로 당겨오거나 제목을 눌러 상세에서 원하는 날짜로 옮긴다.
+const pickerState = { search: "", phase: "all" };
+
+function openTaskPicker() {
+  const dialog = document.querySelector("#picker-dialog");
+  if (!dialog) return;
+  renderTaskPicker();
+  if (!dialog.open) dialog.showModal();
+}
+
+function getPickerEvents() {
+  return getIncompleteEvents().filter((event) => canMoveEventDate(event));
+}
+
+function renderTaskPicker() {
+  const host = document.querySelector("#picker-list");
+  if (!host) return;
+
+  const allEvents = getPickerEvents();
+  if (pickerState.phase !== "all" && !allEvents.some((event) => event.phase === pickerState.phase)) {
+    pickerState.phase = "all";
+  }
+  const search = pickerState.search.trim().toLowerCase();
+  const filtered = allEvents.filter((event) => {
+    if (pickerState.phase !== "all" && event.phase !== pickerState.phase) return false;
+    if (!search) return true;
+    return [event.title, event.track, event.detail]
+      .filter(Boolean)
+      .some((text) => String(text).toLowerCase().includes(search));
+  });
+
+  renderPickerPhaseFilters(allEvents);
+
+  host.innerHTML = filtered.length
+    ? filtered.map((event) => renderPickerRow(event)).join("")
+    : '<p class="empty-copy">조건에 맞는 작업이 없습니다.</p>';
+
+  host.querySelectorAll("[data-picker-today]").forEach((button) => {
+    button.addEventListener("click", () => pullEventIntoThisWeek(button.dataset.pickerToday));
+  });
+  host.querySelectorAll("[data-picker-detail]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = findEvent(button.dataset.pickerDetail);
+      if (target) openTaskDialog(target);
+    });
+  });
+}
+
+function renderPickerPhaseFilters(events) {
+  const host = document.querySelector("#picker-phase-filters");
+  if (!host) return;
+  const availablePhases = phases.filter((phase) => events.some((event) => event.phase === phase.id));
+  const chips = [{ id: "all", label: "전체" }, ...availablePhases];
+  host.innerHTML = chips
+    .map(
+      (phase) =>
+        `<button class="schedule-chip${pickerState.phase === phase.id ? " is-current" : ""}" type="button" data-picker-phase="${escapeHtml(phase.id)}">${escapeHtml(phase.label)}</button>`
+    )
+    .join("");
+  host.querySelectorAll("[data-picker-phase]").forEach((button) => {
+    button.addEventListener("click", () => {
+      pickerState.phase = button.dataset.pickerPhase;
+      renderTaskPicker();
+    });
+  });
+}
+
+function renderPickerRow(event) {
+  const phase = phaseMap.get(event.phase);
+  const delayed = parseDate(event.date) < today;
+  const plan = getEventPlan(event.id);
+  const planChip =
+    plan.focusStatus === "accepted"
+      ? ' <span class="picker-chip is-focus">이번 주</span>'
+      : plan.focusStatus === "hold"
+        ? ' <span class="picker-chip is-hold">보류</span>'
+        : plan.focusStatus === "dismissed"
+          ? ' <span class="picker-chip is-dismissed">안 함</span>'
+          : "";
+  const alreadyToday = event.date === toIso(today) && plan.focusStatus === "accepted";
+  return `
+    <article class="picker-item" style="--event-color:${phase.color}">
+      <div class="picker-item-main">
+        <button class="picker-item-title" type="button" data-picker-detail="${escapeHtml(event.id)}">${escapeHtml(event.title)}</button>
+        <p class="picker-item-meta">${escapeHtml(phase.label)} · ${formatDateRange(event)}${delayed ? " · 지연" : ""}${planChip}</p>
+      </div>
+      <button class="opportunity-action is-primary picker-pull" type="button" data-picker-today="${escapeHtml(event.id)}"${alreadyToday ? " disabled" : ""}>
+        ${alreadyToday ? "오늘 잡음" : "오늘 하기"}
+      </button>
+    </article>
+  `;
 }
 
 function openOpportunityDialog(opportunity) {
@@ -3424,6 +3933,11 @@ function openOpportunityDialog(opportunity) {
   `;
   const opportunityActionsHost = document.querySelector("#dialog-actions");
   if (opportunityActionsHost) opportunityActionsHost.innerHTML = "";
+  const opportunityScheduleHost = document.querySelector("#dialog-schedule");
+  if (opportunityScheduleHost) {
+    opportunityScheduleHost.innerHTML = "";
+    opportunityScheduleHost.hidden = true;
+  }
   dialog.showModal();
 }
 
@@ -3485,6 +3999,8 @@ function renderAll() {
   renderRoadmap();
   renderTracks();
   renderSummary();
+  // 가져오기 시트가 열려 있으면 목록도 같은 상태로 갱신한다.
+  if (document.querySelector("#picker-dialog")?.open) renderTaskPicker();
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -3566,6 +4082,175 @@ document.querySelector("#close-dialog").addEventListener("click", () => document
 document.querySelector("#task-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
+
+// 작업 가져오기 시트: 검색은 정적 입력이라 한 번만 바인딩(재렌더로 포커스를 잃지 않게).
+document.querySelector("#picker-search")?.addEventListener("input", (searchEvent) => {
+  pickerState.search = searchEvent.target.value || "";
+  renderTaskPicker();
+});
+document.querySelector("#close-picker")?.addEventListener("click", () => document.querySelector("#picker-dialog").close());
+document.querySelector("#picker-dialog")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
+document.querySelector("#open-picker-dashboard")?.addEventListener("click", openTaskPicker);
+document.querySelector("#open-picker-calendar")?.addEventListener("click", openTaskPicker);
+
+// 달력 드래그 앤 드롭. 문서 레벨 위임이라 달력 재렌더에 영향받지 않는다.
+// 데스크톱: HTML5 DnD. 모바일: 카드를 길게 눌러(0.5초) 들어올린 뒤 셀에 놓는다.
+// 드롭 결과는 moveEventToDate — 개인 오버레이라 원본 일정은 그대로다.
+function initCalendarDragAndDrop() {
+  let draggingEventId = null;
+
+  const clearDropTargets = () => {
+    document.querySelectorAll(".month-cell.is-drop-target").forEach((cell) => cell.classList.remove("is-drop-target"));
+  };
+  const findCell = (target) =>
+    target instanceof Element ? target.closest(".month-cell[data-date]") : null;
+
+  document.addEventListener("dragstart", (dragEvent) => {
+    const card = dragEvent.target instanceof Element ? dragEvent.target.closest('.calendar-event[draggable="true"]') : null;
+    if (!card) return;
+    draggingEventId = card.dataset.eventId;
+    dragEvent.dataTransfer.setData("text/plain", draggingEventId);
+    dragEvent.dataTransfer.effectAllowed = "move";
+    card.classList.add("is-dragging");
+  });
+  document.addEventListener("dragend", (dragEvent) => {
+    if (dragEvent.target instanceof Element) {
+      dragEvent.target.closest(".calendar-event")?.classList.remove("is-dragging");
+    }
+    draggingEventId = null;
+    clearDropTargets();
+  });
+  document.addEventListener("dragover", (dragEvent) => {
+    if (!draggingEventId) return;
+    const cell = findCell(dragEvent.target);
+    if (!cell) return;
+    dragEvent.preventDefault();
+    dragEvent.dataTransfer.dropEffect = "move";
+    if (!cell.classList.contains("is-drop-target")) {
+      clearDropTargets();
+      cell.classList.add("is-drop-target");
+    }
+  });
+  document.addEventListener("drop", (dragEvent) => {
+    if (!draggingEventId) return;
+    const cell = findCell(dragEvent.target);
+    clearDropTargets();
+    if (!cell) return;
+    dragEvent.preventDefault();
+    const eventId = draggingEventId;
+    draggingEventId = null;
+    moveEventToDate(eventId, cell.dataset.date);
+  });
+
+  // ---- 모바일 long-press 드래그 ----
+  const LONG_PRESS_MS = 500;
+  const MOVE_TOLERANCE = 8;
+  const EDGE_SCROLL_ZONE = 90;
+  let pressTimer = null;
+  let pressCard = null;
+  let pressPoint = null;
+  let touchDragging = false;
+  let ghost = null;
+
+  const cancelPress = () => {
+    if (pressTimer) window.clearTimeout(pressTimer);
+    pressTimer = null;
+    pressCard = null;
+    pressPoint = null;
+  };
+
+  // 드래그 중에만 스크롤을 막는다(리프트 전 스크롤은 그대로 동작).
+  const blockScroll = (touchEvent) => {
+    if (touchDragging) touchEvent.preventDefault();
+  };
+
+  const endTouchDrag = (dropPoint) => {
+    if (!touchDragging) return;
+    touchDragging = false;
+    ghost?.remove();
+    ghost = null;
+    document.removeEventListener("touchmove", blockScroll);
+    const cell = dropPoint
+      ? findCell(document.elementFromPoint(dropPoint.x, dropPoint.y))
+      : null;
+    clearDropTargets();
+    document.querySelectorAll(".calendar-event.is-dragging").forEach((card) => card.classList.remove("is-dragging"));
+    const eventId = draggingEventId;
+    draggingEventId = null;
+    if (cell && eventId) moveEventToDate(eventId, cell.dataset.date);
+    // 드롭 직후 발생하는 잔여 click이 다이얼로그를 열지 않게 한 번 삼킨다.
+    const swallowClick = (clickEvent) => {
+      clickEvent.stopPropagation();
+      clickEvent.preventDefault();
+    };
+    document.addEventListener("click", swallowClick, { capture: true, once: true });
+    window.setTimeout(() => document.removeEventListener("click", swallowClick, { capture: true }), 350);
+  };
+
+  const beginTouchDrag = (card, point) => {
+    touchDragging = true;
+    draggingEventId = card.dataset.eventId;
+    card.classList.add("is-dragging");
+    navigator.vibrate?.(15);
+    ghost = document.createElement("div");
+    ghost.className = "calendar-drag-ghost";
+    ghost.textContent = card.querySelector(".event-title-button")?.textContent || "일정";
+    document.body.appendChild(ghost);
+    positionGhost(point);
+    document.addEventListener("touchmove", blockScroll, { passive: false });
+  };
+
+  const positionGhost = (point) => {
+    if (!ghost) return;
+    ghost.style.left = `${point.x}px`;
+    ghost.style.top = `${point.y}px`;
+    const cell = findCell(document.elementFromPoint(point.x, point.y));
+    clearDropTargets();
+    cell?.classList.add("is-drop-target");
+    // 화면 가장자리 근처에서는 달력을 이어서 스크롤한다.
+    if (point.y < EDGE_SCROLL_ZONE) window.scrollBy(0, -14);
+    else if (point.y > window.innerHeight - EDGE_SCROLL_ZONE) window.scrollBy(0, 14);
+  };
+
+  document.addEventListener("pointerdown", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    const card =
+      pointerEvent.target instanceof Element ? pointerEvent.target.closest(".calendar-event.is-draggable") : null;
+    if (!card) return;
+    pressCard = card;
+    pressPoint = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+    pressTimer = window.setTimeout(() => {
+      const target = pressCard;
+      const point = pressPoint;
+      cancelPress();
+      if (target && point) beginTouchDrag(target, point);
+    }, LONG_PRESS_MS);
+  });
+  document.addEventListener("pointermove", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    const point = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+    if (touchDragging) {
+      positionGhost(point);
+      return;
+    }
+    // 리프트 전 손가락이 흐르면(=스크롤 의도) long-press를 취소한다.
+    if (pressPoint && Math.hypot(point.x - pressPoint.x, point.y - pressPoint.y) > MOVE_TOLERANCE) {
+      cancelPress();
+    }
+  });
+  document.addEventListener("pointerup", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    cancelPress();
+    endTouchDrag({ x: pointerEvent.clientX, y: pointerEvent.clientY });
+  });
+  document.addEventListener("pointercancel", () => {
+    cancelPress();
+    endTouchDrag(null);
+  });
+}
+initCalendarDragAndDrop();
 
 renderAll();
 applyTrackHash();

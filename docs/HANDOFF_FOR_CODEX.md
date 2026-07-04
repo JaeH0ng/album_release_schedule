@@ -17,7 +17,147 @@
 
 ## 변경 로그
 
-### 2026-07-04 — 시각 편안함·사용성 대개편: 단일 헤더 + 히어로 카드 + 이번 주 스트립 (⭐ Codex 리뷰 요청, 브랜치 improve/visual-calm)
+### 2026-07-04 (6차 재리뷰 반영) — 세션 generation 검사로 재로그인 stale write 차단 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(8168c0e)의 Major 1건 반영. `queuedUserId`만으론 **같은 A 계정 로그아웃→재로그인** 시 지연 체인 콜백이 검사를 통과해, 새 로그인 흐름의 backfill/삭제 존중 규칙을 우회하고 stale localStorage를 원격에 되쓸 수 있던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 8168c0e 재리뷰 블록(`[resolved]`).
+
+- **세션 generation**: `eventPlanSyncGeneration`(모듈 스코프) 도입. `setAuthSession`이 세션 경계(`prevUserId !== nextUserId`)마다 pending/체인 clear와 함께 +1.
+- **큐잉 generation 캡처 + 실행 검증**: `queueEventPlanSync`가 `queuedGeneration`을 캡처, `syncEventPlanRow`는 `userId` AND `generation` 둘 다 현재값과 일치할 때만 write. 같은 계정 재로그인(A→null→A)은 generation 2회 증가 → 옛 콜백 차단.
+
+**바꾼 파일**
+- `app.js`(`eventPlanSyncGeneration` 선언, `setAuthSession` 세션 경계 시 증가, `queueEventPlanSync` generation 캡처, `syncEventPlanRow` generation 검사 파라미터), `docs/REVIEW_FROM_CODEX.md`(8168c0e Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **generation 가드는 하네스로 증명**(A 큐잉→로그아웃→같은 A 재로그인 시 옛 write 차단, 새 write만 반영). 실제 세션 경계 경로는 로그인 필요.
+
+### 2026-07-04 (5차 재리뷰 반영) — 지연 체인 계정 오염 방지 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(2dbe342)의 Major 1건 반영. eventId별 직렬화 체인 tail이 계정 정보를 안 들고 있어, A 계정에서 큐잉된 지연 write가 로그아웃→B 로그인 후 실행되면 B의 `user_event_plans`를 오염시킬 수 있던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 2dbe342 재리뷰 블록(`[resolved]`).
+
+- **큐잉 계정 캡처**: `queueEventPlanSync`가 큐잉 시점 `getAuthUser().id`를 `queuedUserId`로 캡처해 `syncEventPlanRow`에 전달. 비로그인이면 큐잉 안 함(로컬 편집은 localStorage→로그인 시 backfill 업로드).
+- **실행 자격 검증(최종 방어선)**: `syncEventPlanRow`가 실행 시점 계정이 `queuedUserId`와 다르면 payload/query 만들기 전에 즉시 return.
+- **세션 변경 clear**: `setAuthSession`이 user id 변경(로그아웃·전환·최초 로그인) 감지 시 `eventPlanPending.clear()` + `eventPlanSyncChains.clear()`.
+
+**바꾼 파일**
+- `app.js`(`syncEventPlanRow` queuedUserId 파라미터·검증, `queueEventPlanSync` 계정 캡처·비로그인 no-op, `setAuthSession` 계정 변경 clear, 로그아웃 분기 중복 clear 제거), `docs/REVIEW_FROM_CODEX.md`(2dbe342 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **계정 가드는 하네스로 증명**(A 큐잉→B 전환 시 A write skip, B 오염 0). 실제 다계정 경로는 로그인 필요.
+
+### 2026-07-04 (4차 재리뷰 반영) — eventId별 원격 write 직렬화 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(fcc137d)의 Major 1건 반영. stamp는 pending 해제만 막고 원격 write 순서는 못 막아, 같은 항목에 upsert→delete가 빠르게 이어질 때 먼저 나간 오래된 request가 늦게 성공해 최신 상태를 stale로 덮던 out-of-order 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` fcc137d 재리뷰 블록(`[resolved]`).
+
+- **직렬화**: `eventPlanSyncChains`(eventId→Promise 꼬리) 도입. `queueEventPlanSync`가 같은 id의 이전 write 뒤에 체이닝해 한 항목의 write가 큐잉 순서대로 하나씩 실행 → out-of-order 구조적 불가. 각 write는 실행 시점 현재 로컬 값을 읽어 마지막 write가 항상 최신 반영. 체인은 꼬리 완료 시 맵에서 제거(무한 성장 방지). `flushPendingEventPlans`도 같은 경로.
+
+**바꾼 파일**
+- `app.js`(`eventPlanSyncChains` + `queueEventPlanSync` 체이닝, `flushPendingEventPlans`가 queueEventPlanSync 경유), `docs/REVIEW_FROM_CODEX.md`(fcc137d Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **직렬화 순서 보장은 동일 체인 패턴 하네스로 증명**(느린 upsert+빠른 delete → 직렬화 O=remote 최신, 직렬화 X=remote stale). 실제 원격 경로는 로그인 필요.
+
+### 2026-07-04 (3차 재리뷰 반영) — 폴링 flush/load 경합 제거 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(087a046)의 Major 1건 반영. 45초 폴링이 `loadRemoteEventPlans()`를 await하지 않고 `flushPendingEventPlans()`를 동시에 돌려, DELETE 성공→pending 해제와 삭제 전 SELECT 응답 apply가 역전되면 tombstone이 부활하던 경합. 상세·처리는 `REVIEW_FROM_CODEX.md` 087a046 재리뷰 블록(`[resolved]`).
+
+- **순서 보장**: 폴링 콜백을 `async`로, `await flushPendingEventPlans(); await loadRemoteEventPlans();`. 재시도 write로 원격을 수렴시킨 뒤 SELECT. `flushPendingEventPlans`는 `Promise.all`로 반환. 로그인 경로 flush도 await.
+- **경합 방어 스냅샷**: `loadRemoteEventPlans`가 SELECT 발신 시점의 pending 키를 `protectIds`로 캡처→`applyRemoteEventPlans`가 apply까지 보존. SELECT 응답 전에 pending이 풀려도 그 시점 tombstone은 refill 안 됨.
+
+**바꾼 파일**
+- `app.js`(폴링 콜백 async+순서, `flushPendingEventPlans` Promise 반환, `loadRemoteEventPlans` protectIds 스냅샷, `applyRemoteEventPlans` protectIds preserve, 로그인 flush await), `docs/REVIEW_FROM_CODEX.md`(087a046 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 비로그인 로컬 회귀 정상. 원격 경합 경로는 로그인 필요라 순서·스냅샷 로직 기준 확인.
+
+### 2026-07-04 (재리뷰 반영) — pending tombstone 보존 + 재시도 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(77b126a)의 Major 1건 반영. pending 보호가 tombstone(삭제) id를 놓쳐 원격 row로 부활하고, 실패/인증 전 pending이 재시도되지 않던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 최신 재리뷰 블록(`[resolved]`).
+
+- **tombstone 보존**: `applyRemoteEventPlans` preserve 순회 집합에 `state.eventPlanPending.keys()` 추가 → 로컬에서 지운 삭제 pending도 preserve 루프가 원격 refill을 걷어냄.
+- **재시도**: `flushPendingEventPlans()` 신설 — pending 전체를 `queueEventPlanSync`로 재큐(tombstone=DELETE, 나머지=현재 로컬 upsert). 45초 폴링 + 로그인 직후(backfill 뒤)에 호출.
+- pending은 in-memory라 리로드 시 비고, 이전 세션 stale localStorage는 pending에 없어 backfill 게이팅으로 부활 차단 → Major 2 보호와 무모순.
+
+**바꾼 파일**
+- `app.js`(preserve 집합에 pending keys, `flushPendingEventPlans` 신설, 폴링·로그인 후 호출), `docs/REVIEW_FROM_CODEX.md`(재리뷰 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 비로그인 로컬 회귀 정상. 원격 tombstone/재시도 경로는 로그인 필요라 로직 기준 확인.
+
+### 2026-07-04 (리뷰 반영) — 능동 계획 Major 3건 처리 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+Codex 리뷰 `feature/active-planning`의 Major 3건을 모두 반영. 상세·처리 요약은 `REVIEW_FROM_CODEX.md` 최신 블록(3건 모두 `[resolved]`).
+
+- **Major 1 — 주 밖 이동 시 stale order (`moveEventToDate`)**: 이번 주 밖으로 나가면 `order: null`, 보류/안 함에서 복귀하는 경로도 보드 밖 stale order로 보고 `order: null`, 이번 주 안 이동은 순서 보존. 브라우저로 두 경로 확인.
+- **Major 2 — backfill/whole-row upsert 되돌림 (동기화 코어 재작성)**: backfill을 **원격이 완전히 빈 최초 연결(`firstConnect`)에만** 로컬 업로드하도록 게이팅(그 외엔 원격 삭제 존중). `state.eventPlanPending`(eventId→단조 시퀀스)로 미반영 로컬 쓰기를 폴링 병합에서 보호(성공 시에만 해제, 실패 시 유지). 로그아웃 시 pending clear.
+- **Major 3 — 트랙 팔로우업 원격 복원 불가**: `isLocalOnlyPlanId`(`track-followup-*`)를 원격 sync에서 제외(유령 완료 row 방지), 폴링/백필에서 로컬 전용 id의 plan·completed를 항상 로컬 값으로 보존.
+
+**바꾼 파일**
+- `app.js`(`moveEventToDate` order 규칙, `applyRemoteEventPlans`/`syncEventPlanRow`/`queueEventPlanSync` 재작성, `isLocalOnlyPlanId` 신설, `state.eventPlanPending` + `eventPlanSyncSeq`, 로그아웃 pending clear), `docs/REVIEW_FROM_CODEX.md`(3건 resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning`에 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행(리뷰 전 상태 유지).
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. Major 1은 UI로 직접 확인, Major 2·3의 원격 경로는 로그인 필요라 로직·`node --check` 기준(비로그인 시 `canUseRemoteReviewSync` no-op).
+
+**남은 한계 / 후속 과제 (리뷰 재확인 요청)**
+- **동시 편집**: 두 기기가 같은 항목의 독립 필드(예: 한쪽 날짜 이동, 다른 쪽 완료)를 거의 동시에 바꾸면 whole-row upsert 특성상 **last-write-wins로 수렴**한다(유령/부활/분기는 없음, 필드 단위 머지는 아님). 이 클라이언트-온리 구조에서 완전한 필드 머지는 서버 로직/CRDT가 필요해 이번 범위 밖으로 두었다. pending 보호로 "내 진행 중 변경이 폴링에 사라지는" 흔한 케이스는 막았다.
+- **트랙 팔로우업 계정 동기화**: 현재 로컬 전용. 계정 간 이동까지 필요하면 `user_track_followups`(또는 `user_event_plans` 확장 컬럼 `track_number`·`step_id`·`date`)로 재구성 정보를 저장하고 로드 시 `state.trackFollowups` 복원이 후속 과제.
+
+**Codex 재확인 요청 포인트**
+- `applyRemoteEventPlans`의 `firstConnect` 판정과 pending/로컬 전용 보존이 삭제 존중과 충돌하지 않는지(원격에서 지운 항목이 pending도 로컬 전용도 아니면 로컬에서 제거되는지).
+- `eventPlanPending` 해제 조건(성공 & 재큐 없음)이 연속 변경·실패 재시도에서 항목을 영구 잠그거나 조기 해제하지 않는지.
+
+### 2026-07-04 — 능동 계획 기능 4종: 날짜 자유 이동·가져오기 시트·수동 순서·달력 DnD + 개인 계획 계정 동기화 (⭐ Codex 리뷰 요청, 브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+사용자 피드백 "작성된 일정을 능동적으로 끌어와서 할 수가 없다"에 대해, 기존 `eventPlan` 오버레이(focusStatus + overrideDate)를 재사용해 4단계로 확장했다. 원본 일정(Supabase `album_events`/시드)은 어느 단계에서도 건드리지 않는다.
+
+- **plan(1/4) `20e28e4` — 날짜 자유 이동 + 작업 가져오기 시트**
+  - `moveEventToDate(eventId, iso)`: overrideDate로 임의 날짜 이동. 보류/안 함은 이동 시 `none`으로 해제, 이번 주 밖으로 나가면 `accepted`도 해제. **고정 마감(milestone)·공모전은 이동 불가**(`canMoveEventDate`), 팔로우업은 `updateTrackFollowupDate` 경로로 위임.
+  - 이벤트 다이얼로그에 "날짜 옮기기" 섹션(`renderDialogSchedule`): 오늘/내일/이번 주말/다음 주 퀵 칩(중복 날짜 칩·현재 날짜 칩은 자동 제외) + date input(min/max=달력 범위) + override 시 "원래 날짜로 되돌리기". 공모전 다이얼로그에서는 섹션 비움.
+  - 작업 가져오기 시트(`#picker-dialog`): 미완료 이동 가능 작업 **전체**(기존 후보 5개 잘림 해소)를 검색(제목·곡·상세)+단계 칩 필터로 표시. [오늘 하기]=`pullEventIntoThisWeek`, 제목 클릭=상세 다이얼로그(중첩 모달). 대시보드("전체에서 가져오기")·달력("작업 가져오기")에서 진입. `renderAll`에서 시트가 열려 있으면 목록 동기 갱신.
+- **plan(2/4) `928495e` — 이번 주 수동 순서**: `eventPlan.order` 추가(빈 항목 정리 조건·`resetEventPlan`에 반영). `getWeeklyFocusItems`가 `compareByPlanOrder`(order 지정 항목 우선, 나머지 날짜순) 정렬. `reorderWeeklyFocus`는 보이는 목록 순서 전체를 order(10,20,…)로 저장. UI: 이번 주 카드 ↑/↓, 히어로 "뒤로 미루기" ↓(2개 이상일 때).
+- **plan(3/4) `8b80d15` — 달력 드래그 앤 드롭**: 문서 레벨 위임(`initCalendarDragAndDrop`, 재렌더 무관). 데스크톱 HTML5 DnD(dragover 셀 하이라이트→drop). 모바일 0.5초 long-press 리프트(진동)→고스트+`elementFromPoint` 셀 하이라이트→놓으면 이동. 리프트 전 8px 이상 이동은 스크롤로 취급, 리프트 후에만 touchmove preventDefault(passive:false). 가장자리 자동 스크롤, 드롭 직후 잔여 click 1회 캡처로 삼킴. draggable은 `canMoveEventDate` 카드만.
+- **plan(4/4) `c5fd23b` — 개인 계획 계정 동기화**: 마이그레이션 `20260704090000_add_user_event_plans.sql`(user_id+event_id PK, focus_status/override_date/plan_order/is_completed/completed_at, RLS 본인 행만 — opportunity_reviews와 동일 패턴, event_id는 합성 id 포함이라 FK 없음). 첫 로그인 backfill(로컬 전용 기록을 지우지 않고 원격 업로드), 45초 폴링은 원격 기준 수렴(기존 reviewSyncTimer 합류). 변경 즉시 upsert(빈 항목은 행 삭제): `updateEventPlan`/순서 변경/완료 토글/팔로우업 생성·제거. 실패는 콘솔 기록 후 폴링 수렴(UI 비차단). 로그아웃 시 localStorage 복원. 로그인 안내·푸터 문구 갱신.
+
+**바꾼 파일**
+- `app.js`(moveEventToDate/canMoveEventDate/getQuickMoveTargets/renderDialogSchedule/피커 4함수/compareByPlanOrder/reorderWeeklyFocus/initCalendarDragAndDrop/loadRemoteEventPlans·applyRemoteEventPlans·syncEventPlanRow·queueEventPlanSync + 훅), `index.html`(#dialog-schedule, #picker-dialog, 진입 버튼 2개), `styles.css`(schedule-chip/picker/DnD 고스트·드롭 타깃·reorder 버튼), `supabase/migrations/20260704090000_add_user_event_plans.sql`(신규), `.claude/launch.json`(미리보기 포트 대체 구성 — 앱 무관).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning`(main에서 분기) 4커밋. main 병합·push·gh-pages 발행 안 함.
+- ⚠️ **마이그레이션 미반영**: `npm run supabase:sync`는 운영 DB 변경이라 실행하지 않았다(권한 정책상 차단, 리뷰 전 배포 방지). 리뷰 통과 후 사용자가 실행해야 로그인 동기화가 동작한다. 테이블이 없는 동안에도 앱은 동작하며, 로그인 시 `user_event_plans` 조회 실패가 콘솔 error로만 남는다(기능 저하: 동기화만 건너뜀).
+- 검증: `node --check` 3파일·`npm run build` 통과. 브라우저(데스크톱+375px 모바일) 콘솔 오류/경고 0. 확인한 플로우 — 가져오기 시트 43건 표시→[오늘 하기]로 6/18 지연 작업이 7/4로 이동(기간 3일 유지, 이번 주 칩, 버튼 '오늘 잡음' 비활성)→상세의 "원래 날짜로 되돌리기"로 plan 항목 삭제·원위치, 퀵 칩 구성(오늘·주말 중복 자동 제외, 다음 주=월요일), 히어로 ↓로 강등·↑로 복귀(order 10~50 저장), 달력 DnD 합성 이벤트로 dragover 하이라이트→drop 시 7/10 이동·잔여 하이라이트 0, milestone 25건 draggable 0건·다이얼로그 잠금 문구. 스크린샷 도구는 이 임베디드 미리보기에서 타임아웃(기존 IntersectionObserver 이슈와 같은 환경 한계, 기능 검증은 DOM 검사로 대체).
+
+**Codex가 특히 봐줬으면 하는 곳 (리뷰 요청)**
+- `moveEventToDate`의 focusStatus 전이 규칙(보류/안 함 해제, 주 밖 이동 시 수락 해제)이 getEventPlan 상태기계·기존 다이얼로그 액션(accept/pull/hold/dismiss/restore)과 모순이 없는지.
+- `applyRemoteEventPlans`의 backfill 병합: 첫 로그인 시 로컬 기록 보존 + 이후 폴링 원격 기준 수렴 — 두 기기 동시 편집·행 삭제 시나리오에서 유령 부활/유실 케이스.
+- 모바일 long-press DnD: pointercancel/터치 스크롤과의 상호작용, 드롭 직후 click 삼킴(350ms 캡처)이 다른 클릭 흐름을 방해할 가능성.
+- 중첩 모달(picker 위 task-dialog)의 백드롭 클릭 닫기·ESC 동작.
+- 피커 innerHTML 보간의 escapeHtml 누락 여부(제목/메타/칩), plan_order 등 원격 값 신뢰 처리.
 
 **작업자:** Claude (Claude Code, Windows)
 
