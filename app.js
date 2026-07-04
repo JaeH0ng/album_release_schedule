@@ -1237,10 +1237,13 @@ function buildEventPlanPayload(eventId, userId) {
 
 // 한 항목을 원격에 반영한다(빈 항목은 행 삭제). 실패는 콘솔에 남기고
 // 다음 폴링에서 원격 기준으로 수렴한다 — UI를 막지 않는다.
-async function syncEventPlanRow(eventId, stamp) {
+async function syncEventPlanRow(eventId, stamp, queuedUserId) {
   if (!canUseRemoteReviewSync()) return;
 
   const user = getAuthUser();
+  // 큐잉 시점과 로그인 계정이 달라졌으면(로그아웃 후 다른 계정 로그인 등) 이 write를
+  // 폐기한다. 지연된 직렬화 체인 콜백이 다음 계정의 row를 오염시키지 않게 하는 최종 방어선.
+  if (!user || user.id !== queuedUserId) return;
   const payload = buildEventPlanPayload(eventId, user.id);
   const empty =
     payload.focus_status === "none" && !payload.override_date && payload.plan_order == null && !payload.is_completed;
@@ -1270,11 +1273,17 @@ const eventPlanSyncChains = new Map();
 function queueEventPlanSync(eventId) {
   // 로컬 전용 id(track-followup)는 원격에 올리지 않는다.
   if (isLocalOnlyPlanId(eventId)) return Promise.resolve();
+  // 비로그인 상태에서는 원격 큐잉을 하지 않는다. 로컬 편집은 localStorage에 남아 있고,
+  // 로그인 시 backfill이 (원격이 비었을 때) 그 기록을 올린다. 큐잉 시점의 계정을 캡처해
+  // 실행 시점에 대조하므로, 지연 실행되는 체인이 다른 계정에 쓰이지 않는다.
+  const user = getAuthUser();
+  if (!user) return Promise.resolve();
+  const queuedUserId = user.id;
   const stamp = ++eventPlanSyncSeq;
   state.eventPlanPending.set(eventId, stamp);
   const prev = eventPlanSyncChains.get(eventId) || Promise.resolve();
   // 앞선 write가 끝난 뒤에 실행(직렬화). catch로 항상 resolve시켜 체인이 끊기지 않게 한다.
-  const next = prev.then(() => syncEventPlanRow(eventId, stamp)).catch((error) => console.error(error));
+  const next = prev.then(() => syncEventPlanRow(eventId, stamp, queuedUserId)).catch((error) => console.error(error));
   eventPlanSyncChains.set(eventId, next);
   // 체인 꼬리가 이 write에서 끝났으면 맵에서 제거(무한 성장 방지).
   next.finally(() => {
@@ -1365,10 +1374,19 @@ function startRemoteReviewPolling() {
 }
 
 async function setAuthSession(session) {
+  const prevUserId = getAuthUser()?.id || null;
   state.session = session;
   state.authReady = true;
   state.adminLoaded = false;
   state.isAdmin = false;
+  // 계정이 바뀌면(로그아웃·계정 전환 포함) 이전 계정에서 큐잉된 미완료 원격 write를 폐기한다.
+  // pending과 직렬화 체인 맵을 비워, 지연된 콜백이 다음 계정 row에 쓰이지 않게 한다.
+  // (이미 스케줄된 체인 콜백은 syncEventPlanRow의 queuedUserId 검사가 최종 방어선.)
+  const nextUserId = getAuthUser()?.id || null;
+  if (prevUserId !== nextUserId) {
+    state.eventPlanPending.clear();
+    eventPlanSyncChains.clear();
+  }
   updateAuthChrome();
   updateAdminChrome();
 
@@ -1384,8 +1402,7 @@ async function setAuthSession(session) {
   }
 
   stopRemoteReviewPolling();
-  // 로그아웃: 다른 계정으로 미반영 쓰기가 새지 않도록 pending을 비우고 로컬 기준으로 복원.
-  state.eventPlanPending.clear();
+  // pending·체인은 위 계정 변경 감지에서 이미 비웠다. 로컬 기준으로 복원한다.
   state.opportunityReview = loadOpportunityReviewState();
   state.eventPlan = loadEventPlanState();
   const localCompletion = loadCompletionState();

@@ -17,6 +17,24 @@
 
 ## 변경 로그
 
+### 2026-07-04 (5차 재리뷰 반영) — 지연 체인 계정 오염 방지 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(2dbe342)의 Major 1건 반영. eventId별 직렬화 체인 tail이 계정 정보를 안 들고 있어, A 계정에서 큐잉된 지연 write가 로그아웃→B 로그인 후 실행되면 B의 `user_event_plans`를 오염시킬 수 있던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 2dbe342 재리뷰 블록(`[resolved]`).
+
+- **큐잉 계정 캡처**: `queueEventPlanSync`가 큐잉 시점 `getAuthUser().id`를 `queuedUserId`로 캡처해 `syncEventPlanRow`에 전달. 비로그인이면 큐잉 안 함(로컬 편집은 localStorage→로그인 시 backfill 업로드).
+- **실행 자격 검증(최종 방어선)**: `syncEventPlanRow`가 실행 시점 계정이 `queuedUserId`와 다르면 payload/query 만들기 전에 즉시 return.
+- **세션 변경 clear**: `setAuthSession`이 user id 변경(로그아웃·전환·최초 로그인) 감지 시 `eventPlanPending.clear()` + `eventPlanSyncChains.clear()`.
+
+**바꾼 파일**
+- `app.js`(`syncEventPlanRow` queuedUserId 파라미터·검증, `queueEventPlanSync` 계정 캡처·비로그인 no-op, `setAuthSession` 계정 변경 clear, 로그아웃 분기 중복 clear 제거), `docs/REVIEW_FROM_CODEX.md`(2dbe342 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **계정 가드는 하네스로 증명**(A 큐잉→B 전환 시 A write skip, B 오염 0). 실제 다계정 경로는 로그인 필요.
+
 ### 2026-07-04 (4차 재리뷰 반영) — eventId별 원격 write 직렬화 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)
