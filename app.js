@@ -9,7 +9,6 @@ const WEEKLY_CHECKIN_KEY = "album-release-weekly-checkin-v1";
 const OPPORTUNITY_REVIEW_KEY = "album-release-opportunity-review-v1";
 const EVENT_PLAN_KEY = "album-release-event-plan-v1";
 const MOBILE_COMPACT_KEY = "album-release-mobile-compact-v1";
-const MOBILE_UTILITY_KEY = "album-release-mobile-utility-v1";
 const ONBOARDING_KEY = "album-release-onboarding-dismissed-v1";
 const RELEASE_DATE = "2026-12-04";
 const CALENDAR_START = "2026-06-15";
@@ -240,7 +239,6 @@ const state = {
   weeklyCheckin: loadWeeklyCheckinState(),
   opportunityReview: loadOpportunityReviewState(),
   mobileCompact: loadMobileCompactState(),
-  mobileUtilityOpen: loadMobileUtilityState(),
   baseEvents: sortEvents(defaultEvents),
   events: [],
   tracks: sortTracks(defaultTracks),
@@ -548,7 +546,6 @@ function updateChrome() {
   const mixEvent = findEvent("post-mix-final");
 
   document.querySelector("#release-date-display").textContent = `${(releaseEvent?.date || RELEASE_DATE).replaceAll("-", ".")} 발매`;
-  document.querySelector("#delivery-date-display").textContent = formatDotDate(deliveryEvent?.date || "2026-11-13");
   document.querySelector("#critical-demo").textContent = formatDotDate(demoEvent?.end || demoEvent?.date || "2026-07-21");
   document.querySelector("#critical-arrangement").textContent = formatDotDate(arrangementEvent?.date || "2026-08-23");
   document.querySelector("#critical-recording").textContent = formatDotDate(recordingEvent?.date || "2026-09-20");
@@ -567,34 +564,20 @@ function setSyncStatus(status, summary, detail) {
   state.syncDetail = detail;
   document.querySelector("#sync-status-text").textContent = summary;
   document.querySelector("#sync-status-detail").textContent = detail;
-  const strip = document.querySelector(".sync-strip");
-  if (strip) strip.dataset.syncStatus = status;
-  const mobileAuthSummary = document.querySelector("#mobile-auth-summary");
-  if (mobileAuthSummary && !getAuthUser()) {
-    mobileAuthSummary.textContent = summary;
-  }
-  document.querySelector("#refresh-data").disabled = status === "loading";
-  // 동기화 실패는 모바일에서도 숨기지 않는다. 오래된 데이터를 최신으로 오인하지 않게.
-  updateMobileSyncBanner(status, summary, detail);
-}
-
-// 모바일 상단 요약(mobile-glance)에 동기화 실패/로딩 배너를 노출한다.
-function updateMobileSyncBanner(status, summary, detail) {
-  const band = document.querySelector(".mobile-glance");
-  if (!band) return;
-  let banner = document.querySelector("#mobile-sync-banner");
-  if (status === "error") {
-    if (!banner) {
-      banner = document.createElement("div");
-      banner.id = "mobile-sync-banner";
-      banner.className = "mobile-sync-banner";
-      banner.setAttribute("role", "status");
-      band.appendChild(banner);
+  // 평상시엔 헤더의 색 점 하나로만 상태를 전달하고,
+  const dot = document.querySelector("#sync-dot");
+  if (dot) dot.dataset.syncStatus = status;
+  const refreshButton = document.querySelector("#refresh-data");
+  if (refreshButton) refreshButton.disabled = status === "loading";
+  // 오류일 때만 전폭 배너로 승격한다 — 오래된 데이터를 최신으로 오인하지 않게.
+  const banner = document.querySelector("#sync-error-banner");
+  if (banner) {
+    if (status === "error") {
+      banner.textContent = `${summary} — ${detail}`;
+      banner.hidden = false;
+    } else {
+      banner.hidden = true;
     }
-    banner.textContent = `${summary} — ${detail}`;
-    banner.hidden = false;
-  } else if (banner) {
-    banner.hidden = true;
   }
 }
 
@@ -815,25 +798,6 @@ function saveMobileCompactState() {
   }
 }
 
-function loadMobileUtilityState() {
-  try {
-    const stored = localStorage.getItem(MOBILE_UTILITY_KEY);
-    if (stored === "true") return true;
-    if (stored === "false") return false;
-  } catch {
-    // Ignore storage errors for local previews.
-  }
-  return false;
-}
-
-function saveMobileUtilityState() {
-  try {
-    localStorage.setItem(MOBILE_UTILITY_KEY, String(state.mobileUtilityOpen));
-  } catch {
-    // Ignore storage errors for local previews.
-  }
-}
-
 function buildDefaultTrackNotes() {
   return Object.fromEntries(
     defaultTracks.map((track) => [
@@ -1020,16 +984,14 @@ function updateAuthChrome() {
   const authGoogle = document.querySelector("#auth-google");
   const authSignout = document.querySelector("#auth-signout");
   const installButton = document.querySelector("#install-app");
-  const mobileAuthSummary = document.querySelector("#mobile-auth-summary");
+  const dot = document.querySelector("#sync-dot");
+  if (dot) dot.classList.toggle("is-authed", Boolean(user));
 
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
     authStatusDetail.textContent = state.isAdmin
       ? "공모전 판단 상태와 개인 동기화가 활성화됨"
       : "공모전 판단 상태가 Supabase로 동기화됨";
-    if (mobileAuthSummary) {
-      mobileAuthSummary.textContent = state.isAdmin ? "관리자 모드 가능" : "Google 동기화 연결됨";
-    }
     authGoogle.hidden = true;
     authSignout.hidden = false;
     installButton.hidden = !deferredInstallPrompt;
@@ -1040,9 +1002,6 @@ function updateAuthChrome() {
   authStatusDetail.textContent = state.authReady
     ? "Google로 로그인하면 작업 상태와 관리자 권한을 이어서 사용합니다"
     : "Supabase 세션을 확인하는 중";
-  if (mobileAuthSummary) {
-    mobileAuthSummary.textContent = state.authReady ? "로그인 전" : "세션 확인 중";
-  }
   authGoogle.hidden = false;
   authSignout.hidden = true;
   installButton.hidden = !deferredInstallPrompt;
@@ -1053,19 +1012,13 @@ function updateAppModeChrome() {
     window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
   const mobile = window.innerWidth <= 760;
   document.body.classList.toggle("body-standalone", standalone);
-  // '집중 보기'는 데스크톱에서도 동작한다(보조 카드 접기). 상태 스트립 토글은 모바일 전용.
+  // '집중 보기'는 데스크톱에서도 동작한다(보조 카드 접기).
   document.body.classList.toggle("body-mobile-compact", state.mobileCompact);
-  document.body.classList.toggle("body-mobile-utility-open", mobile && state.mobileUtilityOpen);
   document.body.classList.toggle("body-mobile", mobile);
   const toggle = document.querySelector("#mobile-focus-toggle");
-  const utilityToggle = document.querySelector("#mobile-utility-toggle");
   if (toggle) {
     toggle.hidden = false;
     toggle.textContent = state.mobileCompact ? "전체 보기" : "집중 보기";
-  }
-  if (utilityToggle) {
-    utilityToggle.hidden = !mobile;
-    utilityToggle.textContent = state.mobileUtilityOpen ? "상태 접기" : "상태 펼치기";
   }
 }
 
@@ -1336,12 +1289,6 @@ function toggleMobileCompactMode() {
   state.mobileCompact = !state.mobileCompact;
   saveMobileCompactState();
   renderAll();
-}
-
-function toggleMobileUtilityPanel() {
-  state.mobileUtilityOpen = !state.mobileUtilityOpen;
-  saveMobileUtilityState();
-  updateAppModeChrome();
 }
 
 function loadWeeklyCheckinState() {
@@ -1976,7 +1923,14 @@ function renderDashboard() {
   const demoSpotlight = getDashboardDemoSpotlight();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
   // 한눈에 카드: 값이 없는 항목(0건/미설정)은 렌더하지 않아 화면을 짧게 유지한다.
+  // '현재 단계'·'유통사 전달'은 헤더에서 내려온 정적 현황 — 여기가 유일한 자리다.
+  const currentPhaseInfo = getCurrentPhase(today);
   document.querySelector("#today-overview").innerHTML = [
+    {
+      value: currentPhaseInfo.label,
+      label: "현재 단계",
+      detail: `유통사 전달 ${formatDotDate(findEvent("delivery-submit")?.date || "2026-11-13")}`,
+    },
     {
       value: acceptedFocus.length,
       label: "지금 잡은 작업",
@@ -2846,14 +2800,14 @@ function renderSummary() {
   const albumEvents = getAlbumPlanningEvents();
   const completedCount = albumEvents.filter((event) => state.completed.has(event.id)).length;
   const progress = albumEvents.length ? Math.round((completedCount / albumEvents.length) * 100) : 0;
+  // 진행률은 헤더 하단 2px 라인 하나로 — 완료율만큼 골드 색이 차오른다.
   const progressFill = document.querySelector("#progress-fill");
-  const progressTrack = document.querySelector(".progress-track");
-  document.querySelector("#progress-percent").textContent = `${progress}%`;
-  progressFill.style.width = `${progress}%`;
-  progressTrack.setAttribute("aria-valuenow", String(progress));
-
-  const currentPhase = getCurrentPhase(today);
-  document.querySelector("#current-phase").textContent = currentPhase.label;
+  const progressLine = document.querySelector(".header-progress");
+  if (progressFill) progressFill.style.width = `${progress}%`;
+  if (progressLine) {
+    progressLine.setAttribute("aria-valuenow", String(progress));
+    progressLine.title = `전체 진행률 ${progress}%`;
+  }
 
   const incomplete = albumEvents
     .filter((event) => !state.completed.has(event.id))
@@ -2864,18 +2818,10 @@ function renderSummary() {
   document.querySelector("#next-deadline").textContent = next.title;
   document.querySelector("#next-deadline-date").textContent =
     parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
-  document.querySelector("#mobile-next-deadline").textContent = next.title;
-  document.querySelector("#mobile-next-deadline-date").textContent =
-    parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
-  document.querySelector("#mobile-delivery-date").textContent = formatDotDate(
-    findEvent("delivery-submit")?.date || "2026-11-13"
-  );
 
   const release = parseDate(findEvent("release-day")?.date || RELEASE_DATE);
   const distance = Math.ceil((release - today) / 86400000);
   document.querySelector("#countdown").textContent = distance >= 0 ? `D-${distance}` : `D+${Math.abs(distance)}`;
-
-  drawWaveform(progress);
 }
 
 function getCurrentPhase(date) {
@@ -3421,26 +3367,6 @@ function jumpToCurrentWeek() {
   (todayCell || document.querySelector(".month-section"))?.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
-function drawWaveform(progress) {
-  const canvas = document.querySelector("#waveform");
-  const context = canvas.getContext("2d");
-  const values = [5, 11, 7, 16, 25, 12, 8, 20, 31, 14, 6, 10, 23, 17, 9, 29, 18, 7, 12, 21, 10, 6, 16, 8, 4];
-  const center = canvas.height / 2;
-  const gap = canvas.width / values.length;
-  const activeBars = Math.round((values.length * progress) / 100);
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.lineWidth = 3;
-  context.lineCap = "round";
-
-  values.forEach((value, index) => {
-    context.strokeStyle = index < activeBars ? "#f2c76c" : "rgba(226, 235, 230, 0.48)";
-    context.beginPath();
-    context.moveTo(index * gap + 2, center - value / 2);
-    context.lineTo(index * gap + 2, center + value / 2);
-    context.stroke();
-  });
-}
-
 function renderAll() {
   updateAppModeChrome();
   updateChrome();
@@ -3492,7 +3418,28 @@ document.querySelector("#auth-form").addEventListener("submit", handleAuthSubmit
 document.querySelector("#auth-signout").addEventListener("click", handleSignout);
 document.querySelector("#install-app").addEventListener("click", promptInstallApp);
 document.querySelector("#mobile-focus-toggle").addEventListener("click", toggleMobileCompactMode);
-document.querySelector("#mobile-utility-toggle").addEventListener("click", toggleMobileUtilityPanel);
+
+// 헤더 동기화 점 → 팝오버(상태·새로고침·로그인). 바깥 클릭/Esc로 닫힘.
+const syncDotButton = document.querySelector("#sync-dot");
+const syncPopover = document.querySelector("#sync-popover");
+function setSyncPopoverOpen(open) {
+  if (!syncDotButton || !syncPopover) return;
+  syncPopover.hidden = !open;
+  syncDotButton.setAttribute("aria-expanded", String(open));
+}
+syncDotButton?.addEventListener("click", (clickEvent) => {
+  clickEvent.stopPropagation();
+  setSyncPopoverOpen(syncPopover.hidden);
+});
+document.addEventListener("click", (clickEvent) => {
+  if (!syncPopover || syncPopover.hidden) return;
+  if (!syncPopover.contains(clickEvent.target) && clickEvent.target !== syncDotButton) {
+    setSyncPopoverOpen(false);
+  }
+});
+document.addEventListener("keydown", (keyEvent) => {
+  if (keyEvent.key === "Escape") setSyncPopoverOpen(false);
+});
 document.querySelector("#admin-opportunity-form")?.addEventListener("submit", saveAdminOpportunity);
 document.querySelector("#admin-reset")?.addEventListener("click", resetAdminOpportunityForm);
 document.querySelector("#admin-delete")?.addEventListener("click", deleteAdminOpportunity);
@@ -3502,16 +3449,6 @@ document.querySelector("#admin-event-delete")?.addEventListener("click", deleteA
 document.querySelector("#admin-track-form")?.addEventListener("submit", saveAdminTrack);
 document.querySelector("#admin-track-reset")?.addEventListener("click", resetAdminTrackForm);
 document.querySelector("#admin-track-delete")?.addEventListener("click", deleteAdminTrack);
-document.querySelectorAll("[data-mobile-jump]").forEach((button) => {
-  button.addEventListener("click", () => {
-    const target = button.dataset.mobileJump;
-    if (target === "calendar") {
-      jumpToCurrentWeek();
-      return;
-    }
-    setActiveView(target);
-  });
-});
 ["#checkin-available", "#checkin-completed", "#checkin-mustdo", "#checkin-blockers"].forEach((selector) => {
   document.querySelector(selector)?.addEventListener("input", () => {
     readWeeklyCheckinForm();

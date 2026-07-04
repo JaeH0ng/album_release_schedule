@@ -74,32 +74,170 @@ input:focus-visible {
   transform: translateY(0);
 }
 
+/* 단일 헤더: 브랜드 · 다음 마감 · 동기화 점 — 한 줄 56px + 진행률 2px 라인 */
 .topbar {
-  min-height: 84px;
-  padding: 16px clamp(18px, 4vw, 54px);
+  position: relative;
+  min-height: 56px;
+  padding: 8px clamp(14px, 3vw, 40px) 10px;
   background: var(--header);
   color: #f7faf8;
-  display: grid;
-  grid-template-columns: minmax(240px, 1fr) 180px minmax(180px, 1fr);
+  display: flex;
   align-items: center;
-  gap: 24px;
+  gap: clamp(14px, 3vw, 28px);
 }
 
 .brand-block {
   display: flex;
   align-items: center;
-  gap: 14px;
+  gap: 10px;
   min-width: 0;
+  flex: 0 1 auto;
 }
 
-.brand-block[data-app-refresh],
-.waveform[data-app-refresh] {
+.brand-copy {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.brand-sub {
+  color: #9fb2a8;
+  font-size: 12px;
+}
+
+.brand-block[data-app-refresh] {
   cursor: pointer;
 }
 
-.brand-block[data-app-refresh]:hover h1,
-.brand-block[data-app-refresh]:hover .eyebrow {
+.brand-block[data-app-refresh]:hover h1 {
   color: #f2c76c;
+}
+
+.header-focus {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  min-width: 0;
+  margin-left: auto;
+  overflow: hidden;
+}
+
+.header-deadline {
+  color: #c9d5cf;
+  font-size: 13px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-deadline strong {
+  color: #f7faf8;
+  margin: 0 2px;
+}
+
+.header-deadline-date {
+  color: #9fb2a8;
+}
+
+/* 동기화 상태 점: 초록=동기화 완료, 파랑=확인 중, 빨강=오류, 회색=로컬 */
+.sync-dot {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 50%;
+}
+
+.sync-dot-mark {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #9fb2a8;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.12);
+  transition: background 160ms ease;
+}
+
+.sync-dot[data-sync-status="ready"] .sync-dot-mark {
+  background: #4ecb8f;
+}
+
+.sync-dot[data-sync-status="loading"] .sync-dot-mark {
+  background: #6d9ce8;
+}
+
+.sync-dot[data-sync-status="error"] .sync-dot-mark {
+  background: #ff7a68;
+  box-shadow: 0 0 0 3px rgba(255, 122, 104, 0.25);
+}
+
+.sync-dot.is-authed .sync-dot-mark {
+  outline: 2px solid #f2c76c;
+  outline-offset: 2px;
+}
+
+/* 헤더 하단 진행률 라인: 완료율만큼 골드가 차오른다 (파형+진행률 바 대체) */
+.header-progress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.header-progress span {
+  display: block;
+  width: 0;
+  height: 100%;
+  background: #f2c76c;
+  transition: width 240ms ease;
+}
+
+/* 동기화/계정 팝오버 (헤더 점 클릭) */
+.sync-popover {
+  position: fixed;
+  top: 62px;
+  right: 14px;
+  z-index: 60;
+  width: min(340px, calc(100vw - 28px));
+  padding: 16px;
+  border: 1px solid var(--line-strong);
+  border-radius: 14px;
+  background: var(--paper);
+  box-shadow: 0 18px 44px rgba(24, 33, 29, 0.18);
+  display: grid;
+  gap: 14px;
+}
+
+.sync-popover-row strong {
+  display: block;
+  font-size: 14px;
+  margin: 2px 0;
+}
+
+.sync-popover-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line);
+}
+
+/* 동기화 오류 배너: 오류일 때만 헤더 아래 전폭 노출 */
+.sync-error-banner {
+  padding: 10px clamp(14px, 3vw, 40px);
+  background: rgba(182, 80, 67, 0.14);
+  border-bottom: 1px solid var(--danger);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 700;
 }
 
 .record-mark {
@@ -143,122 +281,22 @@ input:focus-visible {
 
 .topbar h1 {
   margin: 0;
-  font-size: 21px;
+  font-size: 17px;
   line-height: 1.25;
   letter-spacing: 0;
 }
 
-.waveform {
-  display: block;
-  width: 180px;
-  height: 40px;
-}
-
-.release-lockup {
-  display: flex;
-  align-items: baseline;
-  justify-content: flex-end;
-  gap: 12px;
-  color: #c9d5cf;
-  white-space: nowrap;
-}
-
 .countdown {
   color: #f2c76c;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 800;
-}
-
-.summary-band {
-  display: grid;
-  grid-template-columns: 2fr 1fr 1.5fr 1fr;
-  border-bottom: 1px solid var(--line);
-  background: var(--paper);
-  padding: 0 clamp(18px, 4vw, 54px);
-}
-
-.mobile-glance {
-  display: none;
-}
-
-.sync-strip {
-  min-height: 62px;
-  padding: 12px clamp(18px, 4vw, 54px);
-  border-bottom: 1px solid var(--line);
-  background:
-    linear-gradient(135deg, rgba(47, 125, 105, 0.09), transparent 48%),
-    var(--paper);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 18px;
-  flex-wrap: wrap;
+  white-space: nowrap;
 }
 
 .sync-label {
   margin: 0 0 3px;
   color: var(--muted);
   font-size: 11px;
-}
-
-.sync-strip strong {
-  display: block;
-  font-size: 14px;
-}
-
-/* 동기화 상태를 색으로 구분: 로딩(중립 강조)·완료(초록)·실패(경고). */
-.sync-strip[data-sync-status="loading"] {
-  background:
-    linear-gradient(135deg, rgba(75, 111, 168, 0.16), transparent 52%),
-    var(--paper);
-}
-
-.sync-strip[data-sync-status="ready"] {
-  background:
-    linear-gradient(135deg, rgba(39, 117, 82, 0.16), transparent 52%),
-    var(--paper);
-}
-
-.sync-strip[data-sync-status="error"] {
-  background:
-    linear-gradient(135deg, rgba(182, 80, 67, 0.2), transparent 55%),
-    var(--paper);
-  border-bottom-color: var(--danger);
-}
-
-.sync-strip[data-sync-status="error"] #sync-status-text {
-  color: var(--danger);
-}
-
-.sync-strip[data-sync-status="error"] #sync-status-text::before {
-  content: "⚠ ";
-}
-
-.mobile-sync-banner {
-  grid-column: 1 / -1;
-  margin-top: 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--danger);
-  border-radius: 10px;
-  background: rgba(182, 80, 67, 0.12);
-  color: var(--danger);
-  font-size: 12px;
-  font-weight: 700;
-}
-
-.sync-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.auth-strip {
-  min-width: min(100%, 420px);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  margin-left: auto;
 }
 
 .auth-form {
@@ -333,65 +371,8 @@ input:focus-visible {
   opacity: 0.7;
 }
 
-.summary-item {
-  min-width: 0;
-  min-height: 86px;
-  padding: 18px 22px;
-  border-right: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-}
-
-.summary-item:first-child {
-  padding-left: 0;
-}
-
-.summary-item:last-child {
-  border-right: 0;
-}
-
-.summary-item strong {
-  overflow-wrap: anywhere;
-}
-
-.summary-label,
-.summary-label-row {
+.summary-label {
   color: var(--muted);
-  font-size: 12px;
-}
-
-.summary-label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 9px;
-}
-
-.summary-label-row strong {
-  color: var(--ink);
-  font-size: 13px;
-}
-
-.progress-track {
-  width: 100%;
-  height: 8px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #e4e9e6;
-}
-
-.progress-track span {
-  display: block;
-  width: 0;
-  height: 100%;
-  background: var(--demo);
-  transition: width 180ms ease;
-}
-
-.next-deadline > span:last-child {
-  margin-top: 2px;
-  color: var(--recording);
   font-size: 12px;
   font-weight: 700;
 }
@@ -2276,32 +2257,6 @@ footer {
 }
 
 @media (max-width: 1060px) {
-  .topbar {
-    grid-template-columns: 1fr auto;
-  }
-
-  .waveform {
-    display: none;
-  }
-
-  .summary-band {
-    grid-template-columns: 1.5fr 1fr 1.4fr;
-  }
-
-  .delivery-date {
-    display: none;
-  }
-
-  .sync-strip {
-    padding-right: 18px;
-    padding-left: 18px;
-  }
-
-  .auth-strip {
-    width: 100%;
-    margin-left: 0;
-  }
-
   .app-shell {
     grid-template-columns: 1fr;
   }
@@ -2350,127 +2305,41 @@ footer {
 }
 
 @media (max-width: 760px) {
-  .mobile-glance {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 10px;
-    padding: 10px 12px 0;
-  }
-
-  .mobile-glance-card,
-  .mobile-glance-actions {
-    padding: 13px 14px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--paper);
-    box-shadow: 0 2px 14px rgba(24, 33, 29, 0.04);
-  }
-
-  .mobile-glance-card {
-    display: grid;
-    gap: 4px;
-  }
-
-  .mobile-glance-label {
-    color: var(--muted);
-    font-size: 11px;
-    font-weight: 700;
-  }
-
-  .mobile-glance-card strong {
-    font-size: 15px;
-    line-height: 1.4;
-  }
-
-  .mobile-glance-meta {
-    color: var(--muted);
-    font-size: 11px;
-  }
-
-  .mobile-glance-actions {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 8px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-  }
-
-  .mobile-glance-actions .sync-button {
-    flex: 1 1 0;
-    min-height: 42px;
-    border-radius: 14px;
-    background: #f7faf8;
-  }
-
-  .summary-band {
-    display: none;
-  }
-
   .topbar {
-    min-height: auto;
-    padding: 12px 16px;
-    gap: 12px;
+    padding: 8px 12px 10px;
+    gap: 10px;
+    flex-wrap: wrap;
   }
 
   .record-mark {
-    width: 34px;
-    height: 34px;
-    flex-basis: 34px;
+    width: 30px;
+    height: 30px;
+    flex-basis: 30px;
   }
 
   .topbar h1 {
-    font-size: 16px;
+    font-size: 15px;
   }
 
-  .release-lockup {
-    flex-direction: column;
-    align-items: flex-end;
-    gap: 0;
-    font-size: 10px;
+  .brand-sub {
+    display: none;
+  }
+
+  /* 모바일 헤더 2행: 위 브랜드+점, 아래 D-day+다음 마감 */
+  .header-focus {
+    order: 4;
+    flex-basis: 100%;
+    margin-left: 0;
   }
 
   .countdown {
     font-size: 15px;
   }
 
-  .sync-strip {
-    display: none;
-    min-height: auto;
-    margin: 10px 12px 0;
-    padding: 12px 14px;
-    border: 1px solid var(--line);
-    border-radius: 16px;
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 10px;
-  }
-
-  .sync-actions {
-    width: 100%;
-    justify-content: space-between;
-  }
-
-  .auth-strip,
-  .auth-form {
-    width: 100%;
-    align-items: flex-start;
-    justify-content: space-between;
-  }
-
-  .auth-input {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .sync-detail {
-    text-align: left;
-  }
-
-  .summary-item {
-    min-height: 74px;
-    padding: 13px 12px;
+  .sync-popover {
+    top: auto;
+    bottom: calc(78px + env(safe-area-inset-bottom));
+    right: 12px;
   }
 
   /* 하단 탭바: nav가 문서 상단에 있어 sticky bottom은 절대 발동하지 않는다.
@@ -2538,10 +2407,6 @@ footer {
   .body-mobile-compact .dashboard-card {
     padding: 13px;
     border-radius: 16px;
-  }
-
-  .body-mobile-utility-open .sync-strip {
-    display: flex;
   }
 
   .overview-card {
@@ -2803,7 +2668,8 @@ footer {
     scroll-behavior: auto;
   }
 
-  .progress-track span {
+  .header-progress span,
+  .sync-dot-mark {
     transition: none;
   }
 }

@@ -23,101 +23,66 @@
     <header class="topbar">
       <div class="brand-block" role="button" tabindex="0" data-app-refresh title="새로고침">
         <div class="record-mark" aria-hidden="true"><span></span></div>
-        <div>
-          <p class="eyebrow">ALBUM RELEASE 2026</p>
-          <h1>앨범 제작 캘린더</h1>
+        <div class="brand-copy">
+          <h1>앨범 캘린더</h1>
+          <span id="release-date-display" class="brand-sub">2026.12.04 발매</span>
         </div>
       </div>
 
-      <canvas
-        id="waveform"
-        class="waveform"
-        width="180"
-        height="40"
-        aria-label="앨범 제작 진행 파형"
-        role="button"
-        tabindex="0"
-        data-app-refresh
-        title="새로고침"
-      ></canvas>
-
-      <div class="release-lockup">
+      <div class="header-focus" aria-label="다음 마감">
         <span id="countdown" class="countdown">D-</span>
-        <span id="release-date-display">2026.12.04 발매</span>
+        <span class="header-deadline">
+          다음 마감
+          <strong id="next-deadline">—</strong>
+          <span id="next-deadline-date" class="header-deadline-date"></span>
+        </span>
+      </div>
+
+      <button
+        id="sync-dot"
+        class="sync-dot"
+        type="button"
+        aria-label="동기화 상태와 계정"
+        aria-expanded="false"
+        aria-controls="sync-popover"
+      >
+        <span class="sync-dot-mark" aria-hidden="true"></span>
+      </button>
+
+      <div
+        class="header-progress"
+        role="progressbar"
+        aria-label="전체 일정 완료율"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <span id="progress-fill"></span>
       </div>
     </header>
 
-    <section class="mobile-glance" aria-label="모바일 핵심 요약">
-      <article class="mobile-glance-card">
-        <span class="mobile-glance-label">다음 마감</span>
-        <strong id="mobile-next-deadline">good night 데모</strong>
-        <span id="mobile-next-deadline-date" class="mobile-glance-meta">6월 21일</span>
-      </article>
-      <article class="mobile-glance-card">
-        <span class="mobile-glance-label">유통사 전달</span>
-        <strong id="mobile-delivery-date">11.13</strong>
-        <span id="mobile-auth-summary" class="mobile-glance-meta">로그인 전</span>
-      </article>
-      <div class="mobile-glance-actions">
-        <button id="mobile-utility-toggle" class="sync-button" type="button">상태 펼치기</button>
-        <button class="sync-button" type="button" data-mobile-jump="calendar">달력 보기</button>
-      </div>
-    </section>
-
-    <section class="summary-band" aria-label="제작 현황 요약">
-      <div class="summary-item progress-summary">
-        <div class="summary-label-row">
-          <span>전체 진행률</span>
-          <strong id="progress-percent">0%</strong>
-        </div>
-        <div
-          class="progress-track"
-          role="progressbar"
-          aria-label="전체 일정 완료율"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow="0"
-        >
-          <span id="progress-fill"></span>
-        </div>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">현재 단계</span>
-        <strong id="current-phase">판단용 데모</strong>
-      </div>
-      <div class="summary-item next-deadline">
-        <span class="summary-label">다음 마감</span>
-        <strong id="next-deadline">good night 데모</strong>
-        <span id="next-deadline-date">6월 21일</span>
-      </div>
-      <div class="summary-item delivery-date">
-        <span class="summary-label">유통사 전달</span>
-        <strong id="delivery-date-display">2026.11.13</strong>
-      </div>
-    </section>
-
-    <section class="sync-strip" aria-label="데이터 동기화 상태" aria-live="polite">
-      <div>
+    <div id="sync-popover" class="sync-popover" role="dialog" aria-label="동기화와 계정" hidden>
+      <div class="sync-popover-row">
         <p class="sync-label">게시 일정</p>
         <strong id="sync-status-text">로컬 일정 사용 중</strong>
-      </div>
-      <div class="sync-actions">
         <span id="sync-status-detail" class="sync-detail">Supabase 연동 전</span>
-        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
       </div>
-      <div class="auth-strip">
-        <div>
-          <p class="sync-label">개인 동기화</p>
-          <strong id="auth-status-text">로그인 전</strong>
-          <span id="auth-status-detail" class="sync-detail">Google로 로그인하면 폰과 PC에서 같은 작업 상태를 봅니다</span>
-        </div>
+      <div class="sync-popover-row">
+        <p class="sync-label">개인 동기화</p>
+        <strong id="auth-status-text">로그인 전</strong>
+        <span id="auth-status-detail" class="sync-detail">Google로 로그인하면 폰과 PC에서 같은 작업 상태를 봅니다</span>
+      </div>
+      <div class="sync-popover-actions">
+        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
         <form id="auth-form" class="auth-form">
           <button id="auth-google" class="google-button" type="submit">Google로 로그인</button>
           <button id="auth-signout" class="text-button" type="button" hidden>로그아웃</button>
           <button id="install-app" class="sync-button" type="button" hidden>앱 설치</button>
         </form>
       </div>
-    </section>
+    </div>
+
+    <div id="sync-error-banner" class="sync-error-banner" role="status" aria-live="polite" hidden></div>
 
     <nav class="view-tabs" role="tablist" aria-label="일정 보기 방식">
       <button class="tab-button is-active" type="button" role="tab" data-view="dashboard" aria-controls="dashboard-view" aria-selected="true">
