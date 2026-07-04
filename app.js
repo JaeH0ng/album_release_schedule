@@ -1676,9 +1676,58 @@ function resetEventPlan(eventId) {
 }
 
 function pullEventIntoThisWeek(eventId) {
+  const event = findEvent(eventId);
+  if (!canMoveEventDate(event)) return;
+  if (event.kind === "track-followup") {
+    // 팔로우업은 날짜가 항목 자체에 저장되므로 그쪽 경로로 옮긴 뒤 수락만 표시한다.
+    updateTrackFollowupDate(eventId, toIso(today));
+    updateEventPlan(eventId, { focusStatus: "accepted" });
+    return;
+  }
   updateEventPlan(eventId, {
     focusStatus: "accepted",
-    overrideDate: toIso(today),
+    overrideDate: toIso(today) === event.originalDate ? null : toIso(today),
+  });
+}
+
+// 날짜 자유 이동: 개인 오버레이(overrideDate)로만 옮기고 원본 일정(Supabase/시드)은
+// 건드리지 않는다. 고정 마감(milestone)과 공모전 마감은 옮길 수 없다.
+function canMoveEventDate(event) {
+  return Boolean(event) && event.kind !== "opportunity" && !event.milestone;
+}
+
+function moveEventToDate(eventId, nextIso) {
+  const event = findEvent(eventId);
+  if (!canMoveEventDate(event) || !nextIso) return;
+  if (event.kind === "track-followup") {
+    updateTrackFollowupDate(eventId, nextIso);
+    return;
+  }
+  const plan = getEventPlan(eventId);
+  const patch = { overrideDate: nextIso === event.originalDate ? null : nextIso };
+  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다.
+  if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") patch.focusStatus = "none";
+  // 이번 주 밖으로 보내면 '직접 수락' 고정도 풀어 이번 주 목록에서 내린다.
+  if (plan.focusStatus === "accepted" && !isIsoInCurrentWeek(nextIso)) patch.focusStatus = "none";
+  updateEventPlan(eventId, patch);
+}
+
+// 다이얼로그·가져오기 시트에서 쓰는 빠른 이동 목적지. 같은 날짜가 겹치면 앞의 것만 남긴다.
+function getQuickMoveTargets() {
+  const weekStart = startOfWeek(today);
+  const saturday = addDays(weekStart, 5);
+  const weekend = saturday >= today ? saturday : addDays(weekStart, 6);
+  const targets = [
+    { iso: toIso(today), label: "오늘" },
+    { iso: toIso(addDays(today, 1)), label: "내일" },
+    { iso: toIso(weekend), label: "이번 주말" },
+    { iso: toIso(addDays(weekStart, 7)), label: "다음 주" },
+  ];
+  const seen = new Set();
+  return targets.filter((target) => {
+    if (seen.has(target.iso)) return false;
+    seen.add(target.iso);
+    return true;
   });
 }
 
@@ -1687,9 +1736,13 @@ function getAlbumPlanningEvents() {
 }
 
 function isEventInCurrentWeek(event) {
+  return isIsoInCurrentWeek(event.date);
+}
+
+function isIsoInCurrentWeek(iso) {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
-  const date = parseDate(event.date);
+  const date = parseDate(iso);
   return date >= weekStart && date <= weekEnd;
 }
 
@@ -3392,7 +3445,160 @@ function openTaskDialog(event) {
       });
     });
   }
+  renderDialogSchedule(event, dialog);
   dialog.showModal();
+}
+
+// 날짜 옮기기: 퀵 칩(오늘/내일/이번 주말/다음 주) + 날짜 직접 선택.
+// 개인 오버레이라 원본 일정은 그대로고, '원래 날짜로'로 언제든 복원된다.
+function renderDialogSchedule(event, dialog) {
+  const host = document.querySelector("#dialog-schedule");
+  if (!host) return;
+
+  if (!canMoveEventDate(event)) {
+    host.innerHTML = event?.milestone
+      ? '<p class="dialog-schedule-note">고정 마감이라 날짜를 옮길 수 없습니다.</p>'
+      : "";
+    host.hidden = !host.innerHTML;
+    return;
+  }
+
+  const chips = getQuickMoveTargets()
+    .filter((target) => target.iso !== event.date)
+    .map(
+      (target) =>
+        `<button class="schedule-chip" type="button" data-dialog-move="${escapeHtml(target.iso)}">${escapeHtml(target.label)}</button>`
+    )
+    .join("");
+  host.innerHTML = `
+    <p class="dialog-schedule-label">날짜 옮기기</p>
+    <div class="dialog-schedule-chips">${chips}</div>
+    <div class="dialog-schedule-custom">
+      <input
+        id="dialog-move-date"
+        class="schedule-date-input"
+        type="date"
+        value="${escapeHtml(event.date)}"
+        min="${CALENDAR_START}"
+        max="${CALENDAR_END}"
+        aria-label="옮길 날짜 선택"
+      />
+      <button class="schedule-chip is-confirm" type="button" data-dialog-move-custom="true">이 날짜로</button>
+    </div>
+    ${
+      event.overrideDate
+        ? `<p class="dialog-schedule-note">원래 일정 ${escapeHtml(formatShortDate(event.originalDate))} ·
+            <button class="text-button" type="button" data-dialog-move="${escapeHtml(event.originalDate)}">원래 날짜로 되돌리기</button></p>`
+        : ""
+    }
+  `;
+  host.hidden = false;
+  host.querySelectorAll("[data-dialog-move]").forEach((button) => {
+    button.addEventListener("click", () => {
+      moveEventToDate(event.id, button.dataset.dialogMove);
+      dialog.close();
+    });
+  });
+  host.querySelector("[data-dialog-move-custom]")?.addEventListener("click", () => {
+    const value = host.querySelector("#dialog-move-date")?.value;
+    if (!value) return;
+    moveEventToDate(event.id, value);
+    dialog.close();
+  });
+}
+
+// 작업 가져오기 시트: 남은 작업 전체(잘림 없음)를 검색·단계 필터와 함께 보여주고,
+// [오늘 하기]로 바로 당겨오거나 제목을 눌러 상세에서 원하는 날짜로 옮긴다.
+const pickerState = { search: "", phase: "all" };
+
+function openTaskPicker() {
+  const dialog = document.querySelector("#picker-dialog");
+  if (!dialog) return;
+  renderTaskPicker();
+  if (!dialog.open) dialog.showModal();
+}
+
+function getPickerEvents() {
+  return getIncompleteEvents().filter((event) => canMoveEventDate(event));
+}
+
+function renderTaskPicker() {
+  const host = document.querySelector("#picker-list");
+  if (!host) return;
+
+  const allEvents = getPickerEvents();
+  if (pickerState.phase !== "all" && !allEvents.some((event) => event.phase === pickerState.phase)) {
+    pickerState.phase = "all";
+  }
+  const search = pickerState.search.trim().toLowerCase();
+  const filtered = allEvents.filter((event) => {
+    if (pickerState.phase !== "all" && event.phase !== pickerState.phase) return false;
+    if (!search) return true;
+    return [event.title, event.track, event.detail]
+      .filter(Boolean)
+      .some((text) => String(text).toLowerCase().includes(search));
+  });
+
+  renderPickerPhaseFilters(allEvents);
+
+  host.innerHTML = filtered.length
+    ? filtered.map((event) => renderPickerRow(event)).join("")
+    : '<p class="empty-copy">조건에 맞는 작업이 없습니다.</p>';
+
+  host.querySelectorAll("[data-picker-today]").forEach((button) => {
+    button.addEventListener("click", () => pullEventIntoThisWeek(button.dataset.pickerToday));
+  });
+  host.querySelectorAll("[data-picker-detail]").forEach((button) => {
+    button.addEventListener("click", () => {
+      const target = findEvent(button.dataset.pickerDetail);
+      if (target) openTaskDialog(target);
+    });
+  });
+}
+
+function renderPickerPhaseFilters(events) {
+  const host = document.querySelector("#picker-phase-filters");
+  if (!host) return;
+  const availablePhases = phases.filter((phase) => events.some((event) => event.phase === phase.id));
+  const chips = [{ id: "all", label: "전체" }, ...availablePhases];
+  host.innerHTML = chips
+    .map(
+      (phase) =>
+        `<button class="schedule-chip${pickerState.phase === phase.id ? " is-current" : ""}" type="button" data-picker-phase="${escapeHtml(phase.id)}">${escapeHtml(phase.label)}</button>`
+    )
+    .join("");
+  host.querySelectorAll("[data-picker-phase]").forEach((button) => {
+    button.addEventListener("click", () => {
+      pickerState.phase = button.dataset.pickerPhase;
+      renderTaskPicker();
+    });
+  });
+}
+
+function renderPickerRow(event) {
+  const phase = phaseMap.get(event.phase);
+  const delayed = parseDate(event.date) < today;
+  const plan = getEventPlan(event.id);
+  const planChip =
+    plan.focusStatus === "accepted"
+      ? ' <span class="picker-chip is-focus">이번 주</span>'
+      : plan.focusStatus === "hold"
+        ? ' <span class="picker-chip is-hold">보류</span>'
+        : plan.focusStatus === "dismissed"
+          ? ' <span class="picker-chip is-dismissed">안 함</span>'
+          : "";
+  const alreadyToday = event.date === toIso(today) && plan.focusStatus === "accepted";
+  return `
+    <article class="picker-item" style="--event-color:${phase.color}">
+      <div class="picker-item-main">
+        <button class="picker-item-title" type="button" data-picker-detail="${escapeHtml(event.id)}">${escapeHtml(event.title)}</button>
+        <p class="picker-item-meta">${escapeHtml(phase.label)} · ${formatDateRange(event)}${delayed ? " · 지연" : ""}${planChip}</p>
+      </div>
+      <button class="opportunity-action is-primary picker-pull" type="button" data-picker-today="${escapeHtml(event.id)}"${alreadyToday ? " disabled" : ""}>
+        ${alreadyToday ? "오늘 잡음" : "오늘 하기"}
+      </button>
+    </article>
+  `;
 }
 
 function openOpportunityDialog(opportunity) {
@@ -3424,6 +3630,11 @@ function openOpportunityDialog(opportunity) {
   `;
   const opportunityActionsHost = document.querySelector("#dialog-actions");
   if (opportunityActionsHost) opportunityActionsHost.innerHTML = "";
+  const opportunityScheduleHost = document.querySelector("#dialog-schedule");
+  if (opportunityScheduleHost) {
+    opportunityScheduleHost.innerHTML = "";
+    opportunityScheduleHost.hidden = true;
+  }
   dialog.showModal();
 }
 
@@ -3485,6 +3696,8 @@ function renderAll() {
   renderRoadmap();
   renderTracks();
   renderSummary();
+  // 가져오기 시트가 열려 있으면 목록도 같은 상태로 갱신한다.
+  if (document.querySelector("#picker-dialog")?.open) renderTaskPicker();
 }
 
 document.querySelectorAll(".tab-button").forEach((button) => {
@@ -3566,6 +3779,18 @@ document.querySelector("#close-dialog").addEventListener("click", () => document
 document.querySelector("#task-dialog").addEventListener("click", (event) => {
   if (event.target === event.currentTarget) event.currentTarget.close();
 });
+
+// 작업 가져오기 시트: 검색은 정적 입력이라 한 번만 바인딩(재렌더로 포커스를 잃지 않게).
+document.querySelector("#picker-search")?.addEventListener("input", (searchEvent) => {
+  pickerState.search = searchEvent.target.value || "";
+  renderTaskPicker();
+});
+document.querySelector("#close-picker")?.addEventListener("click", () => document.querySelector("#picker-dialog").close());
+document.querySelector("#picker-dialog")?.addEventListener("click", (event) => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
+document.querySelector("#open-picker-dashboard")?.addEventListener("click", openTaskPicker);
+document.querySelector("#open-picker-calendar")?.addEventListener("click", openTaskPicker);
 
 renderAll();
 applyTrackHash();

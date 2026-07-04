@@ -2374,6 +2374,168 @@ footer {
   gap: 18px;
 }
 
+/* 날짜 옮기기: 다이얼로그 안 퀵 칩 + 날짜 직접 선택 */
+.dialog-schedule {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.dialog-schedule-label {
+  margin: 0 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.dialog-schedule-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.schedule-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.schedule-chip.is-current {
+  box-shadow: inset 0 0 0 1px currentColor;
+  color: var(--demo);
+}
+
+.schedule-chip.is-confirm {
+  border-color: rgba(39, 117, 82, 0.28);
+  background: #eef8f2;
+  color: var(--success);
+}
+
+.dialog-schedule-custom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.schedule-date-input {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.dialog-schedule-note {
+  margin: 10px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* 작업 가져오기 시트 */
+.picker-search {
+  width: 100%;
+  min-height: 38px;
+  margin: 4px 0 10px;
+  padding: 0 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 13px;
+}
+
+.picker-phase-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.picker-list {
+  display: grid;
+  gap: 8px;
+  max-height: 46vh;
+  overflow-y: auto;
+}
+
+.picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--event-color, var(--line-strong));
+  border-radius: 10px;
+  background: #fff;
+}
+
+.picker-item-main {
+  min-width: 0;
+}
+
+.picker-item-title {
+  display: block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  cursor: pointer;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.picker-item-meta {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.picker-chip {
+  display: inline-flex;
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.picker-chip.is-focus {
+  background: #eef8f2;
+  color: var(--success);
+}
+
+.picker-chip.is-hold {
+  background: #f3f7fd;
+  color: var(--arrangement);
+}
+
+.picker-chip.is-dismissed {
+  background: #fdf4f2;
+  color: var(--danger);
+}
+
+.picker-pull {
+  flex-shrink: 0;
+}
+
+.picker-pull:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
 @media (max-width: 1060px) {
   .app-shell {
     grid-template-columns: 1fr;
