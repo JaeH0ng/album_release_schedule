@@ -17,6 +17,23 @@
 
 ## 변경 로그
 
+### 2026-07-04 (3차 재리뷰 반영) — 폴링 flush/load 경합 제거 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(087a046)의 Major 1건 반영. 45초 폴링이 `loadRemoteEventPlans()`를 await하지 않고 `flushPendingEventPlans()`를 동시에 돌려, DELETE 성공→pending 해제와 삭제 전 SELECT 응답 apply가 역전되면 tombstone이 부활하던 경합. 상세·처리는 `REVIEW_FROM_CODEX.md` 087a046 재리뷰 블록(`[resolved]`).
+
+- **순서 보장**: 폴링 콜백을 `async`로, `await flushPendingEventPlans(); await loadRemoteEventPlans();`. 재시도 write로 원격을 수렴시킨 뒤 SELECT. `flushPendingEventPlans`는 `Promise.all`로 반환. 로그인 경로 flush도 await.
+- **경합 방어 스냅샷**: `loadRemoteEventPlans`가 SELECT 발신 시점의 pending 키를 `protectIds`로 캡처→`applyRemoteEventPlans`가 apply까지 보존. SELECT 응답 전에 pending이 풀려도 그 시점 tombstone은 refill 안 됨.
+
+**바꾼 파일**
+- `app.js`(폴링 콜백 async+순서, `flushPendingEventPlans` Promise 반환, `loadRemoteEventPlans` protectIds 스냅샷, `applyRemoteEventPlans` protectIds preserve, 로그인 flush await), `docs/REVIEW_FROM_CODEX.md`(087a046 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 비로그인 로컬 회귀 정상. 원격 경합 경로는 로그인 필요라 순서·스냅샷 로직 기준 확인.
+
 ### 2026-07-04 (재리뷰 반영) — pending tombstone 보존 + 재시도 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)
