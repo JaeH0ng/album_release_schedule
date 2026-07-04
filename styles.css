@@ -1968,6 +1968,41 @@ textarea.admin-input {
     color-mix(in srgb, var(--event-color), #ffffff 93%);
 }
 
+/* 드래그로 날짜 옮기기: 끌 수 있는 카드, 끌리는 중, 놓을 셀, 모바일 고스트 */
+.calendar-event.is-draggable {
+  cursor: grab;
+}
+
+.calendar-event.is-dragging {
+  opacity: 0.45;
+  cursor: grabbing;
+}
+
+.month-cell.is-drop-target {
+  outline: 2px dashed var(--demo);
+  outline-offset: -2px;
+  background: #f0f8f4;
+}
+
+.calendar-drag-ghost {
+  position: fixed;
+  z-index: 90;
+  max-width: 220px;
+  padding: 8px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 12px 32px rgba(24, 33, 29, 0.25);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  pointer-events: none;
+  transform: translate(-50%, -130%);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .calendar-event.is-demo-review {
   background:
     linear-gradient(135deg, rgba(181, 132, 24, 0.14), rgba(255, 255, 255, 0) 58%),

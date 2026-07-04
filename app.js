@@ -2890,6 +2890,9 @@ function renderEvent(event, iso = event.date) {
   if (event.milestone) classes.push("is-milestone");
   if (complete) classes.push("is-complete");
   if (presentation.className) classes.push(presentation.className);
+  // 옮길 수 있는 카드만 드래그 대상(데스크톱 DnD + 모바일 long-press).
+  const movable = canMoveEventDate(event);
+  if (movable) classes.push("is-draggable");
   const plan = getEventPlan(event.id);
   const focusBadge =
     plan.focusStatus === "accepted"
@@ -2912,7 +2915,7 @@ function renderEvent(event, iso = event.date) {
   if (event.overrideDate) metaParts.push(`원래 ${formatShortDate(event.originalDate)}`);
 
   return `
-    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}">
+    <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}"${movable ? ' draggable="true"' : ""}>
       ${badgesRow}
       <div class="event-topline">
         <input
@@ -3838,6 +3841,163 @@ document.querySelector("#picker-dialog")?.addEventListener("click", (event) => {
 });
 document.querySelector("#open-picker-dashboard")?.addEventListener("click", openTaskPicker);
 document.querySelector("#open-picker-calendar")?.addEventListener("click", openTaskPicker);
+
+// 달력 드래그 앤 드롭. 문서 레벨 위임이라 달력 재렌더에 영향받지 않는다.
+// 데스크톱: HTML5 DnD. 모바일: 카드를 길게 눌러(0.5초) 들어올린 뒤 셀에 놓는다.
+// 드롭 결과는 moveEventToDate — 개인 오버레이라 원본 일정은 그대로다.
+function initCalendarDragAndDrop() {
+  let draggingEventId = null;
+
+  const clearDropTargets = () => {
+    document.querySelectorAll(".month-cell.is-drop-target").forEach((cell) => cell.classList.remove("is-drop-target"));
+  };
+  const findCell = (target) =>
+    target instanceof Element ? target.closest(".month-cell[data-date]") : null;
+
+  document.addEventListener("dragstart", (dragEvent) => {
+    const card = dragEvent.target instanceof Element ? dragEvent.target.closest('.calendar-event[draggable="true"]') : null;
+    if (!card) return;
+    draggingEventId = card.dataset.eventId;
+    dragEvent.dataTransfer.setData("text/plain", draggingEventId);
+    dragEvent.dataTransfer.effectAllowed = "move";
+    card.classList.add("is-dragging");
+  });
+  document.addEventListener("dragend", (dragEvent) => {
+    if (dragEvent.target instanceof Element) {
+      dragEvent.target.closest(".calendar-event")?.classList.remove("is-dragging");
+    }
+    draggingEventId = null;
+    clearDropTargets();
+  });
+  document.addEventListener("dragover", (dragEvent) => {
+    if (!draggingEventId) return;
+    const cell = findCell(dragEvent.target);
+    if (!cell) return;
+    dragEvent.preventDefault();
+    dragEvent.dataTransfer.dropEffect = "move";
+    if (!cell.classList.contains("is-drop-target")) {
+      clearDropTargets();
+      cell.classList.add("is-drop-target");
+    }
+  });
+  document.addEventListener("drop", (dragEvent) => {
+    if (!draggingEventId) return;
+    const cell = findCell(dragEvent.target);
+    clearDropTargets();
+    if (!cell) return;
+    dragEvent.preventDefault();
+    const eventId = draggingEventId;
+    draggingEventId = null;
+    moveEventToDate(eventId, cell.dataset.date);
+  });
+
+  // ---- 모바일 long-press 드래그 ----
+  const LONG_PRESS_MS = 500;
+  const MOVE_TOLERANCE = 8;
+  const EDGE_SCROLL_ZONE = 90;
+  let pressTimer = null;
+  let pressCard = null;
+  let pressPoint = null;
+  let touchDragging = false;
+  let ghost = null;
+
+  const cancelPress = () => {
+    if (pressTimer) window.clearTimeout(pressTimer);
+    pressTimer = null;
+    pressCard = null;
+    pressPoint = null;
+  };
+
+  // 드래그 중에만 스크롤을 막는다(리프트 전 스크롤은 그대로 동작).
+  const blockScroll = (touchEvent) => {
+    if (touchDragging) touchEvent.preventDefault();
+  };
+
+  const endTouchDrag = (dropPoint) => {
+    if (!touchDragging) return;
+    touchDragging = false;
+    ghost?.remove();
+    ghost = null;
+    document.removeEventListener("touchmove", blockScroll);
+    const cell = dropPoint
+      ? findCell(document.elementFromPoint(dropPoint.x, dropPoint.y))
+      : null;
+    clearDropTargets();
+    document.querySelectorAll(".calendar-event.is-dragging").forEach((card) => card.classList.remove("is-dragging"));
+    const eventId = draggingEventId;
+    draggingEventId = null;
+    if (cell && eventId) moveEventToDate(eventId, cell.dataset.date);
+    // 드롭 직후 발생하는 잔여 click이 다이얼로그를 열지 않게 한 번 삼킨다.
+    const swallowClick = (clickEvent) => {
+      clickEvent.stopPropagation();
+      clickEvent.preventDefault();
+    };
+    document.addEventListener("click", swallowClick, { capture: true, once: true });
+    window.setTimeout(() => document.removeEventListener("click", swallowClick, { capture: true }), 350);
+  };
+
+  const beginTouchDrag = (card, point) => {
+    touchDragging = true;
+    draggingEventId = card.dataset.eventId;
+    card.classList.add("is-dragging");
+    navigator.vibrate?.(15);
+    ghost = document.createElement("div");
+    ghost.className = "calendar-drag-ghost";
+    ghost.textContent = card.querySelector(".event-title-button")?.textContent || "일정";
+    document.body.appendChild(ghost);
+    positionGhost(point);
+    document.addEventListener("touchmove", blockScroll, { passive: false });
+  };
+
+  const positionGhost = (point) => {
+    if (!ghost) return;
+    ghost.style.left = `${point.x}px`;
+    ghost.style.top = `${point.y}px`;
+    const cell = findCell(document.elementFromPoint(point.x, point.y));
+    clearDropTargets();
+    cell?.classList.add("is-drop-target");
+    // 화면 가장자리 근처에서는 달력을 이어서 스크롤한다.
+    if (point.y < EDGE_SCROLL_ZONE) window.scrollBy(0, -14);
+    else if (point.y > window.innerHeight - EDGE_SCROLL_ZONE) window.scrollBy(0, 14);
+  };
+
+  document.addEventListener("pointerdown", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    const card =
+      pointerEvent.target instanceof Element ? pointerEvent.target.closest(".calendar-event.is-draggable") : null;
+    if (!card) return;
+    pressCard = card;
+    pressPoint = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+    pressTimer = window.setTimeout(() => {
+      const target = pressCard;
+      const point = pressPoint;
+      cancelPress();
+      if (target && point) beginTouchDrag(target, point);
+    }, LONG_PRESS_MS);
+  });
+  document.addEventListener("pointermove", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    const point = { x: pointerEvent.clientX, y: pointerEvent.clientY };
+    if (touchDragging) {
+      positionGhost(point);
+      return;
+    }
+    // 리프트 전 손가락이 흐르면(=스크롤 의도) long-press를 취소한다.
+    if (pressPoint && Math.hypot(point.x - pressPoint.x, point.y - pressPoint.y) > MOVE_TOLERANCE) {
+      cancelPress();
+    }
+  });
+  document.addEventListener("pointerup", (pointerEvent) => {
+    if (pointerEvent.pointerType !== "touch") return;
+    cancelPress();
+    endTouchDrag({ x: pointerEvent.clientX, y: pointerEvent.clientY });
+  });
+  document.addEventListener("pointercancel", () => {
+    cancelPress();
+    endTouchDrag(null);
+  });
+}
+initCalendarDragAndDrop();
 
 renderAll();
 applyTrackHash();
