@@ -17,6 +17,22 @@
 
 ## 변경 로그
 
+### 2026-07-04 (4차 재리뷰 반영) — eventId별 원격 write 직렬화 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(fcc137d)의 Major 1건 반영. stamp는 pending 해제만 막고 원격 write 순서는 못 막아, 같은 항목에 upsert→delete가 빠르게 이어질 때 먼저 나간 오래된 request가 늦게 성공해 최신 상태를 stale로 덮던 out-of-order 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` fcc137d 재리뷰 블록(`[resolved]`).
+
+- **직렬화**: `eventPlanSyncChains`(eventId→Promise 꼬리) 도입. `queueEventPlanSync`가 같은 id의 이전 write 뒤에 체이닝해 한 항목의 write가 큐잉 순서대로 하나씩 실행 → out-of-order 구조적 불가. 각 write는 실행 시점 현재 로컬 값을 읽어 마지막 write가 항상 최신 반영. 체인은 꼬리 완료 시 맵에서 제거(무한 성장 방지). `flushPendingEventPlans`도 같은 경로.
+
+**바꾼 파일**
+- `app.js`(`eventPlanSyncChains` + `queueEventPlanSync` 체이닝, `flushPendingEventPlans`가 queueEventPlanSync 경유), `docs/REVIEW_FROM_CODEX.md`(fcc137d Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **직렬화 순서 보장은 동일 체인 패턴 하네스로 증명**(느린 upsert+빠른 delete → 직렬화 O=remote 최신, 직렬화 X=remote stale). 실제 원격 경로는 로그인 필요.
+
 ### 2026-07-04 (3차 재리뷰 반영) — 폴링 flush/load 경합 제거 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)

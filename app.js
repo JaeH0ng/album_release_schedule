@@ -1261,31 +1261,38 @@ async function syncEventPlanRow(eventId, stamp) {
 
 // 같은 tick에 같은 항목을 여러 번 큐잉해도 최신 write를 구분하도록 단조 증가 시퀀스.
 let eventPlanSyncSeq = 0;
+// eventId별 원격 write 직렬화 체인. 같은 항목의 write는 항상 큐잉 순서대로 실행돼,
+// 먼저 보낸 오래된 request가 늦게 성공해 최신 상태를 덮는 out-of-order 문제를 막는다.
+// 각 write는 실행 시점의 현재 로컬 값을 읽으므로(buildEventPlanPayload), 마지막 write가
+// 항상 최신 로컬 상태를 원격에 반영한다.
+const eventPlanSyncChains = new Map();
 
 function queueEventPlanSync(eventId) {
   // 로컬 전용 id(track-followup)는 원격에 올리지 않는다.
-  if (isLocalOnlyPlanId(eventId)) return;
+  if (isLocalOnlyPlanId(eventId)) return Promise.resolve();
   const stamp = ++eventPlanSyncSeq;
   state.eventPlanPending.set(eventId, stamp);
-  syncEventPlanRow(eventId, stamp).catch((error) => console.error(error));
+  const prev = eventPlanSyncChains.get(eventId) || Promise.resolve();
+  // 앞선 write가 끝난 뒤에 실행(직렬화). catch로 항상 resolve시켜 체인이 끊기지 않게 한다.
+  const next = prev.then(() => syncEventPlanRow(eventId, stamp)).catch((error) => console.error(error));
+  eventPlanSyncChains.set(eventId, next);
+  // 체인 꼬리가 이 write에서 끝났으면 맵에서 제거(무한 성장 방지).
+  next.finally(() => {
+    if (eventPlanSyncChains.get(eventId) === next) eventPlanSyncChains.delete(eventId);
+  });
+  return next;
 }
 
 // 아직 원격에 반영되지 않은 로컬 변경(pending)을 재시도한다. 인증 전에 쌓였거나
 // 네트워크로 실패한 write, 삭제 tombstone까지 현재 로컬 값(빈 항목이면 행 삭제)으로
 // 다시 올린다. 로그인 직후와 45초 폴링에서 호출해 pending이 활성 write 없이 원격과
 // 영구 분기하지 않게 한다. 성공하면 syncEventPlanRow가 해당 pending을 해제한다.
-// Promise를 반환해 호출부가 재시도 write 완료를 기다린 뒤 원격을 다시 읽게 한다
-// (SELECT와 DELETE/UPSERT가 경합해 tombstone이 부활하는 것을 막는다).
+// queueEventPlanSync를 통해 eventId별 직렬화 체인을 타므로 진행 중인 write와 순서가
+// 뒤엉키지 않는다. Promise를 반환해 호출부가 재시도 완료를 기다린 뒤 원격을 다시 읽게 한다.
 function flushPendingEventPlans() {
   if (!canUseRemoteReviewSync()) return Promise.resolve();
   const ids = [...state.eventPlanPending.keys()];
-  return Promise.all(
-    ids.map((id) => {
-      const stamp = ++eventPlanSyncSeq;
-      state.eventPlanPending.set(id, stamp);
-      return syncEventPlanRow(id, stamp).catch((error) => console.error(error));
-    })
-  );
+  return Promise.all(ids.map((id) => queueEventPlanSync(id)));
 }
 
 async function syncOpportunityReview(opportunityId, status) {
