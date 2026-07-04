@@ -232,6 +232,9 @@ const state = {
   completed: completionState.completed,
   completedMeta: completionState.completedMeta,
   eventPlan: loadEventPlanState(),
+  // 아직 원격에 반영되지 않은 로컬 변경(eventId → 큐잉 시각). 폴링 병합이
+  // 이 항목을 원격 값으로 덮어쓰지 않도록 보호한다.
+  eventPlanPending: new Map(),
   trackChecklist: loadTrackChecklistState(),
   trackNotes: loadTrackNotesState(),
   trackActivity: loadTrackActivityState(),
@@ -1106,8 +1109,20 @@ async function loadRemoteOpportunityReviews() {
 
 // ---- 개인 계획(끌어오기·순서·완료) 계정 동기화 ----
 // 로그인하면 user_event_plans(RLS: 본인 행만)와 localStorage를 양쪽으로 맞춘다.
-// 첫 로그인(backfill)에는 이 브라우저에만 있는 기록을 지우지 않고 원격에 올리고,
-// 이후 45초 폴링에서는 원격을 기준으로 수렴한다(변경 즉시 upsert하므로 평시 일치).
+// 규칙:
+// - 최초 연결(backfill이면서 원격이 완전히 비어 있을 때)에만 이 브라우저의 기록을
+//   원격에 올린다. 원격에 행이 하나라도 있으면 다른 기기가 이미 동기화를 시작한
+//   것이므로 로컬 전용 id를 되살리지 않고 원격 삭제를 존중한다.
+// - 폴링(45초)은 원격을 기준으로 수렴하되, 아직 원격에 반영되지 않은 로컬 변경
+//   (eventPlanPending)과 로컬 전용 id는 덮어쓰지 않는다.
+// - 트랙 팔로우업(track-followup-*)은 재구성 정보(trackNumber·stepId·date)가
+//   localStorage에만 있어 원격 row만으로는 다른 기기에서 복원할 수 없다. 유령 완료
+//   row를 만들지 않도록 원격 sync에서 제외하고 로컬 전용으로 둔다.
+
+// 원격 계정 동기화에서 제외하는 로컬 전용 계획 id.
+function isLocalOnlyPlanId(eventId) {
+  return typeof eventId === "string" && eventId.startsWith("track-followup-");
+}
 
 async function loadRemoteEventPlans({ backfill = false } = {}) {
   if (!canUseRemoteReviewSync()) return;
@@ -1127,11 +1142,14 @@ async function loadRemoteEventPlans({ backfill = false } = {}) {
 }
 
 function applyRemoteEventPlans(rows, { backfill = false } = {}) {
+  // 원격 전용 id는 로컬 전용(track-followup)을 스킵한다 — 방어적. 서버에 남아 있는
+  // 구버전 유령 row가 있어도 무시하고 로컬 배열을 기준으로 렌더한다.
+  const remoteRows = rows.filter((row) => !isLocalOnlyPlanId(row.event_id));
   const nextPlan = {};
   const nextCompleted = new Set();
   const nextCompletedMeta = new Map();
 
-  rows.forEach((row) => {
+  remoteRows.forEach((row) => {
     const plan = {
       focusStatus: row.focus_status || "none",
       overrideDate: row.override_date || null,
@@ -1146,19 +1164,34 @@ function applyRemoteEventPlans(rows, { backfill = false } = {}) {
     }
   });
 
-  const localOnlyIds = [];
-  if (backfill) {
-    const remoteIds = new Set(rows.map((row) => row.event_id));
-    new Set([...Object.keys(state.eventPlan), ...state.completed]).forEach((id) => {
-      if (remoteIds.has(id)) return;
-      localOnlyIds.push(id);
-      if (state.eventPlan[id]) nextPlan[id] = { ...getEventPlan(id) };
-      if (state.completed.has(id)) {
-        nextCompleted.add(id);
-        nextCompletedMeta.set(id, state.completedMeta.get(id) || { completedAt: null });
-      }
-    });
-  }
+  // 최초 연결(원격이 비어 있을 때)에만 이 브라우저의 기록 전체를 원격에 올린다.
+  const firstConnect = backfill && remoteRows.length === 0;
+
+  // 항상 로컬 값으로 보존해야 하는 id: 로컬 전용(track-followup) + 아직 원격에
+  // 반영되지 않은 로컬 변경(pending) + 최초 연결 시 로컬 기록 전체.
+  const uploadIds = [];
+  const preserveIds = new Set();
+  new Set([...Object.keys(state.eventPlan), ...state.completed]).forEach((id) => {
+    const localOnly = isLocalOnlyPlanId(id);
+    const pending = state.eventPlanPending.has(id);
+    if (localOnly || pending || firstConnect) {
+      preserveIds.add(id);
+      // 원격에 올릴 대상은 로컬 전용을 제외한다(queueEventPlanSync도 재차 막는다).
+      if (!localOnly && (pending || firstConnect)) uploadIds.push(id);
+    }
+  });
+
+  preserveIds.forEach((id) => {
+    if (state.eventPlan[id]) nextPlan[id] = { ...getEventPlan(id) };
+    else delete nextPlan[id]; // 로컬에서 지운 항목(pending 삭제)은 로컬 기준으로 없앤다.
+    if (state.completed.has(id)) {
+      nextCompleted.add(id);
+      nextCompletedMeta.set(id, state.completedMeta.get(id) || { completedAt: null });
+    } else {
+      nextCompleted.delete(id);
+      nextCompletedMeta.delete(id);
+    }
+  });
 
   state.eventPlan = nextPlan;
   state.completed = nextCompleted;
@@ -1168,8 +1201,9 @@ function applyRemoteEventPlans(rows, { backfill = false } = {}) {
   rebuildEventState();
   renderAll();
 
-  // 로컬에만 있던 기록을 원격에 올린다(상태 반영 후).
-  localOnlyIds.forEach((id) => queueEventPlanSync(id));
+  // 최초 연결 시 로컬 기록을 원격에 올린다(상태 반영 후). pending은 이미 큐에 있으므로
+  // 중복 큐잉을 피하려 최초 연결 케이스만 여기서 올린다.
+  if (firstConnect) uploadIds.forEach((id) => queueEventPlanSync(id));
 }
 
 function buildEventPlanPayload(eventId, userId) {
@@ -1189,7 +1223,7 @@ function buildEventPlanPayload(eventId, userId) {
 
 // 한 항목을 원격에 반영한다(빈 항목은 행 삭제). 실패는 콘솔에 남기고
 // 다음 폴링에서 원격 기준으로 수렴한다 — UI를 막지 않는다.
-async function syncEventPlanRow(eventId) {
+async function syncEventPlanRow(eventId, stamp) {
   if (!canUseRemoteReviewSync()) return;
 
   const user = getAuthUser();
@@ -1201,11 +1235,25 @@ async function syncEventPlanRow(eventId) {
     : state.authClient.from("user_event_plans").upsert(payload, { onConflict: "user_id,event_id" });
 
   const { error } = await query;
-  if (error) console.error(error);
+  if (error) {
+    console.error(error);
+    return; // 실패하면 pending을 유지해 다음 폴링이 로컬 변경을 덮지 않게 둔다.
+  }
+  // 이 write 이후 추가 변경이 없었을 때만 pending 해제(그 사이 재큐되면 최신 stamp가 처리).
+  if (state.eventPlanPending.get(eventId) === stamp) {
+    state.eventPlanPending.delete(eventId);
+  }
 }
 
+// 같은 tick에 같은 항목을 여러 번 큐잉해도 최신 write를 구분하도록 단조 증가 시퀀스.
+let eventPlanSyncSeq = 0;
+
 function queueEventPlanSync(eventId) {
-  syncEventPlanRow(eventId).catch((error) => console.error(error));
+  // 로컬 전용 id(track-followup)는 원격에 올리지 않는다.
+  if (isLocalOnlyPlanId(eventId)) return;
+  const stamp = ++eventPlanSyncSeq;
+  state.eventPlanPending.set(eventId, stamp);
+  syncEventPlanRow(eventId, stamp).catch((error) => console.error(error));
 }
 
 async function syncOpportunityReview(opportunityId, status) {
@@ -1291,6 +1339,8 @@ async function setAuthSession(session) {
   }
 
   stopRemoteReviewPolling();
+  // 로그아웃: 다른 계정으로 미반영 쓰기가 새지 않도록 pending을 비우고 로컬 기준으로 복원.
+  state.eventPlanPending.clear();
   state.opportunityReview = loadOpportunityReviewState();
   state.eventPlan = loadEventPlanState();
   const localCompletion = loadCompletionState();
@@ -1826,11 +1876,20 @@ function moveEventToDate(eventId, nextIso) {
     return;
   }
   const plan = getEventPlan(eventId);
+  const leavesWeek = !isIsoInCurrentWeek(nextIso);
   const patch = { overrideDate: nextIso === event.originalDate ? null : nextIso };
   // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다.
-  if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") patch.focusStatus = "none";
+  // 보류/안 함이던 항목은 이번 주 보드 밖에 있었으므로 남아 있던 순서(order)는
+  // stale이다. 다시 잡을 때 초기화한다.
+  if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
+    patch.focusStatus = "none";
+    patch.order = null;
+  }
   // 이번 주 밖으로 보내면 '직접 수락' 고정도 풀어 이번 주 목록에서 내린다.
-  if (plan.focusStatus === "accepted" && !isIsoInCurrentWeek(nextIso)) patch.focusStatus = "none";
+  if (plan.focusStatus === "accepted" && leavesWeek) patch.focusStatus = "none";
+  // 이번 주 밖으로 나가면 보드 순서는 의미가 없다. order를 비워 compareByPlanOrder가
+  // 이 항목을 날짜와 무관하게 보드 상단에 다시 고정하지 않도록 한다.
+  if (leavesWeek) patch.order = null;
   updateEventPlan(eventId, patch);
 }
 

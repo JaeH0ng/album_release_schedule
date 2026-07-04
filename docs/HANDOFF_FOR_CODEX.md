@@ -17,6 +17,32 @@
 
 ## 변경 로그
 
+### 2026-07-04 (리뷰 반영) — 능동 계획 Major 3건 처리 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+Codex 리뷰 `feature/active-planning`의 Major 3건을 모두 반영. 상세·처리 요약은 `REVIEW_FROM_CODEX.md` 최신 블록(3건 모두 `[resolved]`).
+
+- **Major 1 — 주 밖 이동 시 stale order (`moveEventToDate`)**: 이번 주 밖으로 나가면 `order: null`, 보류/안 함에서 복귀하는 경로도 보드 밖 stale order로 보고 `order: null`, 이번 주 안 이동은 순서 보존. 브라우저로 두 경로 확인.
+- **Major 2 — backfill/whole-row upsert 되돌림 (동기화 코어 재작성)**: backfill을 **원격이 완전히 빈 최초 연결(`firstConnect`)에만** 로컬 업로드하도록 게이팅(그 외엔 원격 삭제 존중). `state.eventPlanPending`(eventId→단조 시퀀스)로 미반영 로컬 쓰기를 폴링 병합에서 보호(성공 시에만 해제, 실패 시 유지). 로그아웃 시 pending clear.
+- **Major 3 — 트랙 팔로우업 원격 복원 불가**: `isLocalOnlyPlanId`(`track-followup-*`)를 원격 sync에서 제외(유령 완료 row 방지), 폴링/백필에서 로컬 전용 id의 plan·completed를 항상 로컬 값으로 보존.
+
+**바꾼 파일**
+- `app.js`(`moveEventToDate` order 규칙, `applyRemoteEventPlans`/`syncEventPlanRow`/`queueEventPlanSync` 재작성, `isLocalOnlyPlanId` 신설, `state.eventPlanPending` + `eventPlanSyncSeq`, 로그아웃 pending clear), `docs/REVIEW_FROM_CODEX.md`(3건 resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning`에 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행(리뷰 전 상태 유지).
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. Major 1은 UI로 직접 확인, Major 2·3의 원격 경로는 로그인 필요라 로직·`node --check` 기준(비로그인 시 `canUseRemoteReviewSync` no-op).
+
+**남은 한계 / 후속 과제 (리뷰 재확인 요청)**
+- **동시 편집**: 두 기기가 같은 항목의 독립 필드(예: 한쪽 날짜 이동, 다른 쪽 완료)를 거의 동시에 바꾸면 whole-row upsert 특성상 **last-write-wins로 수렴**한다(유령/부활/분기는 없음, 필드 단위 머지는 아님). 이 클라이언트-온리 구조에서 완전한 필드 머지는 서버 로직/CRDT가 필요해 이번 범위 밖으로 두었다. pending 보호로 "내 진행 중 변경이 폴링에 사라지는" 흔한 케이스는 막았다.
+- **트랙 팔로우업 계정 동기화**: 현재 로컬 전용. 계정 간 이동까지 필요하면 `user_track_followups`(또는 `user_event_plans` 확장 컬럼 `track_number`·`step_id`·`date`)로 재구성 정보를 저장하고 로드 시 `state.trackFollowups` 복원이 후속 과제.
+
+**Codex 재확인 요청 포인트**
+- `applyRemoteEventPlans`의 `firstConnect` 판정과 pending/로컬 전용 보존이 삭제 존중과 충돌하지 않는지(원격에서 지운 항목이 pending도 로컬 전용도 아니면 로컬에서 제거되는지).
+- `eventPlanPending` 해제 조건(성공 & 재큐 없음)이 연속 변경·실패 재시도에서 항목을 영구 잠그거나 조기 해제하지 않는지.
+
 ### 2026-07-04 — 능동 계획 기능 4종: 날짜 자유 이동·가져오기 시트·수동 순서·달력 DnD + 개인 계획 계정 동기화 (⭐ Codex 리뷰 요청, 브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)
