@@ -987,11 +987,18 @@ function updateAuthChrome() {
   const dot = document.querySelector("#sync-dot");
   if (dot) dot.classList.toggle("is-authed", Boolean(user));
 
+  const footerStorageNote = document.querySelector("#footer-storage-note");
+  if (footerStorageNote) {
+    footerStorageNote.textContent = user
+      ? "체크·계획 상태가 계정에 동기화됨"
+      : "체크 상태는 이 브라우저에 저장됨";
+  }
+
   if (user) {
     authStatusText.textContent = user.email || "로그인됨";
     authStatusDetail.textContent = state.isAdmin
-      ? "공모전 판단 상태와 개인 동기화가 활성화됨"
-      : "공모전 판단 상태가 Supabase로 동기화됨";
+      ? "완료·계획·공모전 판단이 계정에 동기화됨 (관리자)"
+      : "완료·계획·공모전 판단이 계정에 동기화됨";
     authGoogle.hidden = true;
     authSignout.hidden = false;
     installButton.hidden = !deferredInstallPrompt;
@@ -1097,6 +1104,110 @@ async function loadRemoteOpportunityReviews() {
   renderAll();
 }
 
+// ---- 개인 계획(끌어오기·순서·완료) 계정 동기화 ----
+// 로그인하면 user_event_plans(RLS: 본인 행만)와 localStorage를 양쪽으로 맞춘다.
+// 첫 로그인(backfill)에는 이 브라우저에만 있는 기록을 지우지 않고 원격에 올리고,
+// 이후 45초 폴링에서는 원격을 기준으로 수렴한다(변경 즉시 upsert하므로 평시 일치).
+
+async function loadRemoteEventPlans({ backfill = false } = {}) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  const { data, error } = await state.authClient
+    .from("user_event_plans")
+    .select("event_id, focus_status, override_date, plan_order, is_completed, completed_at")
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  applyRemoteEventPlans(data || [], { backfill });
+}
+
+function applyRemoteEventPlans(rows, { backfill = false } = {}) {
+  const nextPlan = {};
+  const nextCompleted = new Set();
+  const nextCompletedMeta = new Map();
+
+  rows.forEach((row) => {
+    const plan = {
+      focusStatus: row.focus_status || "none",
+      overrideDate: row.override_date || null,
+      order: typeof row.plan_order === "number" ? row.plan_order : null,
+    };
+    if (plan.focusStatus !== "none" || plan.overrideDate || plan.order != null) {
+      nextPlan[row.event_id] = plan;
+    }
+    if (row.is_completed) {
+      nextCompleted.add(row.event_id);
+      nextCompletedMeta.set(row.event_id, { completedAt: row.completed_at || null });
+    }
+  });
+
+  const localOnlyIds = [];
+  if (backfill) {
+    const remoteIds = new Set(rows.map((row) => row.event_id));
+    new Set([...Object.keys(state.eventPlan), ...state.completed]).forEach((id) => {
+      if (remoteIds.has(id)) return;
+      localOnlyIds.push(id);
+      if (state.eventPlan[id]) nextPlan[id] = { ...getEventPlan(id) };
+      if (state.completed.has(id)) {
+        nextCompleted.add(id);
+        nextCompletedMeta.set(id, state.completedMeta.get(id) || { completedAt: null });
+      }
+    });
+  }
+
+  state.eventPlan = nextPlan;
+  state.completed = nextCompleted;
+  state.completedMeta = nextCompletedMeta;
+  saveEventPlanState();
+  saveCompletedTasks();
+  rebuildEventState();
+  renderAll();
+
+  // 로컬에만 있던 기록을 원격에 올린다(상태 반영 후).
+  localOnlyIds.forEach((id) => queueEventPlanSync(id));
+}
+
+function buildEventPlanPayload(eventId, userId) {
+  const plan = getEventPlan(eventId);
+  const completed = state.completed.has(eventId);
+  return {
+    user_id: userId,
+    event_id: eventId,
+    focus_status: plan.focusStatus || "none",
+    override_date: plan.overrideDate || null,
+    plan_order: typeof plan.order === "number" ? plan.order : null,
+    is_completed: completed,
+    completed_at: completed ? state.completedMeta.get(eventId)?.completedAt || null : null,
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// 한 항목을 원격에 반영한다(빈 항목은 행 삭제). 실패는 콘솔에 남기고
+// 다음 폴링에서 원격 기준으로 수렴한다 — UI를 막지 않는다.
+async function syncEventPlanRow(eventId) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  const payload = buildEventPlanPayload(eventId, user.id);
+  const empty =
+    payload.focus_status === "none" && !payload.override_date && payload.plan_order == null && !payload.is_completed;
+  const query = empty
+    ? state.authClient.from("user_event_plans").delete().eq("user_id", user.id).eq("event_id", eventId)
+    : state.authClient.from("user_event_plans").upsert(payload, { onConflict: "user_id,event_id" });
+
+  const { error } = await query;
+  if (error) console.error(error);
+}
+
+function queueEventPlanSync(eventId) {
+  syncEventPlanRow(eventId).catch((error) => console.error(error));
+}
+
 async function syncOpportunityReview(opportunityId, status) {
   if (!canUseRemoteReviewSync()) return;
 
@@ -1158,6 +1269,7 @@ function startRemoteReviewPolling() {
   if (!canUseRemoteReviewSync()) return;
   state.reviewSyncTimer = window.setInterval(() => {
     loadRemoteOpportunityReviews();
+    loadRemoteEventPlans();
   }, 45000);
 }
 
@@ -1173,11 +1285,17 @@ async function setAuthSession(session) {
     await loadAdminAccess();
     startRemoteReviewPolling();
     await loadRemoteOpportunityReviews();
+    // 첫 로그인: 이 브라우저에만 쌓인 계획/완료 기록을 지우지 않고 원격과 합친다.
+    await loadRemoteEventPlans({ backfill: true });
     return;
   }
 
   stopRemoteReviewPolling();
   state.opportunityReview = loadOpportunityReviewState();
+  state.eventPlan = loadEventPlanState();
+  const localCompletion = loadCompletionState();
+  state.completed = localCompletion.completed;
+  state.completedMeta = localCompletion.completedMeta;
   rebuildEventState();
   renderAll();
 }
@@ -1368,6 +1486,7 @@ function createTrackFollowup(trackNumber, stepId) {
   addTrackActivity(trackNumber, "일정 추가", `${step.label} 다시 일정에 추가 (${formatShortDate(date)})`);
   saveTrackFollowupsState();
   saveEventPlanState();
+  queueEventPlanSync(id);
   rebuildEventState();
   renderAll();
 }
@@ -1404,6 +1523,7 @@ function removeTrackFollowup(followupId) {
   saveTrackFollowupsState();
   saveEventPlanState();
   saveCompletedTasks();
+  queueEventPlanSync(followupId);
   rebuildEventState();
   renderAll();
 }
@@ -1656,6 +1776,7 @@ function updateEventPlan(eventId, patch) {
   }
 
   saveEventPlanState();
+  queueEventPlanSync(eventId);
   rebuildEventState();
   renderAll();
 }
@@ -1799,6 +1920,7 @@ function reorderWeeklyFocus(eventId, direction) {
     state.eventPlan[id] = { ...getEventPlan(id), order: (position + 1) * 10 };
   });
   saveEventPlanState();
+  ids.forEach((id) => queueEventPlanSync(id));
   rebuildEventState();
   renderAll();
 }
@@ -2959,6 +3081,7 @@ function toggleCompleted(eventId, complete) {
     );
   }
   saveCompletedTasks();
+  queueEventPlanSync(eventId);
   renderDashboard();
   renderSummary();
   renderCalendar();
