@@ -17,6 +17,36 @@
 
 ## 변경 로그
 
+### 2026-07-04 — 시각 편안함·사용성 대개편: 단일 헤더 + 히어로 카드 + 이번 주 스트립 (⭐ Codex 리뷰 요청, 브랜치 improve/visual-calm)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+사용자 피드백 "여전히 보기·쓰기 불편하다"에 대해 4개 렌즈(첫 화면 위계/시간 탐색/모바일 한 손/시각 피로) 디자인 비평을 돌리고, 실측(크롬 320px=뷰포트 44%, 달력 스크롤 9,576px, 필/배지 303개, 11–12px 텍스트 121개, 44px 미만 터치 타깃 49개)으로 근거를 잡아 3커밋으로 개편했다.
+
+- **ux(1/3) `cabbede` — quick-win 7종**
+  - 🔴 버그: 모바일 하단 탭바 `sticky bottom`이 (nav가 문서 상단이라) 발동 불가 → `fixed`로 수정, standalone 무효화 제거. 이제 어느 깊이서든 엄지 밑 탭바.
+  - 터치 44px(체크박스 22px, 칩/버튼), 모바일 메타 12px+, 장식 영문 키커 22곳 삭제.
+  - 탭별 스크롤 위치 기억(instant 복원), 달력 첫 진입 '오늘' 착지.
+  - 달력: 지난달 `<details>` 접힘, 빈 셀 44px, 스티키 월 헤더, 우하단 '오늘' FAB(**스크롤 리스너** — 이 임베디드 미리보기에서 IntersectionObserver 콜백이 아예 안 옴을 확인하고 회피).
+  - 한눈에 0건 카드 미렌더, APP HOME 카드 삭제, 로드맵 행 클릭→달력 점프.
+- **ux(2/3) `39b1232` — 단일 헤더**: topbar+glance+summary-band+sync-strip 4층 → 56px 한 줄(브랜드·D-day·다음 마감·동기화 색점) + 2px 진행률 라인(파형 캔버스 대체). 동기화는 색점+팝오버, 오류시만 전폭 배너. '현재 단계/유통일'은 한눈에 카드로. **실측 크롬 320px(44%) → 112px(14%)**.
+- **ux(3/3) `f78d720` — 히어로/이번 주**: 오늘 보드 최상단 '오늘의 다음 액션 1개' 히어로([완료]+⋯), 작업 카드 5버튼→1+⋯(보조 처리는 다이얼로그 액션), 달력 상단 '이번 주' 가로 스트립, 이벤트 셀 2줄 다이어트. **달력 스크롤 9,576→6,222px**.
+
+**바꾼 파일**
+- `index.html`(헤더/팝오버/배너/히어로/FAB/dialog-actions, glance·summary·sync-strip·APP HOME 삭제), `app.js`(renderSummary/setSyncStatus/updateAuthChrome/updateAppModeChrome 재작성, renderHeroCard 신설, 카드·다이얼로그 액션, 주간 스트립, renderEvent 다이어트, 스크롤 기억, FAB, waveform·mobile-utility 삭제), `styles.css`(±500줄: 헤더/팝오버/히어로/주간 스트립/접힘 추가, 크롬 4층·app-home CSS 삭제).
+
+**커밋·배포 여부**
+- 브랜치 `improve/visual-calm`(main에서 분기) 3커밋. main 병합·push·gh-pages 발행 안 함.
+- 검증: `node --check`·`npm run build` 통과, 데스크톱/모바일 콘솔 오류 0, 5개 탭 회귀, 히어로 완료 플로우(완료→다음 작업 승격→최근 완료 반영→원복), 팝오버 열림/바깥닫힘, 탭바 fixed, FAB 표시/숨김/클릭, 주간 스트립 6개, 스크롤 기억/오늘 착지 모두 브라우저 확인.
+
+**Codex가 특히 봐줬으면 하는 곳 (리뷰 요청)**
+- 제거된 요소(#waveform, mobile-glance, summary-band, sync-strip, #app-home-panel, mobile-utility)를 참조하는 잔존 코드가 남았는지 (grep 기준 0이지만 재확인).
+- setActiveView의 스크롤 기억/오늘 착지/포커스 로직이 딥링크(#track-NN, 곡 점프, jumpToCurrentWeek)와 충돌하지 않는지.
+- 다이얼로그 액션(complete/accept/pull/hold/dismiss/restore)의 상태 전이가 getEventPlan 상태기계와 일관적인지.
+- 주간 스트립이 renderEvent를 재사용하므로 bindEventControls 이중 바인딩/이벤트 중복이 없는지.
+- 지난달 접힘 상태에서 overlap 점프/로드맵 점프가 details를 여는 경로.
+
 ### 2026-07-03 (배포 전 최종 리뷰 반영) — .env.example 비밀값 유출 제거 + 마이그레이션 반영 확인
 
 **작업자:** Claude (Claude Code, Windows)
