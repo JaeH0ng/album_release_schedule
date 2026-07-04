@@ -699,6 +699,19 @@ input:focus-visible {
   border-color: var(--line-strong);
 }
 
+/* 이번 주 목록 안 수동 순서(위/아래) 버튼 */
+.task-reorder {
+  min-width: 44px;
+  justify-content: center;
+  padding: 0;
+  color: var(--muted);
+  font-size: 15px;
+}
+
+.task-reorder:hover {
+  color: var(--ink);
+}
+
 .dialog-actions {
   display: flex;
   flex-wrap: wrap;

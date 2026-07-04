@@ -1640,7 +1640,7 @@ function formatOpportunityReview(reviewStatus) {
 }
 
 function getEventPlan(eventId) {
-  return state.eventPlan[eventId] || { focusStatus: "none", overrideDate: null };
+  return state.eventPlan[eventId] || { focusStatus: "none", overrideDate: null, order: null };
 }
 
 function updateEventPlan(eventId, patch) {
@@ -1650,7 +1650,8 @@ function updateEventPlan(eventId, patch) {
     ...patch,
   };
 
-  if (state.eventPlan[eventId].focusStatus === "none" && !state.eventPlan[eventId].overrideDate) {
+  const next = state.eventPlan[eventId];
+  if (next.focusStatus === "none" && !next.overrideDate && next.order == null) {
     delete state.eventPlan[eventId];
   }
 
@@ -1672,7 +1673,7 @@ function dismissEvent(eventId) {
 }
 
 function resetEventPlan(eventId) {
-  updateEventPlan(eventId, { focusStatus: "none", overrideDate: null });
+  updateEventPlan(eventId, { focusStatus: "none", overrideDate: null, order: null });
 }
 
 function pullEventIntoThisWeek(eventId) {
@@ -1767,8 +1768,39 @@ function getWeeklyFocusItems() {
     .map((event) => ({ event, source: "next" }));
 
   return [...explicitAccepted, ...currentWeek, ...fallbackNext]
-    .sort((left, right) => parseDate(left.event.date) - parseDate(right.event.date))
+    .sort((left, right) => compareByPlanOrder(left.event, right.event))
     .slice(0, 5);
+}
+
+// 수동 순서(order)가 있는 항목이 그 순서대로 먼저, 나머지는 날짜순.
+function getPlanOrder(eventId) {
+  const order = getEventPlan(eventId).order;
+  return typeof order === "number" ? order : null;
+}
+
+function compareByPlanOrder(left, right) {
+  const leftOrder = getPlanOrder(left.id);
+  const rightOrder = getPlanOrder(right.id);
+  if (leftOrder !== null && rightOrder !== null) return leftOrder - rightOrder;
+  if (leftOrder !== null) return -1;
+  if (rightOrder !== null) return 1;
+  return parseDate(left.date) - parseDate(right.date);
+}
+
+// 이번 주 목록 안에서 위/아래 이동. 지금 보이는 순서 전체를 order로 저장해
+// 다음 렌더에서도 사용자가 정한 순서가 유지된다.
+function reorderWeeklyFocus(eventId, direction) {
+  const ids = getWeeklyFocusItems().map(({ event }) => event.id);
+  const index = ids.indexOf(eventId);
+  const target = index + direction;
+  if (index < 0 || target < 0 || target >= ids.length) return;
+  [ids[index], ids[target]] = [ids[target], ids[index]];
+  ids.forEach((id, position) => {
+    state.eventPlan[id] = { ...getEventPlan(id), order: (position + 1) * 10 };
+  });
+  saveEventPlanState();
+  rebuildEventState();
+  renderAll();
 }
 
 function getHeldEvents() {
@@ -2059,7 +2091,7 @@ function renderDashboard() {
 
   const restFocusItems = weeklyFocusItems.slice(1);
   document.querySelector("#weekly-focus-list").innerHTML = restFocusItems.length
-    ? restFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source)).join("")
+    ? restFocusItems.map((item) => renderDashboardTaskCard(item.event, item.source, { reorder: true })).join("")
     : heroFocus
       ? '<p class="empty-copy">위 작업 하나에 집중하면 됩니다.</p>'
       : '<p class="empty-copy">이번 주 핵심 작업이 비었습니다. 위 제안을 수락하거나 아래 후보에서 당겨오세요.</p>';
@@ -2128,6 +2160,8 @@ function renderHeroCard(event, mode) {
   const delayed = parseDate(event.date) < today;
   const metaParts = [`${formatDateRange(event)}${delayed ? " · 지연" : ""}`];
   if (event.duration) metaParts.push(event.duration);
+  // 잡은 작업이 2개 이상이면 히어로를 뒤로 미루고 다음 작업을 올릴 수 있다.
+  const canDemote = mode === "focus" && getWeeklyFocusItems().length > 1;
   host.innerHTML = `
     <p class="hero-kicker">${mode === "candidate" ? "이걸 이번 주로 수락할까요?" : "오늘의 다음 액션"}</p>
     <h3 class="hero-title">${escapeHtml(event.title)}</h3>
@@ -2138,12 +2172,17 @@ function renderHeroCard(event, mode) {
           ? `<button class="hero-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">이번 주로 수락</button>`
           : `<button class="hero-primary" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`
       }
+      ${
+        canDemote
+          ? `<button class="hero-more" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="이 작업을 뒤로 미루고 다음 작업 보기" title="뒤로 미루기">↓</button>`
+          : ""
+      }
       <button class="hero-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
     </div>
   `;
 }
 
-function renderDashboardTaskCard(event, mode) {
+function renderDashboardTaskCard(event, mode, options = {}) {
   const delayed = parseDate(event.date) < today;
   const modeLabel =
     mode === "accepted"
@@ -2179,6 +2218,12 @@ function renderDashboardTaskCard(event, mode) {
       </div>
       <div class="focus-actions">
         ${primaryButton}
+        ${
+          options.reorder
+            ? `<button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-up" data-event-id="${escapeHtml(event.id)}" aria-label="순서 위로">↑</button>
+              <button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="순서 아래로">↓</button>`
+            : ""
+        }
         <button class="opportunity-action task-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
       </div>
     </article>
@@ -2201,6 +2246,8 @@ function bindDashboardTaskControls() {
       if (action === "pull") pullEventIntoThisWeek(eventId);
       if (action === "restore") resetEventPlan(eventId);
       if (action === "complete") toggleCompleted(eventId, true);
+      if (action === "move-up") reorderWeeklyFocus(eventId, -1);
+      if (action === "move-down") reorderWeeklyFocus(eventId, 1);
     });
   });
 }
