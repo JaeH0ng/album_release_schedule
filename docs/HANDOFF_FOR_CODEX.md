@@ -17,6 +17,24 @@
 
 ## 변경 로그
 
+### 2026-07-04 (재리뷰 반영) — pending tombstone 보존 + 재시도 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(77b126a)의 Major 1건 반영. pending 보호가 tombstone(삭제) id를 놓쳐 원격 row로 부활하고, 실패/인증 전 pending이 재시도되지 않던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 최신 재리뷰 블록(`[resolved]`).
+
+- **tombstone 보존**: `applyRemoteEventPlans` preserve 순회 집합에 `state.eventPlanPending.keys()` 추가 → 로컬에서 지운 삭제 pending도 preserve 루프가 원격 refill을 걷어냄.
+- **재시도**: `flushPendingEventPlans()` 신설 — pending 전체를 `queueEventPlanSync`로 재큐(tombstone=DELETE, 나머지=현재 로컬 upsert). 45초 폴링 + 로그인 직후(backfill 뒤)에 호출.
+- pending은 in-memory라 리로드 시 비고, 이전 세션 stale localStorage는 pending에 없어 backfill 게이팅으로 부활 차단 → Major 2 보호와 무모순.
+
+**바꾼 파일**
+- `app.js`(preserve 집합에 pending keys, `flushPendingEventPlans` 신설, 폴링·로그인 후 호출), `docs/REVIEW_FROM_CODEX.md`(재리뷰 Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 비로그인 로컬 회귀 정상. 원격 tombstone/재시도 경로는 로그인 필요라 로직 기준 확인.
+
 ### 2026-07-04 (리뷰 반영) — 능동 계획 Major 3건 처리 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)

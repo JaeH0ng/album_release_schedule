@@ -1169,9 +1169,12 @@ function applyRemoteEventPlans(rows, { backfill = false } = {}) {
 
   // 항상 로컬 값으로 보존해야 하는 id: 로컬 전용(track-followup) + 아직 원격에
   // 반영되지 않은 로컬 변경(pending) + 최초 연결 시 로컬 기록 전체.
+  // pending에는 로컬 plan/completed에서 이미 빠진 '삭제 tombstone' id도 있으므로
+  // eventPlan·completed key뿐 아니라 eventPlanPending key까지 함께 순회해야
+  // 원격에 남아 있는 예전 row가 다시 채워지지 않는다.
   const uploadIds = [];
   const preserveIds = new Set();
-  new Set([...Object.keys(state.eventPlan), ...state.completed]).forEach((id) => {
+  new Set([...Object.keys(state.eventPlan), ...state.completed, ...state.eventPlanPending.keys()]).forEach((id) => {
     const localOnly = isLocalOnlyPlanId(id);
     const pending = state.eventPlanPending.has(id);
     if (localOnly || pending || firstConnect) {
@@ -1256,6 +1259,15 @@ function queueEventPlanSync(eventId) {
   syncEventPlanRow(eventId, stamp).catch((error) => console.error(error));
 }
 
+// 아직 원격에 반영되지 않은 로컬 변경(pending)을 재시도한다. 인증 전에 쌓였거나
+// 네트워크로 실패한 write, 삭제 tombstone까지 현재 로컬 값(빈 항목이면 행 삭제)으로
+// 다시 올린다. 로그인 직후와 45초 폴링에서 호출해 pending이 활성 write 없이 원격과
+// 영구 분기하지 않게 한다. 성공하면 syncEventPlanRow가 해당 pending을 해제한다.
+function flushPendingEventPlans() {
+  if (!canUseRemoteReviewSync()) return;
+  [...state.eventPlanPending.keys()].forEach((id) => queueEventPlanSync(id));
+}
+
 async function syncOpportunityReview(opportunityId, status) {
   if (!canUseRemoteReviewSync()) return;
 
@@ -1318,6 +1330,8 @@ function startRemoteReviewPolling() {
   state.reviewSyncTimer = window.setInterval(() => {
     loadRemoteOpportunityReviews();
     loadRemoteEventPlans();
+    // 실패·인증 전에 쌓인 pending write를 재시도(삭제 tombstone 포함).
+    flushPendingEventPlans();
   }, 45000);
 }
 
@@ -1335,6 +1349,8 @@ async function setAuthSession(session) {
     await loadRemoteOpportunityReviews();
     // 첫 로그인: 이 브라우저에만 쌓인 계획/완료 기록을 지우지 않고 원격과 합친다.
     await loadRemoteEventPlans({ backfill: true });
+    // 로그인 전/실패로 쌓인 pending write를 이 시점에 밀어 넣는다(폴링 45초를 안 기다림).
+    flushPendingEventPlans();
     return;
   }
 
