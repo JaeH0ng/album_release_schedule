@@ -17,6 +17,23 @@
 
 ## 변경 로그
 
+### 2026-07-04 (6차 재리뷰 반영) — 세션 generation 검사로 재로그인 stale write 차단 (브랜치 feature/active-planning)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+재리뷰(8168c0e)의 Major 1건 반영. `queuedUserId`만으론 **같은 A 계정 로그아웃→재로그인** 시 지연 체인 콜백이 검사를 통과해, 새 로그인 흐름의 backfill/삭제 존중 규칙을 우회하고 stale localStorage를 원격에 되쓸 수 있던 문제. 상세·처리는 `REVIEW_FROM_CODEX.md` 8168c0e 재리뷰 블록(`[resolved]`).
+
+- **세션 generation**: `eventPlanSyncGeneration`(모듈 스코프) 도입. `setAuthSession`이 세션 경계(`prevUserId !== nextUserId`)마다 pending/체인 clear와 함께 +1.
+- **큐잉 generation 캡처 + 실행 검증**: `queueEventPlanSync`가 `queuedGeneration`을 캡처, `syncEventPlanRow`는 `userId` AND `generation` 둘 다 현재값과 일치할 때만 write. 같은 계정 재로그인(A→null→A)은 generation 2회 증가 → 옛 콜백 차단.
+
+**바꾼 파일**
+- `app.js`(`eventPlanSyncGeneration` 선언, `setAuthSession` 세션 경계 시 증가, `queueEventPlanSync` generation 캡처, `syncEventPlanRow` generation 검사 파라미터), `docs/REVIEW_FROM_CODEX.md`(8168c0e Major resolved).
+
+**커밋·배포 여부**
+- 브랜치 `feature/active-planning` 후속 커밋. main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로컬 회귀 정상. **generation 가드는 하네스로 증명**(A 큐잉→로그아웃→같은 A 재로그인 시 옛 write 차단, 새 write만 반영). 실제 세션 경계 경로는 로그인 필요.
+
 ### 2026-07-04 (5차 재리뷰 반영) — 지연 체인 계정 오염 방지 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)

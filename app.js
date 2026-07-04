@@ -1237,13 +1237,14 @@ function buildEventPlanPayload(eventId, userId) {
 
 // 한 항목을 원격에 반영한다(빈 항목은 행 삭제). 실패는 콘솔에 남기고
 // 다음 폴링에서 원격 기준으로 수렴한다 — UI를 막지 않는다.
-async function syncEventPlanRow(eventId, stamp, queuedUserId) {
+async function syncEventPlanRow(eventId, stamp, queuedUserId, queuedGeneration) {
   if (!canUseRemoteReviewSync()) return;
 
   const user = getAuthUser();
-  // 큐잉 시점과 로그인 계정이 달라졌으면(로그아웃 후 다른 계정 로그인 등) 이 write를
-  // 폐기한다. 지연된 직렬화 체인 콜백이 다음 계정의 row를 오염시키지 않게 하는 최종 방어선.
-  if (!user || user.id !== queuedUserId) return;
+  // 큐잉 시점 이후 세션 경계가 있었으면(로그아웃·계정 전환·같은 계정 재로그인) 이 write를
+  // 폐기한다. userId만으로는 같은 계정 재로그인을 못 걸러내므로, 세션 경계마다 증가하는
+  // generation까지 대조한다. 이미 스케줄된 체인 콜백을 막는 최종 방어선.
+  if (!user || user.id !== queuedUserId || queuedGeneration !== eventPlanSyncGeneration) return;
   const payload = buildEventPlanPayload(eventId, user.id);
   const empty =
     payload.focus_status === "none" && !payload.override_date && payload.plan_order == null && !payload.is_completed;
@@ -1264,6 +1265,9 @@ async function syncEventPlanRow(eventId, stamp, queuedUserId) {
 
 // 같은 tick에 같은 항목을 여러 번 큐잉해도 최신 write를 구분하도록 단조 증가 시퀀스.
 let eventPlanSyncSeq = 0;
+// 세션 경계(로그아웃·계정 전환·같은 계정 재로그인)마다 증가한다. 큐잉 시점의 generation을
+// 캡처해 실행 시점과 대조하면, 세션이 한 번이라도 바뀐 뒤의 stale 체인 콜백을 걸러낼 수 있다.
+let eventPlanSyncGeneration = 0;
 // eventId별 원격 write 직렬화 체인. 같은 항목의 write는 항상 큐잉 순서대로 실행돼,
 // 먼저 보낸 오래된 request가 늦게 성공해 최신 상태를 덮는 out-of-order 문제를 막는다.
 // 각 write는 실행 시점의 현재 로컬 값을 읽으므로(buildEventPlanPayload), 마지막 write가
@@ -1274,16 +1278,19 @@ function queueEventPlanSync(eventId) {
   // 로컬 전용 id(track-followup)는 원격에 올리지 않는다.
   if (isLocalOnlyPlanId(eventId)) return Promise.resolve();
   // 비로그인 상태에서는 원격 큐잉을 하지 않는다. 로컬 편집은 localStorage에 남아 있고,
-  // 로그인 시 backfill이 (원격이 비었을 때) 그 기록을 올린다. 큐잉 시점의 계정을 캡처해
-  // 실행 시점에 대조하므로, 지연 실행되는 체인이 다른 계정에 쓰이지 않는다.
+  // 로그인 시 backfill이 (원격이 비었을 때) 그 기록을 올린다. 큐잉 시점의 계정+generation을
+  // 캡처해 실행 시점에 대조하므로, 지연 실행되는 체인이 다른 계정/다른 세션에 쓰이지 않는다.
   const user = getAuthUser();
   if (!user) return Promise.resolve();
   const queuedUserId = user.id;
+  const queuedGeneration = eventPlanSyncGeneration;
   const stamp = ++eventPlanSyncSeq;
   state.eventPlanPending.set(eventId, stamp);
   const prev = eventPlanSyncChains.get(eventId) || Promise.resolve();
   // 앞선 write가 끝난 뒤에 실행(직렬화). catch로 항상 resolve시켜 체인이 끊기지 않게 한다.
-  const next = prev.then(() => syncEventPlanRow(eventId, stamp, queuedUserId)).catch((error) => console.error(error));
+  const next = prev
+    .then(() => syncEventPlanRow(eventId, stamp, queuedUserId, queuedGeneration))
+    .catch((error) => console.error(error));
   eventPlanSyncChains.set(eventId, next);
   // 체인 꼬리가 이 write에서 끝났으면 맵에서 제거(무한 성장 방지).
   next.finally(() => {
@@ -1379,13 +1386,15 @@ async function setAuthSession(session) {
   state.authReady = true;
   state.adminLoaded = false;
   state.isAdmin = false;
-  // 계정이 바뀌면(로그아웃·계정 전환 포함) 이전 계정에서 큐잉된 미완료 원격 write를 폐기한다.
-  // pending과 직렬화 체인 맵을 비워, 지연된 콜백이 다음 계정 row에 쓰이지 않게 한다.
-  // (이미 스케줄된 체인 콜백은 syncEventPlanRow의 queuedUserId 검사가 최종 방어선.)
+  // 세션 경계(로그아웃·계정 전환·같은 계정 재로그인)마다 pending과 직렬화 체인 맵을 비우고
+  // generation을 증가시킨다. 맵 clear는 새 콜백이 옛 tail 뒤에 붙는 것만 막고 이미 스케줄된
+  // 콜백은 취소하지 못하므로, syncEventPlanRow의 generation 검사가 stale 콜백을 막는 최종
+  // 방어선이다(userId만으로는 같은 계정 재로그인을 못 걸러낸다).
   const nextUserId = getAuthUser()?.id || null;
   if (prevUserId !== nextUserId) {
     state.eventPlanPending.clear();
     eventPlanSyncChains.clear();
+    eventPlanSyncGeneration += 1;
   }
   updateAuthChrome();
   updateAdminChrome();
