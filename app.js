@@ -1859,16 +1859,25 @@ function setTrackStage(trackNumber, stageId) {
   saveTrackStageState();
   queueTrackStageSync(trackNumber); // 단계를 계정에 동기화(기기 간 desync 방지). 로그아웃 상태면 no-op.
 
-  // 데모 단계를 벗어나면 그 곡의 데모는 끝난 것이다. 데모 이벤트 완료를 state.completed와
-  // 동기화해, 곡 표/파이프라인은 완료로 보이는데 오늘 보드·달력·요약은 같은 데모 이벤트를
-  // 계속 미완료 작업으로 띄우는 split-brain을 없앤다. 새 event id를 만들지 않고 기존
-  // track.eventId를 그대로 완료 처리하므로 localStorage·user_event_plans 기록 보존 원칙과 맞다.
-  // (데모로 되돌릴 때는 이미 원격 동기화됐을 수 있는 완료 기록을 임의로 지우지 않는다 —
-  //  데모 단계에 노출되는 "완료 해제" 버튼으로 사용자가 직접 되돌릴 수 있다.)
+  // 데모 이벤트 완료(state.completed)를 단계 이동과 대칭으로 맞춘다. 데모를 벗어나면 그 곡의
+  // 데모는 끝난 것이므로 완료로, 데모로 되돌리면 완료를 해제한다. 이렇게 해야 곡 표/파이프라인은
+  // 완료인데 오늘 보드·달력·요약은 같은 데모 이벤트를 미완료 작업으로 계속 띄우는 split-brain이
+  // 생기지 않는다. 기존엔 되돌릴 때 완료를 지우지 않아, 데모로 되돌린 곡이 여전히 "완료"로 남고
+  // 오늘 보드/달력에서 사라지는 비대칭 버그가 있었다. 새 event id를 만들지 않고 기존 track.eventId를
+  // 그대로 쓰므로 기록 보존 원칙과 맞고, toggleCompleted가 저장·원격 동기화·전체 리렌더를 수행한다.
+  // (참고: 데모를 벗어난 곡의 데모 이벤트를 달력/다이얼로그에서 직접 완료 해제하면 단계와 어긋나는
+  //  잔여 split-brain은 남아 있다 — 이를 stage 단일 권위로 완전히 통일하는 시도는 적대적 리뷰에서
+  //  기기 간 데이터 손상/파괴적 언체크가 확인돼 보류했다. HANDOFF 및 tag wip/3b-full-attempt-reviewed 참고.)
   const track = findTrack(trackNumber);
-  if (track && stageId !== "demo" && !state.completed.has(track.eventId)) {
-    toggleCompleted(track.eventId, true); // 저장·원격 동기화·전체 리렌더까지 내부에서 수행
-    return;
+  if (track) {
+    if (stageId !== "demo" && !state.completed.has(track.eventId)) {
+      toggleCompleted(track.eventId, true); // 저장·원격 동기화·전체 리렌더까지 내부에서 수행
+      return;
+    }
+    if (stageId === "demo" && state.completed.has(track.eventId)) {
+      toggleCompleted(track.eventId, false); // 대칭: 데모 복귀 시 완료 해제
+      return;
+    }
   }
 
   renderTracks();
