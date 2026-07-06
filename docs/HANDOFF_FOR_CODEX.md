@@ -17,6 +17,41 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 곡별 제작 파이프라인 격자 보드 (Phase 2, 브랜치 feature/pipeline-board)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+Phase 1의 곡×단계 모델 위에, 앨범 전체가 파이프라인 어디까지 왔는지 한눈에 보는 **격자 보드**를 추가(개편 3단계 중 Phase 2). "곡별 진행" 탭 상단에 곡=행 × 5단계(데모/편곡/녹음/믹스/완료)=열 격자. 각 곡의 현재 단계는 강조, 지난 단계는 완료 점, 이후는 대기 점. 행을 누르면 그 곡 상세로 포커스. 제목도 "곡별 데모 진행 보드"→"곡별 제작 파이프라인".
+
+- **렌더**: `renderPipelineBoard()` + `getTrackStageIndex()`. `renderTracks()` 맨 앞에서 호출(단계/체크 변경 시 자동 갱신).
+- **완료 판정 = 단일 소스**: 셀 상태를 `getTrackStatus(...).kind === "complete"` 기준으로 계산해 표·칩·요약·상세와 일치(데모 이벤트만 완료해도 보드가 완료로 그려짐).
+- **상호작용**: 행 `role="button"`, 클릭/Enter/Space로 `setActiveTrack`(네비게이션 전용, 단계 변경은 상세의 단계 칩에서만).
+- **반응형**: 좁은 화면 가로 스크롤(`.pipeline-grid` min-width 460).
+
+**자가 리뷰(5차원 멀티에이전트) 반영**
+정확성·정합성·XSS·접근성·규칙 5축 리뷰 후 적대적 검증 → 확정 4건(전부 major) 모두 수정:
+1. (정합성) 데모 완료 곡이 보드에서만 "진행 중"으로 나오던 cross-view split-brain → 셀 판정을 `getTrackStatus().kind` 단일 소스로.
+2. (a11y) 셀 상태가 aria로 전달 안 됨 → 셀을 `aria-hidden`, 행 `role="button"` 라벨이 "번호 제목 — 단계, 열기"로 상태 요약.
+3. (a11y) 범례가 실제 점 상태를 다 안 담음 → 점 상태를 3개(끝남/진행 중/아직)로 단순화, 범례와 1:1 일치.
+4. (a11y) `role="row"`+tabindex 행이 grid 키보드 모델과 충돌 → grid/gridcell/row role 제거, 행을 버튼으로.
+
+**바꾼 파일**
+- `app.js`(`renderPipelineBoard`/`getTrackStageIndex`/행 클릭 바인딩), `index.html`(`#track-pipeline-board`, 제목), `styles.css`(`.pipeline-*`).
+- `schedule-data.js`·Supabase·고정 마감·service-worker는 **건드리지 않음**.
+
+**추가 코드리뷰(Codex 사용량 소진으로 대체)**
+Codex 리뷰가 불가해 `/code-review`(3개 독립 파인더 + 검증)로 대체 실행. 정확성 버그 0건(보드 셀 상태가 `getTrackStatus` 단일 소스와 모든 단계×완료 조합에서 일치 확인). 클린업 5건 중 안전·유익한 4건 반영:
+1. 셀 조건의 죽은 절 `(index === currentIndex && stage.id === "done")` 제거(done이면 isComplete 항상 true라 도달 불가).
+2. `getActiveTrack()` renderTracks당 2회 → 1회(activeNumber를 `renderPipelineBoard(activeNumber)`로 전달, 중복 전수 스캔·불일치 위험 제거).
+3. 행 라벨 단계명을 `trackStages[currentIndex].label`에서 파생(곡당 `getTrackStage` 3→2회).
+4. 완료 라벨을 하드코딩 "완료"→`status.label`(단일 소스, 드리프트 제거).
+- 미반영 1건: 보드/표 행 클릭 바인딩 복붙 공유 헬퍼 추출 → 기존 표 코드를 건드려 Phase 2 범위 밖(후속). **한계 명시: 자가/`/code-review` 모두 Claude 기반이라 Codex 같은 독립 모델 검증은 아님. 사용량 회복 시 최종 Codex 패스 권장.**
+
+**커밋·배포 여부**
+- 브랜치 `feature/pipeline-board`. **아직 커밋 전(working tree)**, main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. split-brain 해소(데모 완료→보드 전체 완료·표와 일치), 중간 단계 셀 표시, 행 버튼 클릭 포커스, 범례/점 1:1, 모바일 가로 스크롤 하네스로 확인. 클린업 반영 후에도 동일 동작 재확인.
+
 ### 2026-07-06 — 곡 선택 칩 ARIA 계약 위반 수정 (tablist/tab → group/toggle button, 브랜치 claude/goofy-antonelli-0cce62)
 
 **작업자:** Claude (Claude Code, Windows)
