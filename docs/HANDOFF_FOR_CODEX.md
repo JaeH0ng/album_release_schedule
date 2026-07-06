@@ -17,6 +17,29 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 완료 미러 대칭화(Phase 3b 부분) + 완전 통일 시도 보류 (브랜치 feature/pipeline-completion-authority)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 부재 중 자율 진행(ultracode).
+
+**결론 요약:** 완료 권위를 stage 단일 소스로 **완전히 통일**하려던 3b 전체 구현은 **적대적 멀티에이전트 리뷰에서 기기 간 데이터 손상 + 파괴적 언체크가 확인돼 병합하지 않고 보류**했다. 대신 **부작용이 전혀 없는 안전한 부분(완료 미러 대칭화)만** main에 반영했다.
+
+**반영한 것 (안전, main 병합):**
+- `setTrackStage`의 완료 미러를 **대칭화**: 데모를 벗어나면 데모 이벤트를 완료 처리(기존), **데모로 되돌리면 완료를 해제**(신규). 기존엔 되돌릴 때 완료를 안 지워, 곡을 데모로 되돌려도 "완료"로 남고 오늘 보드/달력에서 사라지는 **비대칭 split-brain**이 있었다. 이 부분 + 3a(단계 동기화)로 "비대칭"과 "기기 간 stage desync" 두 벡터는 해소된다.
+- promote/reconcile/토글 라우팅 **없음** — 리뷰에서 걸린 위험 기계장치를 전혀 도입하지 않는다. 기존 `demo && completed → 완료` 모델·`toggleCompleted`·`getTrackStatus`는 그대로 둔다.
+- 검증: `node --check`·`npm run build` 통과, 미리보기 콘솔 0건. demo→mix→demo, demo→done→demo 왕복에서 보드/상태/달력/대시보드 일치, 되돌림 시 완료 해제 확인.
+
+**보류한 것 (전체 통일, tag `wip/3b-full-attempt-reviewed`에 코드 보존):**
+- 시도한 모델: 곡 완료 ⟺ `stage==='done'`, 데모 이벤트 완료는 stage 투영, `toggleCompleted`를 `setTrackStage`로 라우팅, 레거시 `demo+completed`를 `done`으로 승격(`reconcileTrackCompletion`), 로드/로그인/폴링/곡목록변경에 배선.
+- **단일 기기 브라우저 검증은 전부 통과**했으나, `/code-review` 대체로 돌린 **6차원 적대적 리뷰(27후보→20 생존)**에서 **확정(CONFIRMED) 결함 다수**:
+  1. **(critical) 서버 데이터 손상**: `setScheduleData`의 promote가 startup의 `refreshSupabaseData()`↔`initAuth()` 비동기 경쟁 창에서 발화 → 원격에 실제 `mix`인 곡을 `done`으로 승격·업로드해 **전 기기에서 stage 손상**. 폴링/로그인에서 stage SELECT 오류·stage 행 부재 시에도 동일. 관리자가 이미 완료된 generic 이벤트에 새 곡 eventId를 물리면 새 곡이 즉시 `done`으로 오승격.
+  2. **(major) 2기기 진동**: 데모 복귀가 stage 삭제/`is_completed=false` **두 독립 write**를 내는데 순서 보장이 없어, stage만 먼저 지워진 창에 다른 기기가 폴링하면 레거시 지문으로 오인해 다시 `done`으로 승격 → 사용자의 데모 복귀가 되돌려짐.
+  3. **(major) 파괴적 언체크**: `mix`/`done` 곡의 데모 이벤트를 달력/다이얼로그에서 "완료 해제"하면 `setTrackStage(demo)`로 라우팅돼 **편곡/녹음/믹스 진행이 전부 데모로 소실**.
+  4. (minor) reconcile가 완료시각을 reconcile 시점(now)으로 조작해 원격에 동기화, "데모 완료" 버튼이 demo→done 한 방에 점프(중간 단계 스킵)·죽은 라벨 분기 등.
+- **근본 원인:** ① promote(완료→stage 자동 변이)를 서버에 동기화하는 것이 경쟁/모호 문맥에서 손상을 일으킴. ② "데모 벗어남=완료" 미러 + 토글을 stage로 라우팅하는 것이 파괴적 언체크를 낳음.
+- **완전 해결의 남은 결정(사용자 판단 필요):** 데모를 벗어난 곡의 데모 이벤트 완료 컨트롤(달력 체크박스/다이얼로그 버튼)을 어떻게 다룰지 — 권장안은 **stage 파생 + 과거-데모 곡에선 토글 잠금(비활성)**해 out-of-band 언체크 자체를 막고, promote는 서버 write 없이 startup 로컬 표시용으로만 두거나 아예 없애고 `demo && completed` 표시 분기를 유지하는 것. 이 UX 결정을 확정하면 손상 없이 완전 통일 가능. 상세 findings 전문: 세션 작업물 `tasks/wwndxd8ht.output`.
+
+**한계 명시:** 리뷰는 `/code-review`(Claude 기반) 대체다. Codex(독립 모델) 검증은 아니며, 원격 sync 손상 시나리오는 라이브 Supabase 없이는 재현 검증 불가(코드 경로로만 확인). push·`supabase:sync` 미실행.
+
 ### 2026-07-06 — 곡 단계(stage) Supabase 동기화 (Phase 3a, 브랜치 feature/pipeline-stage-sync)
 
 **작업자:** Claude (Claude Code, Windows)
