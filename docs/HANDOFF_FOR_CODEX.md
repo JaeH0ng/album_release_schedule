@@ -17,6 +17,23 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 곡 선택 칩 ARIA 계약 위반 수정 (tablist/tab → group/toggle button, 브랜치 claude/goofy-antonelli-0cce62)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+`#track-chip-nav`가 `role="tablist"` + 칩마다 `role="tab"` / `aria-selected`를 쓰면서 대응하는 `role="tabpanel"`도, 화살표 키 내비게이션도 없어 **ARIA 탭 계약을 위반**했다. 곡 칩 클릭은 뷰 전환이 아니라 **활성 곡 상태 변경**이므로 의미상 탭이 아니라 토글 버튼이다. 이미 정리된 `phase-filter`(`aria-pressed`) 패턴과 동일하게 맞췄다. Phase 1 자가리뷰에서 pre-existing로 분리했던 후속 항목을 별도 워크트리 세션에서 처리한 뒤 함께 병합.
+
+- **컨테이너**: `#track-chip-nav`의 `role="tablist"` → `role="group"` (`aria-label="곡 선택"` 유지).
+- **칩 버튼**: `renderTracks()`의 `track-chip` 마크업에서 `role="tab" aria-selected` → `aria-pressed`. 시각 스타일은 `.is-active` 클래스 기반이라 영향 없음.
+
+**바꾼 파일**
+- `index.html`(#track-chip-nav 컨테이너 role), `app.js`(`renderTracks()` track-chip 버튼 속성 — 병합 시 Phase 1의 `kind` 기반 완료판정과 결합).
+
+**커밋·배포 여부**
+- 별도 워크트리 브랜치 `claude/goofy-antonelli-0cce62` 커밋 → main 병합(Phase 1과 함께). push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. **토글 계약 하네스 확인**: 칩 11개, `aria-pressed="true"` 정확히 1개, 다른 칩 클릭 시 `true`가 그 칩으로 이동(`is-active`도 동기 이동), `role="tab"`/`aria-selected` 잔존 0.
+
 ### 2026-07-06 (Codex 리뷰 반영) — done/단계 이동 완료 동기화로 split-brain 해소 (브랜치 feature/pipeline-stage-model)
 
 **작업자:** Claude (Claude Code, Windows)

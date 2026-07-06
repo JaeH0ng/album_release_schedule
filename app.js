@@ -3771,7 +3771,7 @@ function renderTracks() {
       .map((track) => {
         const isActive = track.number === activeNumber;
         const isDone = getTrackStatus(track.number, track.eventId).kind === "complete";
-        return `<button class="track-chip${isActive ? " is-active" : ""}${isDone ? " is-done" : ""}" type="button" role="tab" aria-selected="${isActive}" data-track-chip="${escapeHtml(track.number)}">${escapeHtml(track.number)} · ${escapeHtml(track.title)}</button>`;
+        return `<button class="track-chip${isActive ? " is-active" : ""}${isDone ? " is-done" : ""}" type="button" aria-pressed="${isActive}" data-track-chip="${escapeHtml(track.number)}">${escapeHtml(track.number)} · ${escapeHtml(track.title)}</button>`;
       })
       .join("");
   }
