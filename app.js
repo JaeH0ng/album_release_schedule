@@ -3726,14 +3726,91 @@ function renderTrackDetailCard(track) {
       `;
 }
 
+// 곡의 현재 단계가 파이프라인(trackStages)에서 몇 번째인지. 알 수 없으면 0(demo).
+function getTrackStageIndex(trackNumber) {
+  const index = trackStages.findIndex((stage) => stage.id === getTrackStage(trackNumber));
+  return index < 0 ? 0 : index;
+}
+
+// 곡 × 단계 격자 보드 — 앨범 전체가 파이프라인 어디까지 왔는지 한눈에.
+// 각 셀은 곡의 현재 단계 기준으로 지난 단계(done)/현재(강조)/이후(대기)를 점으로 표시한다.
+function renderPipelineBoard(activeNumber) {
+  const container = document.querySelector("#track-pipeline-board");
+  if (!container) return;
+
+  // 헤더·범례는 시각 보조일 뿐(정보는 각 행 버튼의 aria-label이 담는다) → aria-hidden.
+  const headCells = trackStages
+    .map((stage) => `<div class="pipeline-cell pipeline-stage-head">${escapeHtml(stage.label)}</div>`)
+    .join("");
+
+  const rows = state.tracks
+    .map((track) => {
+      // 완료 판정·라벨은 표·칩·요약·상세와 같은 단일 소스(getTrackStatus)를 쓴다. 데모 단계에서
+      // 데모 이벤트만 완료해도(단계는 그대로) kind가 complete가 되므로 보드도 완료로 그려야
+      // 다른 뷰와 어긋나지 않는다. 아니면 지난 단계=끝남/현재=진행 중/이후=아직.
+      const status = getTrackStatus(track.number, track.eventId);
+      const isComplete = status.kind === "complete";
+      const currentIndex = getTrackStageIndex(track.number);
+      const isActiveRow = track.number === activeNumber;
+
+      const cells = trackStages
+        .map((stage, index) => {
+          let cellClass = "";
+          let dotState = "is-pending";
+          if (isComplete || index < currentIndex) {
+            dotState = "is-done";
+          } else if (index === currentIndex) {
+            cellClass = " is-current-cell";
+            dotState = "is-current";
+          }
+          return `<div class="pipeline-cell pipeline-dot-cell${cellClass}" aria-hidden="true"><span class="pipeline-dot ${dotState}"></span></div>`;
+        })
+        .join("");
+
+      // 완료 문구는 단일 소스(status.label), 미완료는 보드 목적에 맞게 현재 단계명을 노출.
+      const rowLabel = isComplete
+        ? `${track.number} ${track.title} — ${status.label}, 열기`
+        : `${track.number} ${track.title} — ${trackStages[currentIndex].label} 단계, 열기`;
+
+      return `
+        <div class="pipeline-row${isActiveRow ? " is-active" : ""}" role="button" tabindex="0" data-pipeline-track="${escapeHtml(track.number)}" aria-label="${escapeHtml(rowLabel)}">
+          <div class="pipeline-cell pipeline-song-label" aria-hidden="true">
+            <span class="pipeline-song-num">${escapeHtml(track.number)}</span>
+            <span class="pipeline-song-title">${escapeHtml(track.title)}</span>
+          </div>
+          ${cells}
+        </div>`;
+    })
+    .join("");
+
+  container.innerHTML = `
+    <div class="pipeline-legend" aria-hidden="true">
+      <span><i class="pipeline-dot is-done"></i>끝남</span>
+      <span><i class="pipeline-dot is-current"></i>진행 중</span>
+      <span><i class="pipeline-dot is-pending"></i>아직</span>
+    </div>
+    <div class="pipeline-grid-scroll">
+      <div class="pipeline-grid">
+        <div class="pipeline-row pipeline-head" aria-hidden="true">
+          <div class="pipeline-cell pipeline-song-label">곡</div>
+          ${headCells}
+        </div>
+        ${rows}
+      </div>
+    </div>`;
+}
+
 function renderTracks() {
+  // 활성 곡을 한 번만 계산해 보드·표가 같은 값을 공유한다(중복 전수 스캔/불일치 방지).
+  const activeTrack = getActiveTrack();
+  const activeNumber = activeTrack ? activeTrack.number : null;
+
+  renderPipelineBoard(activeNumber);
   renderTrackSummaryBoard();
 
   const kicker = document.querySelector("#tracks-kicker");
   if (kicker) kicker.textContent = `후보곡 ${state.tracks.length}곡`;
 
-  const activeTrack = getActiveTrack();
-  const activeNumber = activeTrack ? activeTrack.number : null;
   const filtered = getFilteredTracks();
 
   // 브라우즈용 표 — 행을 클릭하면 해당 곡 워크플로로 포커스 이동.
@@ -3802,6 +3879,18 @@ function bindTrackBrowseControls() {
 
   document.querySelectorAll("[data-track-chip]").forEach((chip) => {
     chip.addEventListener("click", () => setActiveTrack(chip.dataset.trackChip, { scroll: true }));
+  });
+
+  // 파이프라인 보드 행 — 클릭/엔터로 해당 곡 상세로 포커스(단계 변경은 상세의 단계 칩에서만).
+  document.querySelectorAll("[data-pipeline-track]").forEach((row) => {
+    const go = () => setActiveTrack(row.dataset.pipelineTrack, { scroll: true });
+    row.addEventListener("click", go);
+    row.addEventListener("keydown", (keyEvent) => {
+      if (keyEvent.key === "Enter" || keyEvent.key === " ") {
+        keyEvent.preventDefault();
+        go();
+      }
+    });
   });
 }
 
