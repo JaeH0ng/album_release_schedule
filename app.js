@@ -303,6 +303,8 @@ const state = {
   // 아직 원격에 반영되지 않은 로컬 변경(eventId → 큐잉 시각). 폴링 병합이
   // 이 항목을 원격 값으로 덮어쓰지 않도록 보호한다.
   eventPlanPending: new Map(),
+  // 단계 원격 동기화의 pending(trackNumber → 큐잉 시각). eventPlanPending과 같은 정책.
+  trackStagePending: new Map(),
   trackChecklist: loadTrackChecklistState(),
   trackStage: loadTrackStageState(),
   trackNotes: loadTrackNotesState(),
@@ -948,6 +950,15 @@ function buildDefaultTrackStages() {
   return Object.fromEntries(defaultTracks.map((track) => [track.number, "demo"]));
 }
 
+// 두 단계 맵이 의미상 같은지 비교. 키가 없거나 "demo"이면 같은 것으로 본다(demo=행 없음 정책).
+function trackStagesEqual(a, b) {
+  const keys = new Set([...Object.keys(a), ...Object.keys(b)]);
+  for (const key of keys) {
+    if ((a[key] || "demo") !== (b[key] || "demo")) return false;
+  }
+  return true;
+}
+
 // 곡별 현재 단계(개인 상태). 체크리스트와 같은 정책 — localStorage 전용,
 // 알 수 없는 값은 demo로 폴백해 렌더가 깨지지 않게 한다.
 function loadTrackStageState() {
@@ -1360,6 +1371,72 @@ function applyRemoteEventPlans(rows, { backfill = false, protectIds = new Set() 
   if (firstConnect) uploadIds.forEach((id) => queueEventPlanSync(id));
 }
 
+// 곡별 단계(user_track_stages)를 계정과 맞춘다. user_event_plans와 같은 규칙:
+// - 최초 연결(원격이 완전히 비어 있을 때)에만 이 브라우저의 비-demo 단계를 원격에 올린다.
+// - 폴링(45초)은 원격을 기준으로 수렴하되, 아직 원격에 반영 안 된 로컬 변경(trackStagePending)은
+//   덮어쓰지 않는다.
+// - demo(기본값)는 행을 만들지 않는다 — 비어 있음 = 행 없음(user_event_plans의 empty 삭제와 동일).
+async function loadRemoteTrackStages({ backfill = false } = {}) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  // SELECT 시점의 pending을 스냅샷으로 잡아, 응답이 늦게 도착해도 그 사이 성공한 로컬
+  // 변경(delete 포함)이 예전 원격 값으로 되살아나지 않게 한다(loadRemoteEventPlans와 동일).
+  const protectIds = new Set(state.trackStagePending.keys());
+  const { data, error } = await state.authClient
+    .from("user_track_stages")
+    .select("track_number, stage")
+    .eq("user_id", user.id);
+
+  if (error) {
+    console.error(error);
+    return;
+  }
+
+  applyRemoteTrackStages(data || [], { backfill, protectIds });
+}
+
+function applyRemoteTrackStages(rows, { backfill = false, protectIds = new Set() } = {}) {
+  // 모든 곡을 demo로 초기화한 뒤 원격의 비-demo 행을 덮어쓴다(demo는 행이 없으므로 기본값 유지).
+  const nextStage = buildDefaultTrackStages();
+  rows.forEach((row) => {
+    const trackNumber = String(row.track_number);
+    if (trackStageMap.has(row.stage)) {
+      nextStage[trackNumber] = row.stage;
+    }
+  });
+
+  // 최초 연결(원격이 비어 있을 때)에만 이 브라우저의 로컬 단계를 원격에 올린다.
+  const firstConnect = backfill && rows.length === 0;
+
+  // 항상 로컬 값으로 보존할 곡번호: 최초 연결이면 로컬 전체, 아니면 아직 원격에 안 올라간
+  // 로컬 변경(pending) + 이 SELECT를 보낸 시점에 pending이던 곡(경합 방어).
+  // 최초 연결 시 pending·protectIds는 모두 state.trackStage 키의 부분집합이라 로컬 전체가 흡수한다.
+  const preserve = firstConnect
+    ? new Set(Object.keys(state.trackStage))
+    : new Set([...state.trackStagePending.keys(), ...protectIds]);
+  preserve.forEach((trackNumber) => {
+    nextStage[trackNumber] = getTrackStage(trackNumber);
+  });
+
+  // 45초 폴링마다 무조건 렌더하면 event-plan 쪽 렌더와 합쳐 폴링당 full render가 2회가 되고,
+  // 유휴 상태에서도 작성 중인 입력이 날아간다. 타 기기의 단계 변경은 드물므로 실제로 바뀐
+  // 경우에만 저장·렌더한다(demo 기본값과 미기재 키를 동일 취급해 오탐 없이 비교).
+  const changed = !trackStagesEqual(state.trackStage, nextStage);
+  state.trackStage = nextStage;
+  if (changed) {
+    saveTrackStageState();
+    renderAll();
+  }
+
+  // 최초 연결 시 로컬의 비-demo 단계를 원격에 올린다(상태 반영 후). demo는 행이 없어야 하므로 제외.
+  if (firstConnect) {
+    Object.keys(nextStage).forEach((trackNumber) => {
+      if (getTrackStage(trackNumber) !== "demo") queueTrackStageSync(trackNumber);
+    });
+  }
+}
+
 function buildEventPlanPayload(eventId, userId) {
   const plan = getEventPlan(eventId);
   const completed = state.completed.has(eventId);
@@ -1451,6 +1528,69 @@ function flushPendingEventPlans() {
   return Promise.all(ids.map((id) => queueEventPlanSync(id)));
 }
 
+// 단계 원격 write. eventPlan 쪽과 같은 직렬화·pending·세션 경계(generation) 방어를 쓴다.
+// generation은 세션 경계 카운터라 eventPlanSyncGeneration을 공유한다(계정 전환 시 함께 무효화).
+function buildTrackStagePayload(trackNumber, userId) {
+  return {
+    user_id: userId,
+    track_number: trackNumber,
+    stage: getTrackStage(trackNumber),
+    updated_at: new Date().toISOString(),
+  };
+}
+
+// 한 곡의 단계를 원격에 반영한다. demo(기본값)면 행 삭제, 그 외에는 upsert.
+async function syncTrackStageRow(trackNumber, stamp, queuedUserId, queuedGeneration) {
+  if (!canUseRemoteReviewSync()) return;
+
+  const user = getAuthUser();
+  if (!user || user.id !== queuedUserId || queuedGeneration !== eventPlanSyncGeneration) return;
+  const stage = getTrackStage(trackNumber);
+  const query =
+    stage === "demo"
+      ? state.authClient.from("user_track_stages").delete().eq("user_id", user.id).eq("track_number", trackNumber)
+      : state.authClient
+          .from("user_track_stages")
+          .upsert(buildTrackStagePayload(trackNumber, user.id), { onConflict: "user_id,track_number" });
+
+  const { error } = await query;
+  if (error) {
+    console.error(error);
+    return; // 실패하면 pending을 유지해 다음 폴링이 로컬 변경을 덮지 않게 둔다.
+  }
+  if (state.trackStagePending.get(trackNumber) === stamp) {
+    state.trackStagePending.delete(trackNumber);
+  }
+}
+
+let trackStageSyncSeq = 0;
+const trackStageSyncChains = new Map();
+
+function queueTrackStageSync(trackNumber) {
+  const user = getAuthUser();
+  if (!user) return Promise.resolve();
+  const queuedUserId = user.id;
+  const queuedGeneration = eventPlanSyncGeneration;
+  const stamp = ++trackStageSyncSeq;
+  state.trackStagePending.set(trackNumber, stamp);
+  const prev = trackStageSyncChains.get(trackNumber) || Promise.resolve();
+  const next = prev
+    .then(() => syncTrackStageRow(trackNumber, stamp, queuedUserId, queuedGeneration))
+    .catch((error) => console.error(error));
+  trackStageSyncChains.set(trackNumber, next);
+  next.finally(() => {
+    if (trackStageSyncChains.get(trackNumber) === next) trackStageSyncChains.delete(trackNumber);
+  });
+  return next;
+}
+
+// 아직 원격에 반영되지 않은 단계 변경(pending)을 재시도한다. flushPendingEventPlans와 같은 역할.
+function flushPendingTrackStages() {
+  if (!canUseRemoteReviewSync()) return Promise.resolve();
+  const numbers = [...state.trackStagePending.keys()];
+  return Promise.all(numbers.map((trackNumber) => queueTrackStageSync(trackNumber)));
+}
+
 async function syncOpportunityReview(opportunityId, status) {
   if (!canUseRemoteReviewSync()) return;
 
@@ -1517,6 +1657,9 @@ function startRemoteReviewPolling() {
     // 동시에 돌리면 삭제 성공→pending 해제와 삭제 전 SELECT 응답이 역전돼 부활할 수 있다.
     await flushPendingEventPlans();
     await loadRemoteEventPlans();
+    // 단계도 같은 순서로: pending을 먼저 수렴시킨 뒤 원격을 다시 읽는다.
+    await flushPendingTrackStages();
+    await loadRemoteTrackStages();
   }, 45000);
 }
 
@@ -1534,6 +1677,8 @@ async function setAuthSession(session) {
   if (prevUserId !== nextUserId) {
     state.eventPlanPending.clear();
     eventPlanSyncChains.clear();
+    state.trackStagePending.clear();
+    trackStageSyncChains.clear();
     eventPlanSyncGeneration += 1;
   }
   updateAuthChrome();
@@ -1545,8 +1690,11 @@ async function setAuthSession(session) {
     await loadRemoteOpportunityReviews();
     // 첫 로그인: 이 브라우저에만 쌓인 계획/완료 기록을 지우지 않고 원격과 합친다.
     await loadRemoteEventPlans({ backfill: true });
+    // 단계도 같은 규칙으로 병합(최초 연결이면 로컬 비-demo 단계를 원격에 올린다).
+    await loadRemoteTrackStages({ backfill: true });
     // 로그인 전/실패로 쌓인 pending write를 이 시점에 밀어 넣는다(폴링 45초를 안 기다림).
     await flushPendingEventPlans();
+    await flushPendingTrackStages();
     return;
   }
 
@@ -1554,6 +1702,7 @@ async function setAuthSession(session) {
   // pending·체인은 위 계정 변경 감지에서 이미 비웠다. 로컬 기준으로 복원한다.
   state.opportunityReview = loadOpportunityReviewState();
   state.eventPlan = loadEventPlanState();
+  state.trackStage = loadTrackStageState();
   const localCompletion = loadCompletionState();
   state.completed = localCompletion.completed;
   state.completedMeta = localCompletion.completedMeta;
@@ -1708,6 +1857,7 @@ function setTrackStage(trackNumber, stageId) {
   state.trackStage[trackNumber] = stageId;
   addTrackActivity(trackNumber, "단계 이동", `${trackStageMap.get(stageId).label} 단계로 이동`);
   saveTrackStageState();
+  queueTrackStageSync(trackNumber); // 단계를 계정에 동기화(기기 간 desync 방지). 로그아웃 상태면 no-op.
 
   // 데모 단계를 벗어나면 그 곡의 데모는 끝난 것이다. 데모 이벤트 완료를 state.completed와
   // 동기화해, 곡 표/파이프라인은 완료로 보이는데 오늘 보드·달력·요약은 같은 데모 이벤트를

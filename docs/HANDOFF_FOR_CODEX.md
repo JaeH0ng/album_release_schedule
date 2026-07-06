@@ -17,6 +17,31 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 곡 단계(stage) Supabase 동기화 (Phase 3a, 브랜치 feature/pipeline-stage-sync)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+완료 모델 근본 개편(Phase 3) 3단계 중 **3a**. split-brain의 두 뿌리 중 "기기 간 desync" 절반을 없앤다. 곡별 현재 단계(`state.trackStage`, `TRACK_STAGE_KEY`)가 그동안 **localStorage 전용**이라, 한 기기에서 곡을 done으로 옮겨도 다른 기기는 그 사실을 몰라 화면마다 진실이 갈렸다. 단계를 계정에 동기화해 단계가 기기를 따라다니게 한다. **의미 변화 0(behavior-preserving)** — 완료 토글 재설계는 3b, 오늘 보드 자동화는 3c.
+
+- **새 개인 상태 테이블** `user_track_stages(user_id, track_number, stage, updated_at)` — `user_event_plans`와 **완전히 동일한 per-user RLS 패턴**(authenticated 본인 행만 rud, anon 불가). demo(기본값)는 행을 만들지 않고, demo로 돌아오면 행 삭제(빈 항목=행 없음). `album_tracks`에 FK 안 걸음(개인 오버레이 — 게시 곡 목록과 독립, 로컬 폴백·관리자 추가 곡 번호도 수용).
+- **클라이언트 동기화**: `loadRemoteTrackStages`/`applyRemoteTrackStages`/`queueTrackStageSync`/`syncTrackStageRow`/`buildTrackStagePayload`/`flushPendingTrackStages` — 검증된 event-plan sync를 그대로 미러(eventId별 직렬화 체인, pending 보호, SELECT-시점 protectIds 스냅샷, 세션 경계 `eventPlanSyncGeneration` 공유 무효화). `setTrackStage`·로그인 backfill·로그아웃 복원·계정전환 클리어·45초 폴링(flush→load 순서)에 배선.
+- **단일 소스/시드 불변**: `schedule-data.js`·`album_events`·`album_tracks`·시드 SQL·`service-worker`·고정 마감 손대지 않음. 단계는 개인 상태지 게시 콘텐츠가 아님.
+
+**리뷰(Codex 사용량 소진 → `/code-review` high 대체)**
+6개 독립 파인더 앵글(라인스캔·삭제동작·크로스파일·재사용/단순화·효율/고도·CLAUDE.md 규칙) 병렬 + 검증. **정확성 버그 0건 확정** — 후보(null deref·track_number 검증·Map 키 타입·admin 트랙 유실·완료 override 등)는 전부 검증된 event-plan 템플릿 미러(동기 가드·DB not-null·문자열 키 일관·의도된 "원격 우선" 정책)라 기각. 규칙 위반 0(RLS·단일소스·XSS·개인상태키·PWA 캐시 통과). 반영한 클린업 2건: (1) 효율 — `applyRemoteTrackStages`에 dirty-check 도입(폴링당 full render 2회 및 유휴 폴링 입력유실 방지, 타 기기 단계변경은 드묾), (2) 단순화 — firstConnect preserve 루프 이중 순회 제거. **한계 명시: `/code-review`는 Claude 기반이라 Codex(독립 모델) 검증은 아님. push/릴리스 전 Codex 사용량 회복 시 최종 패스 권장.**
+
+**알려진 잔여(3b/3c 추적)**
+- split-brain의 "완료 토글" 절반(데모 벗어난 곡의 데모 이벤트 out-of-band 언체크 / 데모 복귀 시 완료 비클리어 비대칭)은 **3a 범위 밖 — 의도적으로 보존**하고 3b(완료 권위를 stage 단일 소스로 통일)에서 해결. 미리보기에서 02를 mix→demo 왕복 시 "완료"로 남는 것이 이 기존 동작.
+- 원격 sync 경로 자체(로그인+마이그레이션 적용 상태)는 라이브 Supabase 없이는 미검증. 마이그레이션은 `supabase:sync` 미실행(지시 대기).
+
+**바꾼 파일**
+- `app.js`(state.trackStagePending + 동기화 함수 6개 + `trackStagesEqual` 헬퍼 + setTrackStage/setAuthSession/폴링 배선), `supabase/migrations/20260706120000_add_user_track_stages.sql`(신규). +약 145줄.
+
+**커밋·배포 여부**
+- 브랜치 `feature/pipeline-stage-sync` → main 로컬 병합 예정. push·gh-pages·`supabase:sync` **미실행**(사용자 지시 대기).
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. 단계 이동 저장·보드 반영·완료 동기화·새로고침 유지·데모 왕복 하네스 확인. 로그아웃 상태라 원격 호출은 전부 no-op(제로 회귀).
+
 ### 2026-07-06 — 로더 중복 제거 + getStageSteps 호이스팅 (클린업, 브랜치 feature/completion-single-source)
 
 **작업자:** Claude (Claude Code, Windows)
