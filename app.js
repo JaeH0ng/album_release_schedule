@@ -2,6 +2,7 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 const STORAGE_KEY = "album-release-completed-tasks-v1";
 const TRACK_CHECKLIST_KEY = "album-release-track-checklist-v1";
+const TRACK_STAGE_KEY = "album-release-track-stage-v1";
 const TRACK_NOTES_KEY = "album-release-track-notes-v1";
 const TRACK_ACTIVITY_KEY = "album-release-track-activity-v1";
 const TRACK_FOLLOWUPS_KEY = "album-release-track-followups-v1";
@@ -44,23 +45,90 @@ const phases = [
   { id: "release", label: "발매", color: "#1f2522" },
 ];
 
-const defaultTrackSteps = [
-  { id: "tune", group: "세션", label: "튜닝 + 현재 키 확인" },
-  { id: "key", group: "세션", label: "후렴·최고음으로 키 테스트", repeatable: true },
-  { id: "bpm", group: "세션", label: "메트로놈 BPM 후보 2개 비교", repeatable: true },
-  { id: "take", group: "세션", label: "멈추지 않은 전체 1테이크 확보", repeatable: true },
-  { id: "comfort", group: "세션", label: "바로 청취하며 불편한 구간 표시", repeatable: true },
-  { id: "structure", group: "마감", label: "키·카포·BPM·구조 곡 문서에 기록" },
-  { id: "arrangement", group: "마감", label: "얹어볼 악기·질감 1개 메모", repeatable: true },
-  { id: "idea", group: "마감", label: "다음 편곡 아이디어 정리", repeatable: true },
-  { id: "memo", group: "마감", label: "파일명 정리 + 곡 문서·세션 노트 연결" },
-  { id: "next", group: "마감", label: "다음에 이어갈 것 1줄 기록" },
+// 곡별 제작 파이프라인 5단계. phase는 달력·팔로우업 색 매핑용(phases 배열의 id).
+// 단계(현재 위치)는 개인 상태로 localStorage(TRACK_STAGE_KEY)에 저장한다.
+const trackStages = [
+  { id: "demo", label: "데모", phase: "demo" },
+  { id: "arrange", label: "편곡", phase: "arrangement" },
+  { id: "record", label: "녹음", phase: "recording" },
+  { id: "mix", label: "믹스", phase: "post" },
+  { id: "done", label: "완료", phase: "release" },
 ];
+const trackStageMap = new Map(trackStages.map((stage) => [stage.id, stage]));
 
-const trackStepGroups = [
-  { id: "세션", label: "세션 (60분, 악기 앞에서)" },
-  { id: "마감", label: "마감 (세션 직후, 책상에서)" },
-];
+// 단계별 체크리스트. demo의 step id는 기존 기록(localStorage) 보존을 위해
+// 절대 바꾸지 않는다. 새 단계 id는 기존과 겹치지 않게 접두어를 붙인다.
+const trackStepsByStage = {
+  demo: [
+    { id: "tune", group: "세션", label: "튜닝 + 현재 키 확인" },
+    { id: "key", group: "세션", label: "후렴·최고음으로 키 테스트", repeatable: true },
+    { id: "bpm", group: "세션", label: "메트로놈 BPM 후보 2개 비교", repeatable: true },
+    { id: "take", group: "세션", label: "멈추지 않은 전체 1테이크 확보", repeatable: true },
+    { id: "comfort", group: "세션", label: "바로 청취하며 불편한 구간 표시", repeatable: true },
+    { id: "structure", group: "마감", label: "키·카포·BPM·구조 곡 문서에 기록" },
+    { id: "arrangement", group: "마감", label: "얹어볼 악기·질감 1개 메모", repeatable: true },
+    { id: "idea", group: "마감", label: "다음 편곡 아이디어 정리", repeatable: true },
+    { id: "memo", group: "마감", label: "파일명 정리 + 곡 문서·세션 노트 연결" },
+    { id: "next", group: "마감", label: "다음에 이어갈 것 1줄 기록" },
+  ],
+  arrange: [
+    { id: "arr-palette", group: "실험", label: "앨범 팔레트 기준으로 질감 확인" },
+    { id: "arr-ab", group: "실험", label: "편곡안 A/B 두 가지 비교", repeatable: true },
+    { id: "arr-instr", group: "실험", label: "악기 하나씩 얹어 중심 유지 확인", repeatable: true },
+    { id: "arr-role", group: "확정", label: "곡의 역할·절정 지점 한 줄 정리" },
+    { id: "arr-lock", group: "확정", label: "편곡안 확정 + 필요 악기 목록 기록" },
+  ],
+  record: [
+    { id: "rec-guitar", group: "테이크", label: "최종 통기타 메인 테이크 확보", repeatable: true },
+    { id: "rec-vocal", group: "테이크", label: "메인 보컬 테이크 확보", repeatable: true },
+    { id: "rec-chorus", group: "테이크", label: "필수 더블링·코러스 녹음", repeatable: true },
+    { id: "rec-best", group: "정리", label: "베스트 테이크 표시 + 세션 정리" },
+    { id: "rec-credit", group: "정리", label: "참여자·사용 악기 크레딧 기록" },
+  ],
+  mix: [
+    { id: "mix-vocal", group: "기준", label: "기준곡 대비 보컬 전면감 맞추기", repeatable: true },
+    { id: "mix-guitar", group: "기준", label: "통기타 크기·저역 기준 확인", repeatable: true },
+    { id: "mix-space", group: "기준", label: "공간감·리버브 앨범 기준 적용" },
+    { id: "mix-limit", group: "검수", label: "수정 요청 3개 이내로 정리" },
+    { id: "mix-check", group: "검수", label: "연속 청취로 튀는 곳 확인" },
+  ],
+  done: [],
+};
+
+// 각 step이 어느 단계 소속인지 역참조할 수 있게 stage를 새겨 둔다(팔로우업 phase 매핑용).
+for (const [stageId, steps] of Object.entries(trackStepsByStage)) {
+  for (const step of steps) step.stage = stageId;
+}
+// 전체 step 플랫 목록 — 체크리스트 기본값·id 조회 등 단계 무관 연산에 사용.
+const allTrackSteps = Object.values(trackStepsByStage).flat();
+
+const trackStepGroupsByStage = {
+  demo: [
+    { id: "세션", label: "세션 (60분, 악기 앞에서)" },
+    { id: "마감", label: "마감 (세션 직후, 책상에서)" },
+  ],
+  arrange: [
+    { id: "실험", label: "실험 (스피커 앞에서)" },
+    { id: "확정", label: "확정 (실험 직후, 책상에서)" },
+  ],
+  record: [
+    { id: "테이크", label: "테이크 (녹음 세션)" },
+    { id: "정리", label: "정리 (세션 직후)" },
+  ],
+  mix: [
+    { id: "기준", label: "기준 맞추기 (스피커 앞에서)" },
+    { id: "검수", label: "검수 (연속 청취)" },
+  ],
+  done: [],
+};
+
+function getStageSteps(stageId) {
+  return trackStepsByStage[stageId] || [];
+}
+
+function getStageGroups(stageId) {
+  return trackStepGroupsByStage[stageId] || [];
+}
 
 const defaultTrackNotes = {
   completedThisWeek: [],
@@ -236,6 +304,7 @@ const state = {
   // 이 항목을 원격 값으로 덮어쓰지 않도록 보호한다.
   eventPlanPending: new Map(),
   trackChecklist: loadTrackChecklistState(),
+  trackStage: loadTrackStageState(),
   trackNotes: loadTrackNotesState(),
   trackActivity: loadTrackActivityState(),
   trackFollowups: loadTrackFollowupsState(),
@@ -421,7 +490,7 @@ function findTrack(trackNumber) {
 }
 
 function findTrackStep(stepId) {
-  return defaultTrackSteps.find((step) => step.id === stepId);
+  return allTrackSteps.find((step) => step.id === stepId);
 }
 
 function setScheduleData({ events = state.events, tracks = state.tracks }) {
@@ -439,7 +508,10 @@ function ensureTrackState() {
   for (const track of state.tracks) {
     const number = track.number;
     if (!state.trackChecklist[number]) {
-      state.trackChecklist[number] = Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false]));
+      state.trackChecklist[number] = Object.fromEntries(allTrackSteps.map((step) => [step.id, false]));
+    }
+    if (!trackStageMap.has(state.trackStage[number])) {
+      state.trackStage[number] = "demo";
     }
     if (!state.trackNotes[number]) {
       state.trackNotes[number] = { completedThisWeek: [], arrangementIdeas: [], nextUp: [] };
@@ -488,7 +560,8 @@ function buildTrackFollowupEvents() {
         id: followup.id,
         date: followup.date,
         title: `${track.title} · ${step.label}`,
-        phase: "demo",
+        // step이 속한 제작 단계의 phase 색(demo/arrangement/recording/post)을 따른다.
+        phase: trackStageMap.get(step.stage)?.phase || "demo",
         duration: "30분",
         result: "반복 확인 메모 1개",
         detail: `이전에 했던 "${step.label}" 작업을 다시 점검하고, 다음에 이어갈 판단을 남긴다.`,
@@ -822,7 +895,7 @@ function buildDefaultTrackChecklist() {
   return Object.fromEntries(
     defaultTracks.map((track) => [
       track.number,
-      Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false])),
+      Object.fromEntries(allTrackSteps.map((step) => [step.id, false])),
     ])
   );
 }
@@ -833,7 +906,7 @@ function loadTrackChecklistState() {
     const stored = JSON.parse(localStorage.getItem(TRACK_CHECKLIST_KEY) || "{}");
     if (!stored || typeof stored !== "object") return base;
 
-    return Object.fromEntries(
+    const merged = Object.fromEntries(
       Object.entries(base).map(([trackNumber, defaults]) => [
         trackNumber,
         {
@@ -842,6 +915,14 @@ function loadTrackChecklistState() {
         },
       ])
     );
+    // defaultTracks에 없는 곡(예: Supabase에서 추가된 12번)의 체크 기록도 보존한다.
+    // base 키만 순회하면 저장돼 있던 이런 곡의 체크가 새로고침마다 사라진다.
+    for (const [trackNumber, checks] of Object.entries(stored)) {
+      if (!merged[trackNumber] && checks && typeof checks === "object") {
+        merged[trackNumber] = { ...checks };
+      }
+    }
+    return merged;
   } catch {
     return base;
   }
@@ -855,13 +936,55 @@ function saveTrackChecklistState() {
   }
 }
 
+function buildDefaultTrackStages() {
+  return Object.fromEntries(defaultTracks.map((track) => [track.number, "demo"]));
+}
+
+// 곡별 현재 단계(개인 상태). 체크리스트와 같은 정책 — localStorage 전용,
+// 알 수 없는 값은 demo로 폴백해 렌더가 깨지지 않게 한다.
+function loadTrackStageState() {
+  const base = buildDefaultTrackStages();
+  try {
+    const stored = JSON.parse(localStorage.getItem(TRACK_STAGE_KEY) || "{}");
+    if (!stored || typeof stored !== "object") return base;
+
+    const merged = { ...base };
+    for (const [trackNumber, stageId] of Object.entries(stored)) {
+      if (trackStageMap.has(stageId)) {
+        merged[trackNumber] = stageId;
+      }
+    }
+    return merged;
+  } catch {
+    return base;
+  }
+}
+
+function saveTrackStageState() {
+  try {
+    localStorage.setItem(TRACK_STAGE_KEY, JSON.stringify(state.trackStage));
+  } catch {
+    // Ignore storage errors for local previews.
+  }
+}
+
+// 저장된 노트 한 곡분을 sanitize한다(모든 필드를 배열로 강제, 기본 키 채움).
+function sanitizeTrackNote(stored) {
+  return {
+    ...defaultTrackNotes,
+    ...Object.fromEntries(
+      Object.entries(stored || {}).map(([key, value]) => [key, Array.isArray(value) ? value : []])
+    ),
+  };
+}
+
 function loadTrackNotesState() {
   const base = buildDefaultTrackNotes();
   try {
     const stored = JSON.parse(localStorage.getItem(TRACK_NOTES_KEY) || "{}");
     if (!stored || typeof stored !== "object") return base;
 
-    return Object.fromEntries(
+    const merged = Object.fromEntries(
       Object.entries(base).map(([trackNumber, defaults]) => [
         trackNumber,
         {
@@ -875,6 +998,14 @@ function loadTrackNotesState() {
         },
       ])
     );
+    // defaultTracks 밖 곡(Supabase 추가곡)의 저장 노트도 보존한다 — 체크리스트·단계
+    // 로더와 동일 정책. 이게 없으면 단계 이동 등으로 남긴 기록이 새로고침에 사라진다.
+    for (const [trackNumber, note] of Object.entries(stored)) {
+      if (!merged[trackNumber] && note && typeof note === "object") {
+        merged[trackNumber] = sanitizeTrackNote(note);
+      }
+    }
+    return merged;
   } catch {
     return base;
   }
@@ -888,29 +1019,39 @@ function saveTrackNotesState() {
   }
 }
 
+// 저장된 활동 배열 한 곡분을 sanitize한다(유효 항목만, 최근 20개).
+function sanitizeTrackActivity(entries) {
+  return entries
+    .filter(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        typeof entry.id === "string" &&
+        typeof entry.text === "string" &&
+        typeof entry.createdAt === "string"
+    )
+    .slice(0, 20);
+}
+
 function loadTrackActivityState() {
   const base = buildDefaultTrackActivity();
   try {
     const stored = JSON.parse(localStorage.getItem(TRACK_ACTIVITY_KEY) || "{}");
     if (!stored || typeof stored !== "object") return base;
 
-    return Object.fromEntries(
+    const merged = Object.fromEntries(
       Object.entries(base).map(([trackNumber, defaults]) => [
         trackNumber,
-        Array.isArray(stored[trackNumber])
-          ? stored[trackNumber]
-              .filter(
-                (entry) =>
-                  entry &&
-                  typeof entry === "object" &&
-                  typeof entry.id === "string" &&
-                  typeof entry.text === "string" &&
-                  typeof entry.createdAt === "string"
-              )
-              .slice(0, 20)
-          : defaults,
+        Array.isArray(stored[trackNumber]) ? sanitizeTrackActivity(stored[trackNumber]) : defaults,
       ])
     );
+    // defaultTracks 밖 곡(Supabase 추가곡)의 활동 로그도 보존한다 — 노트 로더와 동일.
+    for (const [trackNumber, entries] of Object.entries(stored)) {
+      if (!merged[trackNumber] && Array.isArray(entries)) {
+        merged[trackNumber] = sanitizeTrackActivity(entries);
+      }
+    }
+    return merged;
   } catch {
     return base;
   }
@@ -1557,6 +1698,34 @@ function getTrackChecklist(trackNumber) {
   return state.trackChecklist[trackNumber] || {};
 }
 
+function getTrackStage(trackNumber) {
+  const stageId = state.trackStage[trackNumber];
+  return trackStageMap.has(stageId) ? stageId : "demo";
+}
+
+function setTrackStage(trackNumber, stageId) {
+  if (!trackStageMap.has(stageId)) return;
+  if (getTrackStage(trackNumber) === stageId) return;
+  state.trackStage[trackNumber] = stageId;
+  addTrackActivity(trackNumber, "단계 이동", `${trackStageMap.get(stageId).label} 단계로 이동`);
+  saveTrackStageState();
+
+  // 데모 단계를 벗어나면 그 곡의 데모는 끝난 것이다. 데모 이벤트 완료를 state.completed와
+  // 동기화해, 곡 표/파이프라인은 완료로 보이는데 오늘 보드·달력·요약은 같은 데모 이벤트를
+  // 계속 미완료 작업으로 띄우는 split-brain을 없앤다. 새 event id를 만들지 않고 기존
+  // track.eventId를 그대로 완료 처리하므로 localStorage·user_event_plans 기록 보존 원칙과 맞다.
+  // (데모로 되돌릴 때는 이미 원격 동기화됐을 수 있는 완료 기록을 임의로 지우지 않는다 —
+  //  데모 단계에 노출되는 "완료 해제" 버튼으로 사용자가 직접 되돌릴 수 있다.)
+  const track = findTrack(trackNumber);
+  if (track && stageId !== "demo" && !state.completed.has(track.eventId)) {
+    toggleCompleted(track.eventId, true); // 저장·원격 동기화·전체 리렌더까지 내부에서 수행
+    return;
+  }
+
+  renderTracks();
+  renderDashboard();
+}
+
 function getTrackNotes(trackNumber) {
   return state.trackNotes[trackNumber] || { ...defaultTrackNotes };
 }
@@ -1757,42 +1926,71 @@ function renderTrackFollowupSection(track) {
   `;
 }
 
-function getTrackChecklistProgress(trackNumber) {
+// 진행률·상태는 모두 "현재 단계"의 체크리스트를 기준으로 계산한다.
+function getTrackChecklistProgress(trackNumber, stageId = getTrackStage(trackNumber)) {
   const checklist = getTrackChecklist(trackNumber);
-  const completed = defaultTrackSteps.filter((step) => checklist[step.id]).length;
-  return { completed, total: defaultTrackSteps.length };
+  const steps = getStageSteps(stageId);
+  const completed = steps.filter((step) => checklist[step.id]).length;
+  return { completed, total: steps.length };
 }
 
-function getTrackStageProgress(trackNumber) {
+// 현재 단계의 그룹별 진행률 목록 (demo면 세션/마감, arrange면 실험/확정 …).
+function getTrackGroupProgress(trackNumber, stageId = getTrackStage(trackNumber)) {
   const checklist = getTrackChecklist(trackNumber);
-  const sessionSteps = defaultTrackSteps.filter((step) => step.group === "세션");
-  const closingSteps = defaultTrackSteps.filter((step) => step.group === "마감");
-  const sessionCompleted = sessionSteps.filter((step) => checklist[step.id]).length;
-  const closingCompleted = closingSteps.filter((step) => checklist[step.id]).length;
-  return {
-    sessionCompleted,
-    sessionTotal: sessionSteps.length,
-    closingCompleted,
-    closingTotal: closingSteps.length,
-  };
+  const steps = getStageSteps(stageId);
+  return getStageGroups(stageId)
+    .map((group) => {
+      const groupSteps = steps.filter((step) => step.group === group.id);
+      return {
+        id: group.id,
+        label: group.label,
+        completed: groupSteps.filter((step) => checklist[step.id]).length,
+        total: groupSteps.length,
+      };
+    })
+    .filter((group) => group.total > 0);
 }
 
 function getTrackNextStep(trackNumber) {
+  const stageId = getTrackStage(trackNumber);
+  if (stageId === "done") return "전 단계 완료";
   const checklist = getTrackChecklist(trackNumber);
-  return defaultTrackSteps.find((step) => !checklist[step.id])?.label || "데모 완료 처리";
+  const nextStep = getStageSteps(stageId).find((step) => !checklist[step.id]);
+  if (nextStep) return nextStep.label;
+  return stageId === "demo" ? "데모 완료 처리" : "다음 단계로 이동";
 }
 
+// kind: waiting | active | review | ready | complete — 요약 집계는 라벨 문자열이
+// 아니라 kind로 한다(단계별로 라벨이 달라지므로).
 function getTrackStatus(trackNumber, eventId) {
-  if (state.completed.has(eventId)) return { label: "완료", className: "is-complete" };
-  const { completed, total } = getTrackChecklistProgress(trackNumber);
-  const { sessionCompleted, sessionTotal, closingCompleted } = getTrackStageProgress(trackNumber);
-  if (completed === 0) return { label: "대기", className: "" };
-  if (completed === total) return { label: "데모 완료 체크", className: "is-ready" };
-  if (sessionCompleted > 0 && sessionCompleted < sessionTotal) return { label: "세션 중", className: "is-active" };
-  if (sessionCompleted === sessionTotal && closingCompleted < total - sessionTotal) {
-    return { label: "정리 중", className: "is-review" };
+  const stageId = getTrackStage(trackNumber);
+  const stage = trackStageMap.get(stageId);
+  if (stageId === "done") return { label: "완료", className: "is-complete", kind: "complete" };
+  // 데모 단계에서는 기존 의미(데모 이벤트 완료 = 곡 완료)를 유지한다.
+  if (stageId === "demo" && state.completed.has(eventId)) {
+    return { label: "완료", className: "is-complete", kind: "complete" };
   }
-  return { label: "진행", className: "is-active" };
+  const { completed, total } = getTrackChecklistProgress(trackNumber, stageId);
+  const groups = getTrackGroupProgress(trackNumber, stageId);
+  const isDemo = stageId === "demo";
+  if (completed === 0) {
+    return { label: isDemo ? "대기" : `${stage.label} 대기`, className: "", kind: "waiting" };
+  }
+  if (completed === total) {
+    return {
+      label: isDemo ? "데모 완료 체크" : `${stage.label} 마무리`,
+      className: "is-ready",
+      kind: "ready",
+    };
+  }
+  const first = groups[0];
+  if (first && first.completed > 0 && first.completed < first.total) {
+    return { label: isDemo ? "세션 중" : `${stage.label} 중`, className: "is-active", kind: "active" };
+  }
+  if (first && first.completed === first.total && completed < total) {
+    return { label: isDemo ? "정리 중" : `${stage.label} 정리`, className: "is-review", kind: "review" };
+  }
+  return { label: "진행", className: "is-active", kind: "active" };
 }
 
 function getOpportunityReview(opportunityId) {
@@ -3308,17 +3506,18 @@ function renderTrackSummaryBoard() {
 
   const statuses = state.tracks.map((track) => ({ track, status: getTrackStatus(track.number, track.eventId) }));
   const currentFocus =
-    statuses.find(({ status }) => status.className === "is-active" || status.className === "is-review")?.track ||
-    state.tracks.find((track) => !state.completed.has(track.eventId)) ||
+    statuses.find(({ status }) => status.kind === "active" || status.kind === "review")?.track ||
+    statuses.find(({ status }) => status.kind !== "complete")?.track ||
     state.tracks[0];
   const currentEvent = currentFocus ? findEvent(currentFocus.eventId) : null;
   const currentStatus = currentFocus ? getTrackStatus(currentFocus.number, currentFocus.eventId) : null;
 
+  // 단계별로 라벨이 달라지므로 문자열이 아니라 kind로 집계한다.
   const summaryItems = [
-    { label: "대기", count: statuses.filter(({ status }) => status.label === "대기").length },
-    { label: "세션/정리 중", count: statuses.filter(({ status }) => ["세션 중", "정리 중", "진행"].includes(status.label)).length },
-    { label: "완료 체크 필요", count: statuses.filter(({ status }) => status.label === "데모 완료 체크").length },
-    { label: "완료", count: statuses.filter(({ status }) => status.label === "완료").length },
+    { label: "대기", count: statuses.filter(({ status }) => status.kind === "waiting").length },
+    { label: "세션/정리 중", count: statuses.filter(({ status }) => status.kind === "active" || status.kind === "review").length },
+    { label: "완료 체크 필요", count: statuses.filter(({ status }) => status.kind === "ready").length },
+    { label: "완료", count: statuses.filter(({ status }) => status.kind === "complete").length },
   ];
 
   container.innerHTML = `
@@ -3353,11 +3552,13 @@ function getActiveTrack() {
   if (explicit) return explicit;
   const statuses = state.tracks.map((track) => ({ track, status: getTrackStatus(track.number, track.eventId) }));
   const inProgress = statuses.find(
-    ({ status }) => status.className === "is-active" || status.className === "is-review"
+    ({ status }) => status.kind === "active" || status.kind === "review"
   );
   if (inProgress) return inProgress.track;
-  const incomplete = state.tracks.find((track) => !state.completed.has(track.eventId));
-  return incomplete || state.tracks[0] || null;
+  // 완료(kind complete)가 아닌 첫 곡. 단계 칩으로 done 처리한 곡(state.completed에
+  // 없어도 kind complete)이 "미완료"로 잡혀 계속 포커스되는 것을 막는다.
+  const incomplete = statuses.find(({ status }) => status.kind !== "complete");
+  return incomplete?.track || state.tracks[0] || null;
 }
 
 function getFilteredTracks() {
@@ -3405,17 +3606,25 @@ function focusTrackByName(name) {
 
 function renderTrackDetailCard(track) {
   const checklist = getTrackChecklist(track.number);
-  const progress = getTrackChecklistProgress(track.number);
-  const stage = getTrackStageProgress(track.number);
+  const stageId = getTrackStage(track.number);
+  const progress = getTrackChecklistProgress(track.number, stageId);
+  const groupProgress = getTrackGroupProgress(track.number, stageId);
   const event = findEvent(track.eventId);
   const notes = getTrackNotes(track.number);
   const status = getTrackStatus(track.number, track.eventId);
-  const groupedSteps = trackStepGroups
+  const groupedSteps = getStageGroups(stageId)
     .map((group) => ({
       ...group,
-      steps: defaultTrackSteps.filter((step) => step.group === group.id),
+      steps: getStageSteps(stageId).filter((step) => step.group === group.id),
     }))
     .filter((group) => group.steps.length > 0);
+
+  const stageNav = trackStages
+    .map((stage) => {
+      const isCurrent = stage.id === stageId;
+      return `<button class="track-stage-chip${isCurrent ? " is-active" : ""}" type="button" aria-pressed="${isCurrent}"${isCurrent ? ' aria-current="step"' : ""} data-track-stage="${stage.id}" data-track-number="${escapeHtml(track.number)}">${stage.label}</button>`;
+    })
+    .join("");
 
   return `
         <article class="track-detail-card" id="track-card-${escapeHtml(track.number)}">
@@ -3425,17 +3634,23 @@ function renderTrackDetailCard(track) {
               <p>${escapeHtml(event?.detail) || "이번 곡의 데모 준비를 진행합니다."}</p>
               <div class="focus-meta">
                 <span class="meta-pill">데모 마감 ${formatShortDate(track.due)}</span>
-                <span class="meta-pill">세션 ${stage.sessionCompleted}/${stage.sessionTotal}</span>
-                <span class="meta-pill">마감 ${stage.closingCompleted}/${stage.closingTotal}</span>
+                ${groupProgress
+                  .map((group) => `<span class="meta-pill">${escapeHtml(group.id)} ${group.completed}/${group.total}</span>`)
+                  .join("")}
                 <span class="meta-pill">다음 단계 ${getTrackNextStep(track.number)}</span>
               </div>
             </div>
             <div class="track-card-meta">
               <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
-              <span class="card-chip">${progress.completed}/${progress.total} 체크</span>
+              ${progress.total > 0 ? `<span class="card-chip">${progress.completed}/${progress.total} 체크</span>` : ""}
             </div>
           </div>
-          <div class="track-action-row">
+          <div class="track-stage-nav" role="group" aria-label="${escapeHtml(track.title)} 제작 단계">
+            ${stageNav}
+          </div>
+          ${
+            stageId === "demo"
+              ? `<div class="track-action-row">
             <button class="opportunity-action is-primary" type="button" data-track-action="focus" data-track-event-id="${escapeHtml(track.eventId)}">
               오늘 보드에 올리기
             </button>
@@ -3450,8 +3665,15 @@ function renderTrackDetailCard(track) {
                 ? `<button class="opportunity-action opportunity-edit-button" type="button" data-track-edit="${escapeHtml(track.number)}">관리자: 곡 편집</button>`
                 : ""
             }
-          </div>
-          <div class="track-checklist" data-track-number="${escapeHtml(track.number)}">
+          </div>`
+              : canUseAdminMode()
+                ? `<div class="track-action-row"><button class="opportunity-action opportunity-edit-button" type="button" data-track-edit="${escapeHtml(track.number)}">관리자: 곡 편집</button></div>`
+                : ""
+          }
+          ${
+            stageId === "done"
+              ? `<p class="empty-copy">이 곡의 제작 단계가 모두 끝났습니다. 되돌리려면 위 단계 칩을 누르세요.</p>`
+              : `<div class="track-checklist" data-track-number="${escapeHtml(track.number)}">
             ${groupedSteps
               .map(
                 (group) => `
@@ -3478,7 +3700,8 @@ function renderTrackDetailCard(track) {
                 `
               )
               .join("")}
-          </div>
+          </div>`
+          }
           <div class="track-note-grid">
             ${renderTrackChoiceGroup(track.number, "completedThisWeek", "이번 주에 한 것", notes.completedThisWeek)}
             ${renderTrackChoiceGroup(track.number, "arrangementIdeas", "얹어볼 악기 / 편곡 방향", notes.arrangementIdeas)}
@@ -3528,7 +3751,7 @@ function renderTracks() {
           <td data-label="데모 마감">${formatShortDate(track.due)}</td>
           <td data-label="상태">
             <span class="status-pill${status.className ? ` ${status.className}` : ""}">${status.label}</span>
-            <span class="table-progress-copy">${progress.completed}/${progress.total}</span>
+            ${progress.total > 0 ? `<span class="table-progress-copy">${progress.completed}/${progress.total}</span>` : ""}
           </td>
           <td data-label="문서">
             <div class="document-links">
@@ -3547,7 +3770,7 @@ function renderTracks() {
     chipNav.innerHTML = state.tracks
       .map((track) => {
         const isActive = track.number === activeNumber;
-        const isDone = state.completed.has(track.eventId);
+        const isDone = getTrackStatus(track.number, track.eventId).kind === "complete";
         return `<button class="track-chip${isActive ? " is-active" : ""}${isDone ? " is-done" : ""}" type="button" role="tab" aria-selected="${isActive}" data-track-chip="${escapeHtml(track.number)}">${escapeHtml(track.number)} · ${escapeHtml(track.title)}</button>`;
       })
       .join("");
@@ -3588,7 +3811,7 @@ function bindTrackDetailControls() {
     container.querySelectorAll("input").forEach((input) => {
       input.addEventListener("change", () => {
         if (!state.trackChecklist[trackNumber]) {
-          state.trackChecklist[trackNumber] = Object.fromEntries(defaultTrackSteps.map((step) => [step.id, false]));
+          state.trackChecklist[trackNumber] = Object.fromEntries(allTrackSteps.map((step) => [step.id, false]));
         }
         state.trackChecklist[trackNumber][input.dataset.stepId] = input.checked;
         const step = findTrackStep(input.dataset.stepId);
@@ -3611,6 +3834,12 @@ function bindTrackDetailControls() {
       if (action === "focus") acceptEventForThisWeek(eventId);
       if (action === "hold") holdEvent(eventId);
       if (action === "complete") toggleCompleted(eventId, !state.completed.has(eventId));
+    });
+  });
+
+  document.querySelectorAll("[data-track-stage]").forEach((button) => {
+    button.addEventListener("click", () => {
+      setTrackStage(button.dataset.trackNumber, button.dataset.trackStage);
     });
   });
 

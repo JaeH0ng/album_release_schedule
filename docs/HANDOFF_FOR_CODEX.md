@@ -17,6 +17,55 @@
 
 ## 변경 로그
 
+### 2026-07-06 (Codex 리뷰 반영) — done/단계 이동 완료 동기화로 split-brain 해소 (브랜치 feature/pipeline-stage-model)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+Codex 리뷰(feature/pipeline-stage-model)의 Major 1건 반영. 곡을 단계 칩으로 데모 이후 단계(특히 `done`)로 옮기면 곡 표/요약은 완료로 보이는데, 오늘 보드·후보·달력은 `state.completed.has(event.id)`만 봐서 같은 데모 이벤트를 계속 미완료 작업으로 띄우던 split-brain. 상세·처리는 `REVIEW_FROM_CODEX.md` 2026-07-06 블록(`[resolved]`).
+
+- **완료 동기화**: `setTrackStage`가 목적 단계 ≠ `demo`이고 아직 미완료면 기존 `toggleCompleted(track.eventId, true)` 재사용 → `state.completed`·`completedMeta`·`user_event_plans` 동기화·전체 리렌더를 한 경로로. 새 event id 안 만들고 기존 `track.eventId` 사용(기록 보존 원칙 유지).
+- **범위**: `done`만이 아니라 데모를 벗어나는 모든 전환(arrange/record/mix/done)에 적용 — "믹스 중인 곡의 데모 녹음"이 오늘 보드에 뜨는 것도 같은 버그라서.
+- **되돌림 정책**: →demo 복귀 시 완료 기록을 임의 삭제하지 않음(원격 동기화됐을 수 있음). 데모 단계의 "완료 해제" 버튼으로 사용자가 직접 해제(비파괴).
+
+**바꾼 파일**
+- `app.js`(`setTrackStage` 완료 동기화 분기), `docs/REVIEW_FROM_CODEX.md`(Major resolved 처리 기록).
+
+**커밋·배포 여부**
+- 브랜치 `feature/pipeline-stage-model` 후속. 아직 커밋 전(working tree), main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. 편곡/녹음/믹스/done 이동 시 데모 이벤트 완료가 오늘 보드·달력·요약·표에 일관 반영, 손대지 않은 demo 단계 곡은 미완료 유지(제로 회귀) 하네스로 확인.
+
+### 2026-07-06 — 곡별 제작 파이프라인 "단계" 모델 도입 (Phase 1, 브랜치 feature/pipeline-stage-model)
+
+**작업자:** Claude (Claude Code, Windows `C:\workSpace\album_release`)
+
+**무엇을 / 왜**
+사용자 요청: "대략적인 마감(데모/편곡/본녹음/최종)은 이해하지만 그 내부 단계에 참여가 애매하다." 원인은 곡별 세부 단계가 사실상 **데모에만** 존재하고(편곡·녹음·믹스는 곡 이름 없는 배치 이벤트), 곡별 체크리스트가 단계와 무관하게 항상 데모용 10개로 고정돼 있었기 때문. 개편 방향은 작업 단위를 **(곡 × 단계)**로 통일하는 것. 3단계 계획 중 **Phase 1(모델·데이터)**만 이번에 반영. 전체 계획은 `docs/PIPELINE_REDESIGN_PLAN.md` 참조. 화면 개편(파이프라인 격자 보드)은 Phase 2 예정.
+
+핵심 안전 원칙: **모든 확장은 덧붙이기(additive).** 기존 데모 step id 10개(tune,key,bpm,take,comfort,structure,arrangement,idea,memo,next)와 event id를 재발급하지 않아 localStorage·Supabase `user_event_plans`의 개인 기록이 고아가 되지 않는다. 전 곡이 기본값(demo)일 때 화면·동작은 개편 전과 동일(제로 회귀), 단계 칩 UI만 추가.
+
+- **단계 모델**: `trackStages`(demo/arrange/record/mix/done) + `trackStepsByStage`(단계별 체크리스트). demo는 기존 10개 그대로 이동. arrange/record/mix에 통기타+보컬 솔로 앨범 기준 항목 신설, done은 터미널(체크리스트 없음).
+- **곡별 현재 단계**: `TRACK_STAGE_KEY`("album-release-track-stage-v1") localStorage 신설(개인 상태, 체크리스트와 동일 정책, 기본 demo, 미지값은 demo 폴백). `getTrackStage`/`setTrackStage`.
+- **진행·상태 재계산**: `getTrackChecklistProgress`/`getTrackGroupProgress`/`getTrackNextStep`/`getTrackStatus`를 현재 단계 기준으로. 요약 집계는 라벨 문자열 대신 `kind`(waiting/active/review/ready/complete).
+- **곡 상세 카드**: 단계 칩(`track-stage-nav`, `role="group"`+`aria-pressed`), 현재 단계 체크리스트만 렌더, demo가 아니면 데모용 액션 버튼 숨김, done 안내 문구.
+- **팔로우업 phase**: `buildTrackFollowupEvents`가 step 소속 단계의 phase(demo/arrangement/recording/post)를 따라 달력 색 반영.
+- **보존 강화**: `loadTrackNotesState`/`loadTrackActivityState`가 defaultTracks 밖 곡(Supabase 추가곡)의 저장 노트·활동도 보존(체크리스트·단계 로더와 일관). sanitize 헬퍼 분리.
+
+**자가 리뷰(5차원 멀티에이전트) 반영**
+정확성·기록보존·XSS·회귀·규칙 5축 리뷰 후 적대적 검증 → 확정 4건(전부 minor) 모두 수정:
+1. done 단계 곡의 표 진행률 "0/0" 표시 → `progress.total > 0` 가드.
+2. done 곡이 포커스 폴백에서 "미완료"로 잡히는 문제 → `getActiveTrack`/`renderTrackSummaryBoard` 폴백을 `status.kind !== "complete"` 기준으로. 곡 칩 is-done도 kind 기준.
+3. Supabase 추가곡 노트·활동 로더 프루닝 → 보존 루프 추가(위 "보존 강화").
+4. 새 `track-stage-nav`의 role=tablist/tab 오용(대응 tabpanel·키보드 계약 없음) → `role="group"`+`aria-pressed`. (기존 `track-chip-nav`의 동일 부채는 스코프 밖 → 후속 작업으로 분리)
+
+**바꾼 파일**
+- `app.js`(단계 모델·상태·진행/상태 함수·상세 카드 렌더·팔로우업 phase·보존 로더), `styles.css`(`.track-stage-nav`/`.track-stage-chip`), `docs/PIPELINE_REDESIGN_PLAN.md`(신규 계획 문서).
+- `schedule-data.js`·Supabase 스키마·시드·고정 마감·service-worker는 **건드리지 않음**.
+
+**커밋·배포 여부**
+- 브랜치 `feature/pipeline-stage-model`. **아직 커밋 전(working tree)**, main 병합·push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건. 기본(전 곡 demo) 화면 개편 전과 동일(11행·0/10·대기 11) 확인. 단계 전환·체크·새로고침 유지·팔로우업 생성·done 카드 렌더·Supabase 추가곡 기록 보존 모두 하네스로 확인.
+
 ### 2026-07-04 (6차 재리뷰 반영) — 세션 generation 검사로 재로그인 stale write 차단 (브랜치 feature/active-planning)
 
 **작업자:** Claude (Claude Code, Windows)
