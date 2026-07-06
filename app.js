@@ -900,6 +900,19 @@ function buildDefaultTrackChecklist() {
   );
 }
 
+// defaultTracks 밖 곡(예: Supabase에서 추가된 12번)의 저장 항목을 merged에 보존한다.
+// base(기본곡)에 없는 trackNumber만 대상. sanitize는 유효하면 정제값을, 무효면 null을
+// 반환한다. base 키만 순회하는 로더는 이런 곡 기록을 새로고침마다 잃으므로, 세 개인상태
+// 로더(체크리스트·노트·활동)가 이 헬퍼로 보존 정책을 한 곳에 모은다.
+function preserveExtraTrackKeys(merged, stored, sanitize) {
+  for (const [trackNumber, value] of Object.entries(stored)) {
+    if (merged[trackNumber]) continue;
+    const cleaned = sanitize(value);
+    if (cleaned !== null) merged[trackNumber] = cleaned;
+  }
+  return merged;
+}
+
 function loadTrackChecklistState() {
   const base = buildDefaultTrackChecklist();
   try {
@@ -915,14 +928,9 @@ function loadTrackChecklistState() {
         },
       ])
     );
-    // defaultTracks에 없는 곡(예: Supabase에서 추가된 12번)의 체크 기록도 보존한다.
-    // base 키만 순회하면 저장돼 있던 이런 곡의 체크가 새로고침마다 사라진다.
-    for (const [trackNumber, checks] of Object.entries(stored)) {
-      if (!merged[trackNumber] && checks && typeof checks === "object") {
-        merged[trackNumber] = { ...checks };
-      }
-    }
-    return merged;
+    return preserveExtraTrackKeys(merged, stored, (checks) =>
+      checks && typeof checks === "object" ? { ...checks } : null
+    );
   } catch {
     return base;
   }
@@ -998,14 +1006,9 @@ function loadTrackNotesState() {
         },
       ])
     );
-    // defaultTracks 밖 곡(Supabase 추가곡)의 저장 노트도 보존한다 — 체크리스트·단계
-    // 로더와 동일 정책. 이게 없으면 단계 이동 등으로 남긴 기록이 새로고침에 사라진다.
-    for (const [trackNumber, note] of Object.entries(stored)) {
-      if (!merged[trackNumber] && note && typeof note === "object") {
-        merged[trackNumber] = sanitizeTrackNote(note);
-      }
-    }
-    return merged;
+    return preserveExtraTrackKeys(merged, stored, (note) =>
+      note && typeof note === "object" ? sanitizeTrackNote(note) : null
+    );
   } catch {
     return base;
   }
@@ -1045,13 +1048,9 @@ function loadTrackActivityState() {
         Array.isArray(stored[trackNumber]) ? sanitizeTrackActivity(stored[trackNumber]) : defaults,
       ])
     );
-    // defaultTracks 밖 곡(Supabase 추가곡)의 활동 로그도 보존한다 — 노트 로더와 동일.
-    for (const [trackNumber, entries] of Object.entries(stored)) {
-      if (!merged[trackNumber] && Array.isArray(entries)) {
-        merged[trackNumber] = sanitizeTrackActivity(entries);
-      }
-    }
-    return merged;
+    return preserveExtraTrackKeys(merged, stored, (entries) =>
+      Array.isArray(entries) ? sanitizeTrackActivity(entries) : null
+    );
   } catch {
     return base;
   }
@@ -3612,10 +3611,11 @@ function renderTrackDetailCard(track) {
   const event = findEvent(track.eventId);
   const notes = getTrackNotes(track.number);
   const status = getTrackStatus(track.number, track.eventId);
+  const stageSteps = getStageSteps(stageId);
   const groupedSteps = getStageGroups(stageId)
     .map((group) => ({
       ...group,
-      steps: getStageSteps(stageId).filter((step) => step.group === group.id),
+      steps: stageSteps.filter((step) => step.group === group.id),
     }))
     .filter((group) => group.steps.length > 0);
 

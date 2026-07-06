@@ -17,6 +17,25 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 로더 중복 제거 + getStageSteps 호이스팅 (클린업, 브랜치 feature/completion-single-source)
+
+**작업자:** Claude (Claude Code, Windows)
+
+**무엇을 / 왜**
+`/code-review`(Codex 사용량 소진 대체)에서 확정된 클린업 2건만 반영한 안전한 정리 커밋.
+
+- **로더 중복 제거**: `loadTrackChecklistState`/`loadTrackNotesState`/`loadTrackActivityState`가 각자 복붙하던 'Supabase 추가곡(defaultTracks 밖) 보존' 루프를 `preserveExtraTrackKeys(merged, stored, sanitize)` 헬퍼로 통합. sanitize는 유효 시 정제값·무효 시 null 반환. 동작 보존(12번 곡 체크·노트·활동이 저장 사이클 후 보존됨 하네스 확인).
+- **호이스팅**: `renderTrackDetailCard`에서 `getStageSteps(stageId)`를 group.map 밖으로 1회 호출.
+
+**시도했다 되돌린 것(중요):** 코드리뷰 확정 cross-view split-brain(done 곡의 데모 이벤트를 완료 해제/desync 시 보드는 완료, 대시보드는 할 일)을 `isEventDone` 단일 판정으로 근본 수정하려 했으나, **적대적 재리뷰(멀티에이전트)에서 major 2건 발견**: (1) 달력 체크박스가 isEventDone로 표시되는데 토글은 state.completed에 써서 유령 토글(해제 불가), (2) 다이얼로그/상세 완료 버튼 라벨이 표시상태와 반대. 원래 엣지(드묾)를 고치려다 더 나쁜 상호작용 버그를 만들어 **isEventDone 파생을 전량 revert**했다. 근본 해결은 **stage(현재 localStorage 전용)를 Supabase에 동기화**하고 완료 토글 의미를 재설계해야 하는 Phase 3 인프라 작업이다. split-brain은 Phase 3 추적 항목으로 유지(작업 칩).
+
+**바꾼 파일**
+- `app.js`(로더 3개 + `preserveExtraTrackKeys` 헬퍼, `renderTrackDetailCard` 호이스팅). +24/-24. schedule-data.js·기타 불변.
+
+**커밋·배포 여부**
+- 브랜치 `feature/completion-single-source`. 아직 커밋 전(working tree), main 병합 예정, push·gh-pages·`supabase:sync` 미실행.
+- 검증: `node --check` 3파일·`npm run build` 통과, 미리보기 콘솔 0건, 로더 동작 보존·상세카드 렌더 정상.
+
 ### 2026-07-06 — 곡별 제작 파이프라인 격자 보드 (Phase 2, 브랜치 feature/pipeline-board)
 
 **작업자:** Claude (Claude Code, Windows)
