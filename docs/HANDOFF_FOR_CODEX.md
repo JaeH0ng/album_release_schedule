@@ -17,6 +17,27 @@
 
 ## 변경 로그
 
+### 2026-07-08 — UI 정제: 타이포 계층·가독성 + overview 중복 제거 + 태블릿 폭 가로 오버플로우 수정 (브랜치 feature/ui-refinement)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 요청("UI에서 더 수정할 수 있는 것")으로 시각/UX 정제만 진행(로직·데이터·정책 무변경).
+
+**무엇을** (모두 순수 UI, 데이터/RLS/시드/서비스워커 무관)
+- **⑧ 태블릿 폭 가로 스크롤 버그 수정(가장 실질적):** `760~1060px` 구간에서 `.app-shell`이 단일 열(`1fr`)이 될 때, grid 아이템 `.phase-sidebar`의 `min-width:auto`(=min-content) 때문에 안쪽 단계 필터 칩 줄(`.phase-filters`, 칩 9개 `max-content`)이 트랙을 뷰포트보다 넓게(≈1110px) 밀어 페이지 전체가 가로로 넘쳤다(768px에서 overflow +373px). `@media (max-width:1060px)`에 `.phase-sidebar, .content-panel { min-width: 0 }` 추가 → 아이템이 줄고 `.phase-filters`의 기존 `overflow-x:auto`가 칩 스크롤을 담당. 검증: 768/900/1280px 모두 overflow ≤0, 필터 칩은 자체 영역 내 스크롤. **원본에서도 재현됨을 stash로 확인(내 다른 변경과 무관한 기존 버그).**
+- **④ 제목 계층:** `.panel-heading h2`가 카드 `h3`(18px)와 사실상 동일(데스크톱 19px/모바일 18px)해 섹션 제목이 안 도드라지던 문제 → 데스크톱 22px(+`letter-spacing:-0.01em`)·모바일 20px로 상향. h3는 그대로.
+- **⑤ 보조 텍스트 가독성:** `.section-kicker`·`.sync-detail`·`footer` 11px → 12px. `--muted` `#65706a`→`#5a645e`(캔버스 대비 4.73→5.64, AA 여유 확보). muted는 변수라 전역 적용.
+- **⑥ 아이콘 버튼 툴팁 일관성:** 히어로·대시보드 카드의 `⋯`(menu) 버튼에 `title="상세·다른 처리"` 추가(기존 `↓`엔 title 있고 `⋯`엔 없던 불일치 해소). `aria-label`은 원래 있었음.
+- **⑦ overview 중복 렌더 제거:** "오늘 한눈에 보기 → 이번 확인 포인트" 카드에서 `bullets[0]`이 detail 문단과 목록 첫 항목으로 **두 번** 나오던 것 수정 — `detailList: …bullets.slice(1)`로 목록은 나머지 bullet만. (bullet 텍스트 내 "닫기"는 트랙 체크포인트 **데이터**라 손대지 않음 — 가사/표현 보존 원칙.)
+
+**손대지 않은/보류(사용자 결정 필요)**
+- **다크 모드:** 애초 "변수만 덮으면 됨"으로 봤으나 확인 결과 `#fff`·근백색 배경·rgba가 40+ 곳 하드코딩되어 **큰 리팩터**. 별도 전용 PR 권장(이번엔 미포함).
+- **헤더 "다음 마감" ↔ 히어로 "오늘의 다음 액션" 중복:** [app.js](../app.js) `renderSummary()` 주석상 헤더값은 이미 "행동할 다음 항목"으로 **의도된 것**(마일스톤이 아니라 다음 액션). 라벨/역할 재정의는 제품 카피 결정이라 독단 변경 안 함 — 사용자 확정 후 진행 예정.
+
+**검증:** `node --check app.js/schedule-data.js/service-worker.js` 통과, `npm run build` 성공(dist 재생성). 브라우저 미리보기 콘솔 오류 0(375/768/900/1280px). 반응형: 모바일 overflow 0, 761~1060 overflow 해소, 1280 정상. **아직 main·gh-pages 미반영, push 안 함**(브랜치 feature/ui-refinement에만 존재).
+
+**대역 리뷰(Codex 토큰 소진 → 멀티에이전트 적대적 리뷰):** Opus 4개 차원(JS정확성/CSS회귀/프로젝트규칙/완결성) 병렬 리뷰 → 지적별 반증 2인(REPRODUCE·SCOPE 렌즈) → 누락 비평. 총 15에이전트. 5지적 중 **3생존·2기각**, 누락 0.
+- 생존→**반영 완료**: (1) *minor* `renderDashboardTaskCard` 순서변경 ↑/↓ 버튼이 title 없이 aria-label만 있어, 이번에 세운 "아이콘 버튼=title" 원칙이 같은 카드에서 반쪽만 적용됨 → ↑ `title="위로"`, ↓ `title="아래로"` 추가([app.js](../app.js) reorder 버튼). (2)(3) *nit* `@media(max-width:1060px)`의 `.content-panel { min-width:0 }`은 base(styles.css:534)에 이미 있어 죽은 중복 — 실효는 `.phase-sidebar`뿐 → 미디어쿼리 셀렉터에서 `.content-panel` 제거, 주석 정리. (제거 후에도 900/768px overflow 해소 유지 재검증.)
+- 기각(반증 근거 타당): (a) h2 22px가 760~1060 캘린더 헤딩을 압박 → space-between이 수백 px slack 보유, +21px는 무시 가능(재현 실패). (b) 11→12px가 마이크로 텍스트 스케일을 11/12 혼재화 → 사실이나 해당 라벨들이 서로 다른 뷰에 흩어져 인접 렌더 없음, 사용자 영향 0(지적 자체가 off-ramp 제공). XSS·단일소스·RLS·PWA·폴백·고정마감 등 절대규칙 위반 0.
+
 ### 2026-07-08 — 라이브 배포 + Supabase 마이그레이션 적용 (gh-pages 배포, DB push)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 지시로 라이브 배포.
