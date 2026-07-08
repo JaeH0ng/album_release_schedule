@@ -3639,8 +3639,10 @@ function renderSummary() {
     progressLine.title = `전체 진행률 ${progress}%`;
   }
 
+  // 헤더의 "다음 마감"은 실제로 행동할 다음 항목이라 배치/수용량 레일은 제외한다(레일은 달력
+  // 컨텍스트일 뿐). 단, 위 진행률(%)은 레일도 앨범 이벤트로 포함해 그대로 둔다.
   const incomplete = albumEvents
-    .filter((event) => !state.completed.has(event.id))
+    .filter((event) => !state.completed.has(event.id) && !isRailEvent(event))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const overdue = incomplete.filter((event) => parseDate(event.date) < today);
   const next =
