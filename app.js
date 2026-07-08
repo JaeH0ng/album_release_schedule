@@ -3438,7 +3438,7 @@ function renderCalendar() {
     .filter((event) => parseDate(event.date) <= weekEnd && parseDate(event.end || event.date) >= weekStart)
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const nextUpcoming = filteredEvents
-    .filter((event) => parseDate(event.date) > weekEnd && !state.completed.has(event.id))
+    .filter((event) => parseDate(event.date) > weekEnd && !state.completed.has(event.id) && !isRailEvent(event))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date))[0];
   const weekStripMarkup = `
     <section class="week-strip" aria-label="이번 주 일정">
@@ -3645,8 +3645,12 @@ function renderSummary() {
     .filter((event) => !state.completed.has(event.id) && !isRailEvent(event))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const overdue = incomplete.filter((event) => parseDate(event.date) < today);
+  // 폴백도 레일을 건너뛴다(현재 데이터에선 레일이 마지막 이벤트가 아니지만 데이터 변경에 안전하게).
   const next =
-    overdue[0] || incomplete.find((event) => parseDate(event.date) >= today) || state.events.at(-1);
+    overdue[0] ||
+    incomplete.find((event) => parseDate(event.date) >= today) ||
+    state.events.filter((event) => !isRailEvent(event)).at(-1) ||
+    state.events.at(-1);
   document.querySelector("#next-deadline").textContent = next.title;
   document.querySelector("#next-deadline-date").textContent =
     parseDate(next.date) < today ? `${formatShortDate(next.date)} · 지연` : formatShortDate(next.date);
