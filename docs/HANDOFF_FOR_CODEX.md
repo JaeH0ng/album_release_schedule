@@ -17,6 +17,25 @@
 
 ## 변경 로그
 
+### 2026-07-06 — Phase 3 홀리스틱 통합 리뷰(Sonnet) 반영: 레일 누출 2건 수정 + 기기 간 정합성 한계 문서화 (브랜치 feature/phase3-holistic-fixes)
+
+**작업자:** Claude (Claude Code, Windows). push 전 Phase 3 전체(3a×3b×3c) 통합 검토.
+
+**리뷰**: 구현(Opus)과 **다른 모델(Sonnet)**로 6차원 phase-간 상호작용 적대적 리뷰(base 27a099f..main). 6후보 생존, critical 0.
+
+**수정(반영)**
+- **레일 누출 2건**(이전 renderSummary 수정과 같은 계열): (1) 달력 주간 스트립 빈 상태 "다음 일정" 폴백(`renderCalendar`)이 레일 미필터 → `!isRailEvent` 추가. (2) `renderSummary`의 "다음 마감" 최종 폴백 `state.events.at(-1)`이 레일 미필터(현재 데이터에선 레일이 마지막이 아니라 안전하나 비강제) → 비레일 마지막 이벤트로 폴백하도록 강제.
+
+**문서화(미수정, 근본 개선은 후속 권장)**
+- **기기 간 stage↔완료 미러 정합성(major 1 + minor 2)**: 곡의 단계(user_track_stages)와 완료 미러(user_event_plans)는 **별도 테이블·별도 write**라 한 논리적 전환이 원자적이지 않다. 곡을 뒤로(예: mix→demo) 옮기면 두 write(stage DELETE + is_completed=false)가 독립 발화하고, 다른 기기의 45초 폴링이 그 사이(stage는 반영·완료는 미반영)에 읽으면 일시적으로 stage=demo인데 completed=true로 보여 그 데모 작업이 목록에서 숨는다(≤45초, 다음 폴링에 수렴). `applyRemoteTrackStages`/`applyRemoteEventPlans`가 서로의 미러를 재조정하지 않음. **왜 지금 안 고쳤나**: 안전한 재조정(completed:=stage!=='demo')이 **레거시 demo+completed(구 곡완료) 표시를 지워버려** 3b가 의도적으로 보존한 동작과 충돌하고, 로드 시 재조정은 폐기한 promote 접근의 위험 계열이다. **근본 개선안(후속)**: 단계+완료를 한 테이블/RPC로 원자화하거나, 곡 데모 이벤트의 완료를 모든 리더가 stage에서 파생(대규모). 현재는 전이 상태(자가 수렴)라 push 차단 사유는 아님.
+- **관리자 event_id=레일 id 충돌(minor, #3)**: 관리자가 곡의 event_id를 레일 이벤트 id로 잘못 지정하면 그 이벤트가 is-rail + 곡 잠금 둘 다로 렌더. 관리자 오입력 한정·표시상 혼란뿐 — 별도 가드 미도입.
+
+**한계**: Sonnet도 Claude 계열 — Codex 독립성엔 못 미침. push/릴리스 전 Codex 최종 패스 권장.
+
+**검증**: `node --check`·`build` 통과, 콘솔 0(스테일 400 제외, 현재 fetch 200), 전 비레일 완료 시 다음마감 비레일 폴백 유지 확인.
+
+**커밋·배포**: 브랜치 `feature/phase3-holistic-fixes` → main 병합. push·`supabase:sync` 미실행.
+
 ### 2026-07-06 — 배치 이벤트를 작업 단위에서 빼고 달력 레일로 강등 (Phase 3c 후속, 브랜치 feature/batch-events-to-rails)
 
 **작업자:** Claude (Claude Code, Windows).
