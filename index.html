@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ko" data-build-version="20260629115411">
+<html lang="ko" data-build-version="20260708082040">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -12,10 +12,10 @@
       content="2026년 12월 정규 앨범 발매를 위한 주차별 제작 캘린더"
     />
     <title>앨범 제작 캘린더</title>
-    <link rel="icon" href="assets/icon.svg?v=20260629115411" type="image/svg+xml" />
-    <link rel="manifest" href="manifest.webmanifest?v=20260629115411" />
-    <link rel="apple-touch-icon" href="assets/icon.svg?v=20260629115411" />
-    <link rel="stylesheet" href="styles.css?v=20260629115411" />
+    <link rel="icon" href="assets/icon.svg?v=20260708082040" type="image/svg+xml" />
+    <link rel="manifest" href="manifest.webmanifest?v=20260708082040" />
+    <link rel="apple-touch-icon" href="assets/icon.svg?v=20260708082040" />
+    <link rel="stylesheet" href="styles.css?v=20260708082040" />
   </head>
   <body>
     <a class="skip-link" href="#main-content">일정으로 바로가기</a>
@@ -23,117 +23,82 @@
     <header class="topbar">
       <div class="brand-block" role="button" tabindex="0" data-app-refresh title="새로고침">
         <div class="record-mark" aria-hidden="true"><span></span></div>
-        <div>
-          <p class="eyebrow">ALBUM RELEASE 2026</p>
-          <h1>앨범 제작 캘린더</h1>
+        <div class="brand-copy">
+          <h1>앨범 캘린더</h1>
+          <span id="release-date-display" class="brand-sub">2026.12.04 발매</span>
         </div>
       </div>
 
-      <canvas
-        id="waveform"
-        class="waveform"
-        width="180"
-        height="40"
-        aria-label="앨범 제작 진행 파형"
-        role="button"
-        tabindex="0"
-        data-app-refresh
-        title="새로고침"
-      ></canvas>
-
-      <div class="release-lockup">
+      <div class="header-focus" aria-label="다음 마감">
         <span id="countdown" class="countdown">D-</span>
-        <span id="release-date-display">2026.12.04 발매</span>
+        <span class="header-deadline">
+          다음 마감
+          <strong id="next-deadline">—</strong>
+          <span id="next-deadline-date" class="header-deadline-date"></span>
+        </span>
+      </div>
+
+      <button
+        id="sync-dot"
+        class="sync-dot"
+        type="button"
+        aria-label="동기화 상태와 계정"
+        aria-expanded="false"
+        aria-controls="sync-popover"
+      >
+        <span class="sync-dot-mark" aria-hidden="true"></span>
+      </button>
+
+      <div
+        class="header-progress"
+        role="progressbar"
+        aria-label="전체 일정 완료율"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <span id="progress-fill"></span>
       </div>
     </header>
 
-    <section class="mobile-glance" aria-label="모바일 핵심 요약">
-      <article class="mobile-glance-card">
-        <span class="mobile-glance-label">다음 마감</span>
-        <strong id="mobile-next-deadline">good night 데모</strong>
-        <span id="mobile-next-deadline-date" class="mobile-glance-meta">6월 21일</span>
-      </article>
-      <article class="mobile-glance-card">
-        <span class="mobile-glance-label">유통사 전달</span>
-        <strong id="mobile-delivery-date">11.13</strong>
-        <span id="mobile-auth-summary" class="mobile-glance-meta">로그인 전</span>
-      </article>
-      <div class="mobile-glance-actions">
-        <button id="mobile-utility-toggle" class="sync-button" type="button">상태 펼치기</button>
-        <button class="sync-button" type="button" data-mobile-jump="calendar">달력 보기</button>
-      </div>
-    </section>
-
-    <section class="summary-band" aria-label="제작 현황 요약">
-      <div class="summary-item progress-summary">
-        <div class="summary-label-row">
-          <span>전체 진행률</span>
-          <strong id="progress-percent">0%</strong>
-        </div>
-        <div
-          class="progress-track"
-          role="progressbar"
-          aria-label="전체 일정 완료율"
-          aria-valuemin="0"
-          aria-valuemax="100"
-          aria-valuenow="0"
-        >
-          <span id="progress-fill"></span>
-        </div>
-      </div>
-      <div class="summary-item">
-        <span class="summary-label">현재 단계</span>
-        <strong id="current-phase">판단용 데모</strong>
-      </div>
-      <div class="summary-item next-deadline">
-        <span class="summary-label">다음 마감</span>
-        <strong id="next-deadline">good night 데모</strong>
-        <span id="next-deadline-date">6월 21일</span>
-      </div>
-      <div class="summary-item delivery-date">
-        <span class="summary-label">유통사 전달</span>
-        <strong id="delivery-date-display">2026.11.13</strong>
-      </div>
-    </section>
-
-    <section class="sync-strip" aria-label="데이터 동기화 상태">
-      <div>
+    <div id="sync-popover" class="sync-popover" role="dialog" aria-label="동기화와 계정" hidden>
+      <div class="sync-popover-row">
         <p class="sync-label">게시 일정</p>
         <strong id="sync-status-text">로컬 일정 사용 중</strong>
-      </div>
-      <div class="sync-actions">
         <span id="sync-status-detail" class="sync-detail">Supabase 연동 전</span>
-        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
       </div>
-      <div class="auth-strip">
-        <div>
-          <p class="sync-label">개인 동기화</p>
-          <strong id="auth-status-text">로그인 전</strong>
-          <span id="auth-status-detail" class="sync-detail">Google로 로그인하면 폰과 PC에서 같은 작업 상태를 봅니다</span>
-        </div>
+      <div class="sync-popover-row">
+        <p class="sync-label">개인 동기화</p>
+        <strong id="auth-status-text">로그인 전</strong>
+        <span id="auth-status-detail" class="sync-detail">Google로 로그인하면 폰과 PC에서 같은 작업 상태를 봅니다</span>
+      </div>
+      <div class="sync-popover-actions">
+        <button id="refresh-data" class="sync-button" type="button">새로고침</button>
         <form id="auth-form" class="auth-form">
           <button id="auth-google" class="google-button" type="submit">Google로 로그인</button>
           <button id="auth-signout" class="text-button" type="button" hidden>로그아웃</button>
           <button id="install-app" class="sync-button" type="button" hidden>앱 설치</button>
         </form>
       </div>
-    </section>
+    </div>
 
-    <nav class="view-tabs" aria-label="일정 보기 방식">
-      <button class="tab-button is-active" type="button" data-view="dashboard" aria-selected="true">
+    <div id="sync-error-banner" class="sync-error-banner" role="status" aria-live="polite" hidden></div>
+
+    <nav class="view-tabs" role="tablist" aria-label="일정 보기 방식">
+      <button class="tab-button is-active" type="button" role="tab" data-view="dashboard" aria-controls="dashboard-view" aria-selected="true">
         오늘
       </button>
-      <button class="tab-button" type="button" data-view="opportunities" aria-selected="false">
-        공모전
+      <button class="tab-button" type="button" role="tab" data-view="tracks" aria-controls="tracks-view" aria-selected="false">
+        곡별 진행
       </button>
-      <button class="tab-button" type="button" data-view="calendar" aria-selected="false">
+      <button class="tab-button" type="button" role="tab" data-view="calendar" aria-controls="calendar-view" aria-selected="false">
         달력
       </button>
-      <button class="tab-button desktop-only-tab" type="button" data-view="roadmap" aria-selected="false">
+      <button class="tab-button desktop-only-tab" type="button" role="tab" data-view="roadmap" aria-controls="roadmap-view" aria-selected="false">
         전체 제작 일정
       </button>
-      <button class="tab-button" type="button" data-view="tracks" aria-selected="false">
-        곡 체크
+      <button class="tab-button" type="button" role="tab" data-view="opportunities" aria-controls="opportunities-view" aria-selected="false">
+        공모전
       </button>
     </nav>
 
@@ -172,21 +137,21 @@
       </aside>
 
       <section class="content-panel">
-        <div id="dashboard-view" class="view-panel is-active" aria-labelledby="dashboard-title">
+        <div id="dashboard-view" class="view-panel is-active" role="tabpanel" tabindex="-1" aria-labelledby="dashboard-title">
           <div class="panel-heading dashboard-heading">
             <div>
-              <p class="section-kicker">TODAY BOARD</p>
               <h2 id="dashboard-title">오늘 해야 할 일 보드</h2>
             </div>
             <button id="mobile-focus-toggle" class="sync-button mobile-focus-toggle" type="button">
               집중 보기
             </button>
           </div>
+          <div id="onboarding-hint" class="onboarding-hint" hidden></div>
+          <section id="hero-card" class="hero-card" aria-label="오늘의 다음 액션" hidden></section>
           <div class="dashboard-grid">
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="weekly-focus-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">TOP PRIORITY</p>
                   <h3 id="weekly-focus-title">이번 주 핵심 작업</h3>
                 </div>
                 <span id="weekly-period" class="card-chip">06.18 - 06.21</span>
@@ -197,7 +162,6 @@
             <section class="dashboard-card dashboard-card-wide" aria-labelledby="today-at-a-glance-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">AT A GLANCE</p>
                   <h3 id="today-at-a-glance-title">오늘 한눈에 보기</h3>
                 </div>
               </div>
@@ -207,7 +171,6 @@
             <section class="dashboard-card dashboard-secondary-card" aria-labelledby="fallback-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">FALLBACK</p>
                   <h3 id="fallback-title">30분만 가능할 때</h3>
                 </div>
               </div>
@@ -217,9 +180,9 @@
             <section class="dashboard-card" aria-labelledby="overdue-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">MISSED OR NEXT</p>
                   <h3 id="overdue-title">지난주에서 넘어온 것과 다음 준비</h3>
                 </div>
+                <button id="open-picker-dashboard" class="sync-button" type="button">전체에서 가져오기</button>
               </div>
               <div id="urgency-list" class="urgency-list"></div>
             </section>
@@ -227,7 +190,6 @@
             <section class="dashboard-card dashboard-card-wide dashboard-secondary-card" aria-labelledby="opportunity-dashboard-title">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">SINGER-SONGWRITER CALLS</p>
                   <h3 id="opportunity-dashboard-title">이번 주 확인할 공모전</h3>
                 </div>
                 <span id="opportunity-last-updated" class="card-chip">업데이트 전</span>
@@ -235,50 +197,44 @@
               <div id="dashboard-opportunity-list" class="opportunity-list"></div>
             </section>
 
-            <section class="dashboard-card dashboard-card-wide app-home-card dashboard-secondary-card" aria-labelledby="app-home-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">APP HOME</p>
-                  <h3 id="app-home-title">앱처럼 바로 쓰기</h3>
-                </div>
-              </div>
-              <div id="app-home-panel" class="app-home-panel"></div>
-            </section>
+            <details class="dashboard-retro dashboard-card-wide">
+              <summary class="dashboard-retro-summary">
+                <span class="dashboard-retro-title">보류 · 이번 주 안 함 · 최근 끝낸 것</span>
+              </summary>
+              <div class="dashboard-retro-grid">
+                <section class="dashboard-card" aria-labelledby="hold-title">
+                  <div class="card-heading">
+                    <div>
+                      <h3 id="hold-title">보류 중인 작업</h3>
+                    </div>
+                  </div>
+                  <div id="hold-list" class="urgency-list"></div>
+                </section>
 
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="hold-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">ON HOLD</p>
-                  <h3 id="hold-title">보류 중인 작업</h3>
-                </div>
-              </div>
-              <div id="hold-list" class="urgency-list"></div>
-            </section>
+                <section class="dashboard-card" aria-labelledby="dismissed-title">
+                  <div class="card-heading">
+                    <div>
+                      <h3 id="dismissed-title">이번 주 안 하는 것</h3>
+                    </div>
+                  </div>
+                  <div id="dismissed-list" class="urgency-list"></div>
+                </section>
 
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="dismissed-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">NOT THIS WEEK</p>
-                  <h3 id="dismissed-title">이번 주 안 하는 것</h3>
-                </div>
+                <section class="dashboard-card" aria-labelledby="done-title">
+                  <div class="card-heading">
+                    <div>
+                      <h3 id="done-title">최근 끝낸 것</h3>
+                    </div>
+                  </div>
+                  <ul id="recent-done-list" class="compact-list"></ul>
+                </section>
               </div>
-              <div id="dismissed-list" class="urgency-list"></div>
-            </section>
-
-            <section class="dashboard-card dashboard-secondary-card" aria-labelledby="done-title">
-              <div class="card-heading">
-                <div>
-                  <p class="section-kicker">MOMENTUM</p>
-                  <h3 id="done-title">최근 끝낸 것</h3>
-                </div>
-              </div>
-              <ul id="recent-done-list" class="compact-list"></ul>
-            </section>
+            </details>
 
           </div>
         </div>
 
-        <div id="calendar-view" class="view-panel" aria-labelledby="calendar-title" hidden>
+        <div id="calendar-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="calendar-title" hidden>
           <div class="panel-heading">
             <div>
               <p class="section-kicker">2026.06.15 - 2026.12.06</p>
@@ -289,14 +245,15 @@
               <span><i class="legend-dot milestone"></i>마감</span>
               <span><i class="legend-dot done"></i>완료</span>
             </div>
+            <button id="open-picker-calendar" class="sync-button" type="button">작업 가져오기</button>
           </div>
           <div id="month-list" class="month-list"></div>
+          <button id="calendar-today-fab" class="calendar-today-fab" type="button" hidden>오늘</button>
         </div>
 
-        <div id="opportunities-view" class="view-panel" aria-labelledby="opportunities-title" hidden>
+        <div id="opportunities-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="opportunities-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">WEEKLY SEARCH BOARD</p>
               <h2 id="opportunities-title">싱어송라이터 공모전 보드</h2>
             </div>
             <div class="calendar-legend" aria-label="공모전 상태">
@@ -318,11 +275,202 @@
               <strong id="opportunity-accepted-count">0</strong>
             </article>
           </section>
+
+          <section id="admin-panel" class="admin-panel" aria-label="관리자 편집" hidden>
+            <div class="admin-panel-head">
+              <div>
+                <h3>관리자 편집</h3>
+              </div>
+              <span id="admin-status-badge" class="card-chip">관리자 확인 중</span>
+            </div>
+
+            <form id="admin-opportunity-form" class="admin-form">
+              <p class="admin-form-title">공모전 추가 / 수정</p>
+              <label class="admin-field">
+                <span>ID (슬러그, 고유)</span>
+                <input id="admin-id" class="admin-input" type="text" placeholder="예: grounz-2026-fall" required />
+              </label>
+              <label class="admin-field">
+                <span>제목</span>
+                <input id="admin-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>주최</span>
+                <input id="admin-host" class="admin-input" type="text" />
+              </label>
+              <label class="admin-field">
+                <span>상태</span>
+                <select id="admin-status" class="admin-select">
+                  <option value="open">접수 중</option>
+                  <option value="watch">지켜보는 중</option>
+                  <option value="closed">마감</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>접수 시작</span>
+                <input id="admin-open-date" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>마감</span>
+                <input id="admin-deadline" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>적합도</span>
+                <select id="admin-fit-label" class="admin-select">
+                  <option value="아주 잘 맞음">아주 잘 맞음</option>
+                  <option value="잘 맞음">잘 맞음</option>
+                  <option value="보통">보통</option>
+                  <option value="낮음">낮음</option>
+                  <option value="확인 필요">확인 필요</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-sort-order" class="admin-input" type="number" placeholder="예: 10" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>요약</span>
+                <textarea id="admin-summary" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>준비 사항</span>
+                <textarea id="admin-preparation" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>공식 링크</span>
+                <input id="admin-url" class="admin-input" type="url" placeholder="https://" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>출처 메모</span>
+                <input id="admin-source-note" class="admin-input" type="text" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <hr class="admin-divider" />
+
+            <form id="admin-event-form" class="admin-form">
+              <p class="admin-form-title">일정(이벤트) 추가 / 수정</p>
+              <label class="admin-field">
+                <span>ID (슬러그, 고유)</span>
+                <input id="admin-event-id" class="admin-input" type="text" placeholder="예: demo-psyche" required />
+              </label>
+              <label class="admin-field">
+                <span>제목</span>
+                <input id="admin-event-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>시작일</span>
+                <input id="admin-event-date" class="admin-input" type="date" required />
+              </label>
+              <label class="admin-field">
+                <span>종료일 (선택, 여러 날)</span>
+                <input id="admin-event-end" class="admin-input" type="date" />
+              </label>
+              <label class="admin-field">
+                <span>단계</span>
+                <select id="admin-event-phase" class="admin-select">
+                  <option value="demo">판단용 데모</option>
+                  <option value="structure">키·구조 확정</option>
+                  <option value="arrangement">편곡 테스트</option>
+                  <option value="recording">본녹음</option>
+                  <option value="post">편집·믹스·마스터</option>
+                  <option value="delivery">유통 준비</option>
+                  <option value="release">발매</option>
+                </select>
+              </label>
+              <label class="admin-field">
+                <span>예상 시간</span>
+                <input id="admin-event-duration" class="admin-input" type="text" placeholder="예: 60분" />
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-event-sort-order" class="admin-input" type="number" placeholder="예: 40" />
+              </label>
+              <label class="admin-field admin-checkbox-field">
+                <input id="admin-event-milestone" class="admin-checkbox" type="checkbox" />
+                <span>고정 마감(마일스톤)</span>
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>완료 결과</span>
+                <input id="admin-event-result" class="admin-input" type="text" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>상세 설명</span>
+                <textarea id="admin-event-detail" class="admin-input"></textarea>
+              </label>
+              <label class="admin-field">
+                <span>연결 곡 이름 (선택)</span>
+                <input id="admin-event-track" class="admin-input" type="text" placeholder="예: Psyche" />
+              </label>
+              <label class="admin-field">
+                <span>문서 경로 (선택)</span>
+                <input id="admin-event-document" class="admin-input" type="text" placeholder="docs/…" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>가사 경로 (선택)</span>
+                <input id="admin-event-lyrics" class="admin-input" type="text" placeholder="lyrics/…" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-event-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-event-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <hr class="admin-divider" />
+
+            <form id="admin-track-form" class="admin-form">
+              <p class="admin-form-title">곡(트랙) 추가 / 수정</p>
+              <label class="admin-field">
+                <span>번호 (예: 01)</span>
+                <input id="admin-track-number" class="admin-input" type="text" placeholder="01" required />
+              </label>
+              <label class="admin-field">
+                <span>곡 제목</span>
+                <input id="admin-track-title" class="admin-input" type="text" required />
+              </label>
+              <label class="admin-field">
+                <span>데모 마감</span>
+                <input id="admin-track-due" class="admin-input" type="date" required />
+              </label>
+              <label class="admin-field">
+                <span>연결 이벤트 ID</span>
+                <input id="admin-track-event-id" class="admin-input" type="text" placeholder="예: demo-psyche" required />
+              </label>
+              <label class="admin-field">
+                <span>정렬 순서 (작을수록 위)</span>
+                <input id="admin-track-sort-order" class="admin-input" type="number" placeholder="예: 10" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>곡 문서 경로</span>
+                <input id="admin-track-document" class="admin-input" type="text" placeholder="tracks/…/README.md" />
+              </label>
+              <label class="admin-field admin-field-wide">
+                <span>가사 경로</span>
+                <input id="admin-track-lyrics" class="admin-input" type="text" placeholder="lyrics/…" />
+              </label>
+              <div class="admin-actions">
+                <button class="opportunity-action is-primary" type="submit">저장</button>
+                <button id="admin-track-reset" class="opportunity-action is-secondary" type="button">새 항목 / 초기화</button>
+                <button id="admin-track-delete" class="opportunity-action is-danger" type="button">삭제</button>
+              </div>
+            </form>
+
+            <p class="admin-note">
+              화면 편집은 원격 Supabase에 바로 반영됩니다. <code>schedule-data.js</code>는 오프라인 폴백·초기 시드용이며,
+              대량 재설정이 필요할 때만 <code>npm run schedule:sync</code>로 맞춥니다.
+            </p>
+          </section>
+
           <section class="opportunity-board">
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ACCEPTED</p>
                   <h3>캘린더에 넣은 공모전</h3>
                 </div>
               </div>
@@ -331,7 +479,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ON HOLD</p>
                   <h3>보류 중인 공모전</h3>
                 </div>
               </div>
@@ -340,7 +487,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">ALL CANDIDATES</p>
                   <h3>지금 검토할 후보</h3>
                 </div>
               </div>
@@ -349,7 +495,6 @@
             <div class="opportunity-board-section">
               <div class="card-heading">
                 <div>
-                  <p class="section-kicker">DISMISSED</p>
                   <h3>이번엔 넘긴 공모전</h3>
                 </div>
               </div>
@@ -358,24 +503,34 @@
           </section>
         </div>
 
-        <div id="roadmap-view" class="view-panel" aria-labelledby="roadmap-title" hidden>
+        <div id="roadmap-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="roadmap-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">RELEASE PIPELINE</p>
               <h2 id="roadmap-title">전체 제작 일정</h2>
             </div>
           </div>
           <div id="roadmap-list" class="roadmap-list"></div>
         </div>
 
-        <div id="tracks-view" class="view-panel" aria-labelledby="tracks-title" hidden>
+        <div id="tracks-view" class="view-panel" role="tabpanel" tabindex="-1" aria-labelledby="tracks-title" hidden>
           <div class="panel-heading">
             <div>
-              <p class="section-kicker">10 CANDIDATE TRACKS</p>
-              <h2 id="tracks-title">곡별 데모 진행 보드</h2>
+              <p class="section-kicker" id="tracks-kicker">CANDIDATE TRACKS</p>
+              <h2 id="tracks-title">곡별 제작 파이프라인</h2>
             </div>
           </div>
+          <div id="track-pipeline-board" class="track-pipeline-board"></div>
           <div id="track-summary-board" class="track-summary-board"></div>
+          <div class="track-browse-head">
+            <input
+              id="track-search"
+              class="track-search"
+              type="search"
+              placeholder="곡 이름·번호로 찾기"
+              aria-label="곡 검색"
+              autocomplete="off"
+            />
+          </div>
           <div class="track-table-wrap">
             <table class="track-table">
               <thead>
@@ -390,6 +545,7 @@
               <tbody id="track-table-body"></tbody>
             </table>
           </div>
+          <div id="track-chip-nav" class="track-chip-nav" role="group" aria-label="곡 선택"></div>
           <div id="track-detail-list" class="track-detail-list"></div>
         </div>
       </section>
@@ -409,9 +565,28 @@
       <p id="dialog-date" class="dialog-date"></p>
       <p id="dialog-detail" class="dialog-detail"></p>
       <dl id="dialog-meta" class="dialog-meta"></dl>
+      <div id="dialog-actions" class="dialog-actions"></div>
+      <div id="dialog-schedule" class="dialog-schedule" hidden></div>
       <div id="dialog-links" class="dialog-links"></div>
     </dialog>
 
-    <script type="module" src="app.js?v=20260629115411"></script>
+    <dialog id="picker-dialog" class="task-dialog picker-dialog">
+      <button id="close-picker" class="icon-button" type="button" aria-label="닫기" title="닫기">
+        ×
+      </button>
+      <h2>작업 가져오기</h2>
+      <p class="dialog-date">남은 작업 전체에서 골라 오늘이나 원하는 날짜로 끌어옵니다.</p>
+      <input
+        id="picker-search"
+        class="picker-search"
+        type="search"
+        placeholder="작업 이름·곡 이름 검색"
+        aria-label="작업 검색"
+      />
+      <div id="picker-phase-filters" class="picker-phase-filters" role="group" aria-label="단계 필터"></div>
+      <div id="picker-list" class="picker-list"></div>
+    </dialog>
+
+    <script type="module" src="app.js?v=20260708082040"></script>
   </body>
 </html>
