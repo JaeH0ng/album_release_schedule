@@ -17,6 +17,18 @@
 
 ## 변경 로그
 
+### 2026-07-08 — 라이브 배포 + Supabase 마이그레이션 적용 (gh-pages 배포, DB push)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 지시로 라이브 배포.
+
+**무엇을**
+- **gh-pages 배포**: `npm run build`(dist, 캐시버스팅 스탬프) → git worktree로 dist를 gh-pages 루트에 복제 → commit·push(origin/gh-pages `910ae71..2317a5a`). **라이브 검증**: `index.html data-build-version="20260708082040"`, 라이브 app.js Phase3 심볼·`schedule-data.js rail:true` 9개 curl 확인. (이 repo는 CI 없음 — gh-pages 수동 배포. 이전 gh-pages는 Phase1~3 이전이라 변경량 큼, schedule-data.js도 신규 포함.)
+- **`supabase db push`**: pending 2건 적용 — `20260704090000_add_user_event_plans` **+** `20260706120000_add_user_track_stages`. 둘 다 멱등(`create table if not exists`). **중요 발견**: user_event_plans 적용 시 정책 "does not exist, skipping" 로그 → **이 테이블이 원격에 없었음** = 그동안 로그인 사용자의 완료/포커스/override 동기화가 실제로는 안 되고 localStorage 폴백만 되던 상태였고, 이번에 함께 생성돼 정상화됨. `migration list`로 둘 다 Local·Remote 확인. (Docker 미실행 경고는 카탈로그 캐싱용 비치명적 — 마이그레이션은 성공.)
+
+**전제/환경**: `.env.local`에 SUPABASE_ACCESS_TOKEN·SUPABASE_DB_PASSWORD·SUPABASE_PROJECT_REF, supabase CLI v2.98.1. `db push`는 비대화형이라 `printf 'y\n' |`로 확인 입력.
+
+**남은 것**: 없음(Phase 3 라이브 반영 완료). Codex 사용량 회복 시 독립 최종 패스 권장. anon publishable key만 클라이언트, 서비스 키 미노출 유지.
+
 ### 2026-07-06 — Codex 대역 최종 push-게이트 리뷰(Sonnet) 통과 → main push (브랜치 docs/final-gate-record + feature/plannable-event-helper)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 지시로 push 전 최종 리뷰.
