@@ -17,6 +17,15 @@
 
 ## 변경 로그
 
+### 2026-07-06 — Codex 대역 최종 push-게이트 리뷰(Sonnet) 통과 → main push (브랜치 docs/final-gate-record + feature/plannable-event-helper)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 지시로 push 전 최종 리뷰.
+
+**리뷰**: Codex 소진 → **Sonnet(다른 모델)로 최종 push-게이트 리뷰**(final state, ship-blocker 판정 포함). 8후보→**ship-blocker 0**. 생존 nice-to-have: (a) 기기 간 stage↔완료 미러 정합성(major지만 두 독립 리뷰어가 single-user·45초폴링·자가수렴·무손실 근거로 **not-a-blocker**·문서화된 known limitation 적합 판정 — Promise.all 완화조차 서버 커밋 가시성 병목이라 무의미), (b) 관리자 event_id=레일 id 충돌(minor, 오입력 한정), (c) 레일 제외 술어 3중복(cleanup).
+**반영**: (c)만 수정 — `isPlannableEvent(event)`(=미완료+비레일) 헬퍼로 getIncompleteEvents·주간스트립·다음마감 술어 단일화(순수 리팩터). (a)(b)는 문서화 유지.
+
+**검증·배포**: `node --check`·`build` 통과, 콘솔 0(현재 fetch 200), 레일 0누출 동일. **main을 origin에 push함**(사용자 지시, 인증 JaeH0ng 확인). **주의**: gh-pages 배포와 `supabase:sync`(user_track_stages 마이그레이션)는 별개 — 미실행. 3a 원격 단계 동기화가 라이브에서 동작하려면 배포 시 마이그레이션 적용 필요(미적용 시 로그인 사용자에 stage 테이블 400이 로깅되나 localStorage 폴백으로 비치명적). Codex 사용량 회복 시 독립 최종 패스 권장.
+
 ### 2026-07-06 — Phase 3 홀리스틱 통합 리뷰(Sonnet) 반영: 레일 누출 2건 수정 + 기기 간 정합성 한계 문서화 (브랜치 feature/phase3-holistic-fixes)
 
 **작업자:** Claude (Claude Code, Windows). push 전 Phase 3 전체(3a×3b×3c) 통합 검토.
