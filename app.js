@@ -2464,9 +2464,15 @@ function isRailEvent(event) {
   return Boolean(event) && railEventIds.has(event.id);
 }
 
+// 작업으로 계획 가능한 이벤트: 미완료 + 레일 아님. 후보/이번 주/다음 마감/주간 스트립 등
+// 여러 곳이 같은 판정을 쓰므로 한 곳에서 정의해 드리프트를 막는다.
+function isPlannableEvent(event) {
+  return !state.completed.has(event.id) && !isRailEvent(event);
+}
+
 function getIncompleteEvents() {
   return state.events
-    .filter((event) => !state.completed.has(event.id) && !isRailEvent(event))
+    .filter(isPlannableEvent)
     .sort((left, right) => parseDate(left.date) - parseDate(right.date));
 }
 
@@ -3438,7 +3444,7 @@ function renderCalendar() {
     .filter((event) => parseDate(event.date) <= weekEnd && parseDate(event.end || event.date) >= weekStart)
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const nextUpcoming = filteredEvents
-    .filter((event) => parseDate(event.date) > weekEnd && !state.completed.has(event.id) && !isRailEvent(event))
+    .filter((event) => parseDate(event.date) > weekEnd && isPlannableEvent(event))
     .sort((a, b) => parseDate(a.date) - parseDate(b.date))[0];
   const weekStripMarkup = `
     <section class="week-strip" aria-label="이번 주 일정">
@@ -3642,7 +3648,7 @@ function renderSummary() {
   // 헤더의 "다음 마감"은 실제로 행동할 다음 항목이라 배치/수용량 레일은 제외한다(레일은 달력
   // 컨텍스트일 뿐). 단, 위 진행률(%)은 레일도 앨범 이벤트로 포함해 그대로 둔다.
   const incomplete = albumEvents
-    .filter((event) => !state.completed.has(event.id) && !isRailEvent(event))
+    .filter(isPlannableEvent)
     .sort((a, b) => parseDate(a.date) - parseDate(b.date));
   const overdue = incomplete.filter((event) => parseDate(event.date) < today);
   // 폴백도 레일을 건너뛴다(현재 데이터에선 레일이 마지막 이벤트가 아니지만 데이터 변경에 안전하게).
