@@ -2453,9 +2453,20 @@ function getPullForwardCandidates() {
     .slice(0, 5);
 }
 
+// 배치/수용량 이벤트("편곡 테스트 N주차", "본녹음 묶음 A~D", "1차 믹스 전/후반부")는
+// 이제 곡×단계 격자가 실제 작업 단위를 담으므로, 작업 단위 목록(후보·이번 주·보류·당김·
+// 오늘 보드·가져오기)에서는 빼고 달력에는 마감·수용량 레일로 남긴다(삭제 아님, 완료 id 보존).
+// 레일 여부는 schedule-data.js의 rail 플래그가 단일 소스 — Supabase 런타임 이벤트에도 id로
+// 투영한다(DB 컬럼/마이그레이션 없이 동작, album_events SELECT를 깨지 않음).
+const railEventIds = new Set(defaultEvents.filter((event) => event.rail).map((event) => event.id));
+
+function isRailEvent(event) {
+  return Boolean(event) && railEventIds.has(event.id);
+}
+
 function getIncompleteEvents() {
   return state.events
-    .filter((event) => !state.completed.has(event.id))
+    .filter((event) => !state.completed.has(event.id) && !isRailEvent(event))
     .sort((left, right) => parseDate(left.date) - parseDate(right.date));
 }
 
@@ -3517,6 +3528,8 @@ function renderEvent(event, iso = event.date) {
   const classes = ["calendar-event"];
   const presentation = getCalendarEventPresentation(event);
   if (event.milestone) classes.push("is-milestone");
+  // 배치/수용량 레일: 달력엔 남기되 작업 단위가 아님을 시각적으로 구분(점선 좌측 강조).
+  if (isRailEvent(event)) classes.push("is-rail");
   if (complete) classes.push("is-complete");
   if (presentation.className) classes.push(presentation.className);
   // 옮길 수 있는 카드만 드래그 대상(데스크톱 DnD + 모바일 long-press).
