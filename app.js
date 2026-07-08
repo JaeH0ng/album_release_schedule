@@ -491,6 +491,12 @@ function findTrack(trackNumber) {
   return state.tracks.find((track) => track.number === trackNumber);
 }
 
+// 이 eventId가 어떤 곡의 데모 이벤트인가? (곡의 데모 이벤트 완료를 stage 권위의 투영으로 다룬다)
+function findTrackByEventId(eventId) {
+  if (!eventId) return null;
+  return state.tracks.find((track) => track.eventId === eventId) || null;
+}
+
 function findTrackStep(stepId) {
   return allTrackSteps.find((step) => step.id === stepId);
 }
@@ -1859,29 +1865,34 @@ function setTrackStage(trackNumber, stageId) {
   saveTrackStageState();
   queueTrackStageSync(trackNumber); // 단계를 계정에 동기화(기기 간 desync 방지). 로그아웃 상태면 no-op.
 
-  // 데모 이벤트 완료(state.completed)를 단계 이동과 대칭으로 맞춘다. 데모를 벗어나면 그 곡의
+  // 데모 이벤트 완료(state.completed)를 단계와 대칭으로 맞춘다(투영): 데모를 벗어나면 그 곡의
   // 데모는 끝난 것이므로 완료로, 데모로 되돌리면 완료를 해제한다. 이렇게 해야 곡 표/파이프라인은
   // 완료인데 오늘 보드·달력·요약은 같은 데모 이벤트를 미완료 작업으로 계속 띄우는 split-brain이
-  // 생기지 않는다. 기존엔 되돌릴 때 완료를 지우지 않아, 데모로 되돌린 곡이 여전히 "완료"로 남고
-  // 오늘 보드/달력에서 사라지는 비대칭 버그가 있었다. 새 event id를 만들지 않고 기존 track.eventId를
-  // 그대로 쓰므로 기록 보존 원칙과 맞고, toggleCompleted가 저장·원격 동기화·전체 리렌더를 수행한다.
-  // (참고: 데모를 벗어난 곡의 데모 이벤트를 달력/다이얼로그에서 직접 완료 해제하면 단계와 어긋나는
-  //  잔여 split-brain은 남아 있다 — 이를 stage 단일 권위로 완전히 통일하는 시도는 적대적 리뷰에서
-  //  기기 간 데이터 손상/파괴적 언체크가 확인돼 보류했다. HANDOFF 및 tag wip/3b-full-attempt-reviewed 참고.)
+  // 생기지 않는다. 새 event id를 만들지 않고 기존 track.eventId를 그대로 쓴다.
+  // 중요: state.completed를 직접 갱신한다 — toggleCompleted는 곡의 데모 이벤트를 다시
+  // setTrackStage로 라우팅하므로(잠금/투영), 여기서 호출하면 재귀가 돼 미러가 실제로 안 써진다.
   const track = findTrack(trackNumber);
+  let mirrorChanged = false;
   if (track) {
-    if (stageId !== "demo" && !state.completed.has(track.eventId)) {
-      toggleCompleted(track.eventId, true); // 저장·원격 동기화·전체 리렌더까지 내부에서 수행
-      return;
+    const eventId = track.eventId;
+    const shouldComplete = stageId !== "demo";
+    if (shouldComplete && !state.completed.has(eventId)) {
+      state.completed.add(eventId);
+      state.completedMeta.set(eventId, { completedAt: new Date().toISOString() });
+      mirrorChanged = true;
+    } else if (!shouldComplete && state.completed.has(eventId)) {
+      state.completed.delete(eventId);
+      state.completedMeta.delete(eventId);
+      mirrorChanged = true;
     }
-    if (stageId === "demo" && state.completed.has(track.eventId)) {
-      toggleCompleted(track.eventId, false); // 대칭: 데모 복귀 시 완료 해제
-      return;
+    if (mirrorChanged) {
+      saveCompletedTasks();
+      queueEventPlanSync(eventId); // 데모 이벤트 완료 미러를 계정에 동기화(로그아웃이면 no-op)
     }
   }
 
-  renderTracks();
-  renderDashboard();
+  // 단계·완료 미러가 달력·요약·로드맵·대시보드·표에 모두 영향을 주므로 전체 리렌더.
+  renderAll();
 }
 
 function getTrackNotes(trackNumber) {
@@ -3522,6 +3533,10 @@ function renderEvent(event, iso = event.date) {
   const metaParts = [presentation.meta];
   if (event.overrideDate) metaParts.push(`원래 ${formatShortDate(event.originalDate)}`);
 
+  // 곡의 데모 이벤트 완료는 stage의 투영이라 달력에서 직접 토글하지 않는다(잠금). 완료 여부는
+  // 곡의 단계를 따르고, 변경은 '곡별 진행' 단계 칩에서 한다. out-of-band 언체크로 인한 split-brain 방지.
+  const isTrackDemoEvent = Boolean(findTrackByEventId(event.id));
+
   return `
     <div class="${classes.join(" ")}" style="--event-color:${phase.color}" data-event-id="${escapeHtml(event.id)}"${movable ? ' draggable="true"' : ""}>
       ${badgesRow}
@@ -3531,6 +3546,7 @@ function renderEvent(event, iso = event.date) {
           type="checkbox"
           aria-label="${escapeHtml(event.title)} 완료"
           ${complete ? "checked" : ""}
+          ${isTrackDemoEvent ? 'disabled title="완료 여부는 곡의 단계를 따릅니다 — 곡별 진행에서 단계를 바꾸세요"' : ""}
         />
         <button class="event-title-button" type="button">${escapeHtml(presentation.title)}</button>
       </div>
@@ -3551,6 +3567,18 @@ function bindEventControls() {
 }
 
 function toggleCompleted(eventId, complete) {
+  // 곡의 데모 이벤트 완료는 stage 단일 권위의 투영이다(3a 동기화 + setTrackStage 대칭 미러가
+  // state.completed를 stage와 맞춰 둔다). out-of-band 토글이 표시와 stage를 어긋나게 하는 걸 막는다:
+  // - 완료 표시(check)는 곡을 done 단계로 올린다(비파괴적, setTrackStage가 저장·동기화·리렌더 수행).
+  // - 완료 해제(uncheck)는 무시한다. 데모를 벗어난 곡을 데모로 되돌리는 건 파괴적(편곡·녹음·믹스
+  //   진행 소실)이라 완료 해제로는 하지 않고 단계 칩으로만 한다. 달력 체크박스·다이얼로그 버튼은
+  //   이 이벤트에 대해 잠금 UI로 노출해 사용자가 헛클릭하지 않게 한다.
+  const track = findTrackByEventId(eventId);
+  if (track) {
+    if (complete) setTrackStage(track.number, "done");
+    return;
+  }
+
   const event = findEvent(eventId);
   if (complete) {
     state.completed.add(eventId);
@@ -4193,9 +4221,15 @@ function openTaskDialog(event) {
   if (actionsHost) {
     const plan = getEventPlan(event.id);
     const completed = state.completed.has(event.id);
-    const actionButtons = [
-      `<button class="opportunity-action is-primary" type="button" data-dialog-action="complete">${completed ? "완료 해제" : "완료"}</button>`,
-    ];
+    // 곡의 데모 이벤트는 완료가 stage의 투영이다: 데모면 '곡 완료'(→done, 비파괴적)만 노출하고,
+    // 이미 데모를 벗어났으면 완료 해제를 막고(파괴적) 잠금 안내로 대체한다. 곡이 아닌 이벤트는 그대로.
+    const trackForEvent = findTrackByEventId(event.id);
+    const completeButton = trackForEvent
+      ? completed
+        ? '<button class="opportunity-action" type="button" disabled title="완료 여부는 곡의 단계를 따릅니다">완료됨 · 곡별 진행에서 단계 변경</button>'
+        : '<button class="opportunity-action is-primary" type="button" data-dialog-action="complete">곡 완료</button>'
+      : `<button class="opportunity-action is-primary" type="button" data-dialog-action="complete">${completed ? "완료 해제" : "완료"}</button>`;
+    const actionButtons = [completeButton];
     if (plan.focusStatus !== "accepted") {
       actionButtons.push('<button class="opportunity-action" type="button" data-dialog-action="accept">이번 주로 수락</button>');
     }
