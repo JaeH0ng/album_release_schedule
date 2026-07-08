@@ -1,7 +1,7 @@
 :root {
   color-scheme: light;
   --ink: #18211d;
-  --muted: #65706a;
+  --muted: #5a645e;
   --line: #d8dedb;
   --line-strong: #b9c3be;
   --paper: #ffffff;
@@ -274,7 +274,7 @@ input:focus-visible {
 .section-kicker {
   margin: 0 0 2px;
   color: #9fb2a8;
-  font-size: 11px;
+  font-size: 12px;
   font-weight: 700;
   letter-spacing: 0;
 }
@@ -351,7 +351,7 @@ input:focus-visible {
 
 .sync-detail {
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   text-align: right;
 }
 
@@ -545,7 +545,9 @@ input:focus-visible {
 
 .panel-heading h2 {
   margin: 0;
-  font-size: 19px;
+  /* 페이지(섹션) 제목은 카드 제목(h3 18px)보다 확실히 커야 스캔이 쉽다. */
+  font-size: 22px;
+  letter-spacing: -0.01em;
 }
 
 /* 오늘 보드는 위→아래 우선순위로 훑는 단일 열. 2열일 때 짧은 카드와 긴 카드가
@@ -2535,7 +2537,7 @@ footer {
   display: flex;
   justify-content: space-between;
   gap: 16px;
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .task-dialog {
@@ -2787,6 +2789,14 @@ footer {
     grid-template-columns: 1fr;
   }
 
+  /* 단일 열 그리드 아이템은 min-width:auto(=min-content)라, 사이드바의 단계 필터
+     칩 줄(.phase-filters, max-content)이 트랙을 뷰포트보다 넓게 밀어 가로 스크롤을
+     만든다(760~1060px 구간). min-width:0으로 사이드바가 줄게 하면 .phase-filters의
+     자체 overflow-x:auto가 칩 스크롤을 담당한다. (.content-panel은 이미 base에서 min-width:0) */
+  .phase-sidebar {
+    min-width: 0;
+  }
+
   .dashboard-grid,
   .checkin-grid,
   .opportunity-summary-grid,
@@ -2953,7 +2963,7 @@ footer {
   }
 
   .panel-heading h2 {
-    font-size: 18px;
+    font-size: 20px;
   }
 
   .calendar-legend {

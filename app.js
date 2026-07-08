@@ -2690,7 +2690,8 @@ function renderDashboard() {
       value: demoSpotlight ? demoSpotlight.track.title : "-",
       label: "이번 확인 포인트",
       detail: demoSpotlight ? demoSpotlight.bullets[0] : "설정된 포인트 없음",
-      detailList: demoSpotlight?.bullets || [],
+      // detail이 이미 bullets[0]을 대표로 보여주므로 목록은 나머지만(중복 렌더 방지).
+      detailList: demoSpotlight ? demoSpotlight.bullets.slice(1) : [],
       wide: true,
       trackNumber: demoSpotlight ? demoSpotlight.track.number : null,
     },
@@ -2845,7 +2846,7 @@ function renderHeroCard(event, mode) {
           ? `<button class="hero-more" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="이 작업을 뒤로 미루고 다음 작업 보기" title="뒤로 미루기">↓</button>`
           : ""
       }
-      <button class="hero-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
+      <button class="hero-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기" title="상세·다른 처리">⋯</button>
     </div>
   `;
 }
@@ -2888,11 +2889,11 @@ function renderDashboardTaskCard(event, mode, options = {}) {
         ${primaryButton}
         ${
           options.reorder
-            ? `<button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-up" data-event-id="${escapeHtml(event.id)}" aria-label="순서 위로">↑</button>
-              <button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="순서 아래로">↓</button>`
+            ? `<button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-up" data-event-id="${escapeHtml(event.id)}" aria-label="순서 위로" title="위로">↑</button>
+              <button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="순서 아래로" title="아래로">↓</button>`
             : ""
         }
-        <button class="opportunity-action task-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기">⋯</button>
+        <button class="opportunity-action task-more" type="button" data-dashboard-action="menu" data-event-id="${escapeHtml(event.id)}" aria-label="상세와 다른 처리 열기" title="상세·다른 처리">⋯</button>
       </div>
     </article>
   `;
