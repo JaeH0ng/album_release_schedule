@@ -2182,6 +2182,12 @@ textarea.admin-input {
   border-left-width: 5px;
 }
 
+/* 배치/수용량 레일: 곡×단계 격자가 작업 단위를 담으므로 달력엔 컨텍스트로만 남긴다. */
+.calendar-event.is-rail {
+  border-left-style: dashed;
+  opacity: 0.85;
+}
+
 .calendar-event.is-complete {
   border-color: #cbd9d1;
   border-left-color: var(--success);

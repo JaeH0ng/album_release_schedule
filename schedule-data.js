@@ -469,6 +469,7 @@ const defaultEvents = [
   },
   {
     id: "arrangement-week-1",
+    rail: true,
     date: "2026-08-05",
     end: "2026-08-10",
     title: "편곡 테스트 1주차",
@@ -480,6 +481,7 @@ const defaultEvents = [
   },
   {
     id: "arrangement-week-2",
+    rail: true,
     date: "2026-08-11",
     end: "2026-08-16",
     title: "편곡 테스트 2주차",
@@ -491,6 +493,7 @@ const defaultEvents = [
   },
   {
     id: "arrangement-week-3",
+    rail: true,
     date: "2026-08-17",
     end: "2026-08-22",
     title: "편곡 테스트 3주차",
@@ -513,6 +516,7 @@ const defaultEvents = [
   },
   {
     id: "recording-batch-a",
+    rail: true,
     date: "2026-08-24",
     end: "2026-08-30",
     title: "본녹음 묶음 A",
@@ -524,6 +528,7 @@ const defaultEvents = [
   },
   {
     id: "recording-batch-b",
+    rail: true,
     date: "2026-08-31",
     end: "2026-09-06",
     title: "본녹음 묶음 B",
@@ -535,6 +540,7 @@ const defaultEvents = [
   },
   {
     id: "recording-batch-c",
+    rail: true,
     date: "2026-09-07",
     end: "2026-09-13",
     title: "본녹음 묶음 C",
@@ -546,6 +552,7 @@ const defaultEvents = [
   },
   {
     id: "recording-batch-d",
+    rail: true,
     date: "2026-09-14",
     end: "2026-09-19",
     title: "본녹음 묶음 D",
@@ -602,6 +609,7 @@ const defaultEvents = [
   },
   {
     id: "post-mix-a",
+    rail: true,
     date: "2026-10-05",
     end: "2026-10-11",
     title: "1차 믹스 전반부",
@@ -613,6 +621,7 @@ const defaultEvents = [
   },
   {
     id: "post-mix-b",
+    rail: true,
     date: "2026-10-12",
     end: "2026-10-18",
     title: "1차 믹스 후반부",

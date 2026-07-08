@@ -17,6 +17,23 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 배치 이벤트를 작업 단위에서 빼고 달력 레일로 강등 (Phase 3c 후속, 브랜치 feature/batch-events-to-rails)
+
+**작업자:** Claude (Claude Code, Windows).
+
+**무엇을 / 왜**
+곡×단계 격자가 실제 작업 단위를 담게 되면서, 곡 이름 없는 배치/수용량 이벤트 9개(편곡 테스트 1~3주차, 본녹음 묶음 A~D, 1차 믹스 전/후반부)를 **작업 단위 목록에서 제외**하고 달력에는 마감·수용량 레일로 남긴다(삭제 아님, 완료 id 보존).
+
+- **schedule-data.js**: 9개에 `rail: true`(단일 소스). **app.js**: `railEventIds`(=schedule-data.js rail 플래그) + `isRailEvent(id 기반)`. `getIncompleteEvents`에서 레일 제외 → 후보·이번 주·보류·당김·오늘 보드·가져오기 6개 작업단위 표면 일괄 반영. 달력엔 `is-rail`(점선 좌측·opacity) 표시, 체크박스는 유지(비파괴). **styles.css**: `.is-rail`.
+- **무-스키마 설계(중요)**: 처음 `rail`을 album_events 컬럼+SELECT로 넣었다가 **live album_events fetch가 400으로 깨지는 것을 콘솔/네트워크에서 확인**(컬럼 미존재) → schedule-data.js를 단일 소스로 유지하되 **id로 Supabase 런타임 이벤트에 투영**하는 방식으로 전환. DB 컬럼/마이그레이션/SELECT 변경 없음(build-schedule-sql.mjs 원복). milestone 마감·진행률(%)은 불변.
+
+**리뷰(Codex 소진 → 교차 모델 대체: 리뷰어를 Sonnet으로)**
+구현(Opus)과 **다른 모델(Sonnet)**로 4차원 적대적 리뷰(모델 다양성 → 상관 맹점 감소). 3후보→1생존 **major**: 헤더 "다음 마감"(`#next-deadline`)이 `getAlbumPlanningEvents()`(레일 미필터)로 `next`를 뽑아, 앞 이벤트가 다 완료되면 레일 제목("본녹음 묶음 A")이 사이트 전역 헤드라인에 노출되던 누출. **수정**: `renderSummary`의 next-deadline 계산에서 레일 제외(진행률 %는 레일 포함 유지). 하네스로 재현·수정 확인(전 비레일 완료 시 헤드라인이 레일 대신 "정규 앨범 발매"로 폴백). **한계**: Sonnet도 같은 Claude 계열 — Codex(비-Claude) 독립성엔 못 미침. push/릴리스 전 Codex 최종 패스 권장.
+
+**검증**: `node --check`·`build`·`schedule:sql` 정상, album_events fetch 200(스키마 비의존), 레일 9개 작업단위 0누출·달력 is-rail·비레일 배치 정상·다음마감 레일 미노출 하네스 확인.
+
+**커밋·배포**: 브랜치 `feature/batch-events-to-rails` → main 병합. push·`supabase:sync` 미실행.
+
 ### 2026-07-06 — 오늘 보드 '작업 중' 카드 격자 파생 (Phase 3c 부분, 브랜치 feature/dashboard-active-from-grid)
 
 **작업자:** Claude (Claude Code, Windows).
