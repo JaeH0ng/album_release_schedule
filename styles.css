@@ -548,10 +548,35 @@ input:focus-visible {
   font-size: 19px;
 }
 
+/* 오늘 보드는 위→아래 우선순위로 훑는 단일 열. 2열일 때 짧은 카드와 긴 카드가
+   나란히 놓여 행이 들쭉날쭉해지던 문제(줄맞춤 어긋남)를 정렬로 해소한다.
+   내부의 한눈에-보기(.dashboard-overview)·회고(.dashboard-retro-grid)는 각자
+   자체 그리드라 영향받지 않는다. */
 .dashboard-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+/* 대시보드 공모전 요약(개수 + 임박 마감 + 탭 링크) — 전체 목록은 공모전 탭. */
+.opportunity-compact-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.opportunity-compact-text strong {
+  display: block;
+  font-size: 15px;
+  color: var(--ink);
+}
+
+.opportunity-compact-text p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 13px;
 }
 
 .dashboard-overview {
