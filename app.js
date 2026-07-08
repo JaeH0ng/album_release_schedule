@@ -2746,8 +2746,10 @@ function renderDashboard() {
     .map((item) => `<li>${item}</li>`)
     .join("");
 
+  // 후보는 3개까지만 노출해 카드가 과도하게 길어지지 않게 한다(더 많은 항목은 '전체에서 가져오기').
   document.querySelector("#urgency-list").innerHTML = urgencyEvents.length
     ? urgencyEvents
+        .slice(0, 3)
         .map((event) => renderDashboardTaskCard(event, "candidate"))
         .join("")
     : '<p class="empty-copy">당겨올 만한 작업이 없습니다. 이번 주 수락한 작업을 마친 뒤 새 후보가 나타납니다.</p>';
@@ -2767,12 +2769,32 @@ function renderDashboard() {
         .join("")
     : '<li>아직 완료한 작업이 없습니다. 오늘 끝낸 작업 하나부터 체크해보세요.</li>';
 
-  const spotlight = getOpportunityCandidates()
-    .filter((opportunity) => opportunity.status !== "closed")
-    .slice(0, 3);
-  document.querySelector("#dashboard-opportunity-list").innerHTML = spotlight.length
-    ? spotlight.map((opportunity) => renderOpportunityCard(opportunity, { compact: true })).join("")
-    : '<p class="opportunity-empty">이번 주 표시할 공모전이 아직 없습니다.</p>';
+  // 대시보드엔 공모전 '요약'만(개수 + 가장 임박한 마감) + 공모전 탭 링크. 전체 카드 목록은 탭에
+  // 있으니 중복을 없애 부피를 줄이되, 싱어송라이터가 마감을 놓치지 않게 인지성은 유지한다.
+  const opportunityCandidates = getOpportunityCandidates().filter((opportunity) => opportunity.status !== "closed");
+  // 강조할 공모전 = 가장 임박한 '앞으로의' 마감(지난 마감은 강조하지 않음), 없으면 상시·공고 대기 항목.
+  const upcomingOpportunity = opportunityCandidates
+    .filter((opportunity) => opportunity.deadline && parseDate(opportunity.deadline) >= today)
+    .sort((a, b) => parseDate(a.deadline) - parseDate(b.deadline))[0];
+  const watchOpportunity = opportunityCandidates.find((opportunity) => !opportunity.deadline);
+  const nearestOpportunity = upcomingOpportunity || watchOpportunity || null;
+  const nearestOpportunityMeta = nearestOpportunity
+    ? nearestOpportunity.deadline
+      ? `마감 D-${Math.ceil((parseDate(nearestOpportunity.deadline) - today) / 86400000)}`
+      : "상시·공고 대기"
+    : "";
+  document.querySelector("#dashboard-opportunity-list").innerHTML = opportunityCandidates.length
+    ? `<div class="opportunity-compact-summary">
+        <div class="opportunity-compact-text">
+          <strong>확인할 공모전 ${opportunityCandidates.length}개</strong>
+          ${nearestOpportunity ? `<p>${escapeHtml(nearestOpportunity.title)} · ${escapeHtml(nearestOpportunityMeta)}</p>` : ""}
+        </div>
+        <button class="sync-button" type="button" data-go-opportunities>공모전 보기 →</button>
+      </div>`
+    : '<p class="opportunity-empty">지금 검토할 공모전이 없습니다.</p>';
+  document
+    .querySelector("#dashboard-opportunity-list [data-go-opportunities]")
+    ?.addEventListener("click", () => setActiveView("opportunities"));
 
   const latestCheckedAt = state.opportunities
     .map((opportunity) => opportunity.lastCheckedAt)
