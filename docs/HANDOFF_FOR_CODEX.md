@@ -17,6 +17,22 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 오늘 보드 '작업 중' 카드 격자 파생 (Phase 3c 부분, 브랜치 feature/dashboard-active-from-grid)
+
+**작업자:** Claude (Claude Code, Windows).
+
+**무엇을 / 왜**
+오늘 보드의 "데모 작업 중" 카드가 하드코딩(`dashboardDemoMonitor.activeTrackNumbers = ["02","06","11"]`)이라 곡이 단계를 진행해도 안 바뀌어 stale했다. 이를 **격자(각 곡의 현재 단계)에서 파생**해 실제 진행 상태를 반영한다.
+
+- **`getDashboardActiveTracks()`** 신설: 데모를 벗어나 아직 안 끝난 곡(편곡/녹음/믹스) + 데모에서 착수한 곡(`getTrackStatus().kind !== waiting`). 미착수 데모·완료(done/legacy complete)는 제외. 카드 라벨 "데모 작업 중" → "작업 중". 하드코딩 `activeTrackNumbers` 제거.
+- **범위 분리**: 큐레이션 spotlight("이번 확인 포인트", 아티스트 작성 문구)는 **그대로 보존**(사용자 승인 범위). 배치 이벤트("본녹음 묶음 A~D" 등)의 마감 레일 강등은 `schedule-data.js`(단일 소스)를 건드리므로 **미착수 — 사용자 확인 대기**.
+
+**리뷰(`/code-review` 대체, 적대적 1패스)**: **클린(결함 0)**. 로직 정확(진행 중 포함·미착수/완료 제외), 엣지(빈 eventId·관리자 곡·spotlight 부재) 안전, XSS `escapeHtml` 적용, 단일 소스·개인상태키 규칙 준수, dangling 참조 0. getTrackStatus 곡당 호출은 기존 패턴(수용).
+
+**검증**: `node --check`·`npm run build` 통과, 콘솔 0건. 격자 이동에 따라 카드 갱신(미착수→숨김, record/mix/데모진행→표시, done→제외), spotlight 불변 하네스 확인.
+
+**커밋·배포**: 브랜치 `feature/dashboard-active-from-grid` → main 병합. push·`supabase:sync` 미실행. 배치 이벤트 레일 강등은 후속(확인 대기).
+
 ### 2026-07-06 — 완료 stage 단일 권위 완전 통일: out-of-band 토글 잠금 (Phase 3b 완전판, 브랜치 feature/pipeline-completion-lock)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 복귀 후 방향 확정 → 진행(ultracode).
