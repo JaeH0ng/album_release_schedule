@@ -226,7 +226,8 @@ const weeklyFocus = {
 };
 
 const dashboardDemoMonitor = {
-  activeTrackNumbers: ["02", "06", "11"],
+  // '작업 중' 목록은 이제 격자(각 곡의 현재 단계)에서 파생한다 — getDashboardActiveTracks().
+  // (예전 하드코딩 activeTrackNumbers는 곡이 단계를 진행하면 stale해져 제거함.)
   spotlight: {
     trackNumber: "06",
     bullets: [
@@ -2474,10 +2475,17 @@ function getRecentCompletedEvents() {
     .filter(Boolean);
 }
 
-function getDashboardActiveDemoTracks() {
-  return dashboardDemoMonitor.activeTrackNumbers
-    .map((trackNumber) => findTrack(trackNumber))
-    .filter(Boolean);
+// '작업 중' = 제작 파이프라인에서 실제로 진행 중인 곡을 격자(현재 단계)에서 계산한다.
+// 데모를 벗어나 아직 안 끝난 곡(편곡/녹음/믹스) + 데모 단계에서 착수한 곡. 미착수 데모·완료 곡은 제외.
+function getDashboardActiveTracks() {
+  return state.tracks.filter((track) => {
+    const stage = getTrackStage(track.number);
+    if (stage === "done") return false;
+    const kind = getTrackStatus(track.number, track.eventId).kind;
+    if (kind === "complete") return false; // 레거시 demo+completed 등 완료로 잡히는 곡 제외
+    if (stage !== "demo") return true; // 편곡/녹음/믹스 = 제작 중
+    return kind !== "waiting"; // 데모 단계는 체크를 시작한 곡만
+  });
 }
 
 function getDashboardDemoSpotlight() {
@@ -2625,7 +2633,7 @@ function renderDashboard() {
   const heldEvents = getHeldEvents();
   const dismissedEvents = getDismissedEvents();
   const urgencyEvents = getPullForwardCandidates();
-  const activeDemoTracks = getDashboardActiveDemoTracks();
+  const activeTracks = getDashboardActiveTracks();
   const demoSpotlight = getDashboardDemoSpotlight();
   document.querySelector("#weekly-period").textContent = `${formatDotDate(weekStart)} - ${formatDotDate(weekEnd)}`;
   // 한눈에 카드: 값이 없는 항목(0건/미설정)은 렌더하지 않아 화면을 짧게 유지한다.
@@ -2653,12 +2661,12 @@ function renderDashboard() {
       detail: dismissedEvents[0] ? dismissedEvents[0].title : "제외 항목 없음",
     },
     {
-      value: activeDemoTracks.length,
-      label: "데모 작업 중",
+      value: activeTracks.length,
+      label: "작업 중",
       detail:
-        activeDemoTracks.length > 0
-          ? activeDemoTracks.map((track) => track.title).join(", ")
-          : "아직 표시된 진행 곡 없음",
+        activeTracks.length > 0
+          ? activeTracks.map((track) => track.title).join(", ")
+          : "아직 진행 중인 곡 없음",
       wide: true,
     },
     {
