@@ -17,6 +17,25 @@
 
 ## 변경 로그
 
+### 2026-07-06 — 완료 stage 단일 권위 완전 통일: out-of-band 토글 잠금 (Phase 3b 완전판, 브랜치 feature/pipeline-completion-lock)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 복귀 후 방향 확정 → 진행(ultracode).
+
+**무엇을 / 왜**
+앞선 "완전 통일" 시도가 promote 기반이라 기기 간 손상으로 보류됐었다(아래 항목). 사용자가 **"stage 파생 + out-of-band 토글 잠금(promote 제거)"** 방향을 택해, **손상 없는 완전 통일**을 새로 구현했다. 핵심: 곡의 데모 이벤트 완료를 stage의 투영으로 확정하고, split-brain의 근원인 out-of-band 토글(달력 체크박스·다이얼로그·데모카드 버튼)을 **잠근다**. promote·load/login/poll reconcile를 **전혀 쓰지 않아**(사용자 액션 경로만 수정) 리뷰가 잡았던 경쟁·손상 클래스를 원천 배제한다.
+
+- **`toggleCompleted`**: 곡의 데모 이벤트면 완료 표시(check)는 `setTrackStage(number,'done')`로 라우팅(비파괴적 전진), 완료 해제(uncheck)는 무시. 표시(state.completed 읽기)와 쓰기(stage)가 같은 소스를 거쳐 이전 isEventDone 유령 토글을 구조적으로 차단. 곡이 아닌 이벤트는 기존 동작 유지.
+- **달력 체크박스**: 곡의 데모 이벤트면 `disabled`(잠금)+안내 title. **다이얼로그·데모카드 완료 버튼**: 데모면 "곡 완료"(→done), 데모를 벗어났으면(레거시 demo+completed 포함) `disabled` "완료됨 · 곡별 진행에서 단계 변경"으로 파괴적 완료 해제 차단.
+- **`setTrackStage` 미러**: `state.completed`를 **직접** add/delete(대칭) + `queueEventPlanSync`. toggleCompleted가 이제 곡 이벤트를 라우팅하므로 재귀 방지 위해 직접 갱신(리뷰 전 하네스에서 재귀 버그 발견→수정). 빈/누락 `eventId` 가드 추가(관리자 공란·Supabase null 대비).
+- **범위**: 곡 소유 11개 eventId만 잠금·라우팅. 곡 아닌 데모 이벤트(`demo-template`/`demo-buffer`/`*-arrangement-sketch`)는 일반 토글 유지(과잉 잠금 아님). `getTrackStatus`의 `demo && completed → 완료`는 레거시 표시용으로 유지(마이그레이션·promote 없음).
+
+**리뷰(Codex 소진 → `/code-review` 대체, 5차원 적대적)**
+10후보→9생존, **전부 minor/cleanup(critical·major 0)**. 반영: (1) 데모카드 "완료 해제" 죽은 버튼(레거시)·라벨 불일치 → 다이얼로그와 동일한 잠금 처리 + "곡 완료" 라벨 통일, (2) `setTrackStage` 미러 빈 eventId 가드. **문서화(미수정, self-healing):** 기기 간 stage=done+미러=false 전파 갭에서 setTrackStage 조기 반환이 미러를 즉시 복구 못 하나, ~45초 이벤트플랜 폴링이 수렴(표시는 stage로 항상 정확). **한계:** `/code-review`는 Claude 기반—Codex 독립 검증 아님. 원격 손상 시나리오는 라이브 Supabase 없인 코드 경로로만 검증.
+
+**검증**: `node --check`·`npm run build` 통과, 미리보기 콘솔 0건. 달력 체크박스 잠금·강제 언체크 시 상태 불변·재렌더 self-heal, mix 곡 "믹스 단계"(완료 아님), 다이얼로그/데모카드 곡완료→done, 레거시 demo+completed 잠금 버튼, 데모 복귀 완료 해제, 곡 아닌 데모 이벤트 정상 토글 하네스 확인.
+
+**커밋·배포**: 브랜치 `feature/pipeline-completion-lock` → main 병합. push·`supabase:sync` 미실행. (참고: 앞선 promote 기반 보류 항목은 아래. 이번 접근이 그 대안으로 채택됨.)
+
 ### 2026-07-06 — 완료 미러 대칭화(Phase 3b 부분) + 완전 통일 시도 보류 (브랜치 feature/pipeline-completion-authority)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 부재 중 자율 진행(ultracode).

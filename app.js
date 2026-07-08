@@ -1873,7 +1873,9 @@ function setTrackStage(trackNumber, stageId) {
   // setTrackStage로 라우팅하므로(잠금/투영), 여기서 호출하면 재귀가 돼 미러가 실제로 안 써진다.
   const track = findTrack(trackNumber);
   let mirrorChanged = false;
-  if (track) {
+  if (track && track.eventId) {
+    // eventId가 빈 값/누락인 곡(관리자 공란·Supabase null·시드 폴백)은 건너뛴다 —
+    // state.completed에 빈 키를 넣거나 빈 event_id로 원격 upsert하지 않도록(findTrackByEventId와 대칭).
     const eventId = track.eventId;
     const shouldComplete = stageId !== "demo";
     if (shouldComplete && !state.completed.has(eventId)) {
@@ -3841,9 +3843,11 @@ function renderTrackDetailCard(track) {
             <button class="opportunity-action is-primary" type="button" data-track-action="focus" data-track-event-id="${escapeHtml(track.eventId)}">
               오늘 보드에 올리기
             </button>
-            <button class="opportunity-action" type="button" data-track-action="complete" data-track-event-id="${escapeHtml(track.eventId)}">
-              ${state.completed.has(track.eventId) ? "완료 해제" : "데모 완료"}
-            </button>
+            ${
+              state.completed.has(track.eventId)
+                ? '<button class="opportunity-action" type="button" disabled title="완료 여부는 곡의 단계를 따릅니다">완료됨 · 곡별 진행에서 단계 변경</button>'
+                : `<button class="opportunity-action" type="button" data-track-action="complete" data-track-event-id="${escapeHtml(track.eventId)}">곡 완료</button>`
+            }
             <button class="opportunity-action is-secondary" type="button" data-track-action="hold" data-track-event-id="${escapeHtml(track.eventId)}">
               보류
             </button>
