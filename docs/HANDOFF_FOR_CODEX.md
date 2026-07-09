@@ -17,6 +17,29 @@
 
 ## 변경 로그
 
+### 2026-07-09 — 기능: 지연(기한 넘긴) 작업 '오늘로 다시 설정' (일괄 + 카드별) (브랜치 feature/overdue-reset-and-topbar-fixes)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 요청: "기한이 넘긴 작업을 우선순위는 유지한 채 D-day만 오늘로 되돌려 아무것도 놓치지 않게." 스코프 확인(질문) → **일괄 + 카드별 둘 다**로 확정. 변경 파일: [app.js](../app.js) · [index.html](../index.html) · [styles.css](../styles.css). 데이터/RLS/시드/서비스워커 무변경.
+
+**무엇을** (모두 개인 오버레이 `overrideDate`/팔로우업 `date`만 조작 — 원본 일정(Supabase/시드) 불변, 기존 '원래 날짜로'로 복원됨)
+- **일괄 배너 '전부 오늘로':** `오늘` 보드 히어로 위에 지연 작업이 있을 때만 뜨는 배너([index.html](../index.html) `#overdue-banner`). `renderOverdueBanner()`가 `getOverdueMovableEvents().length`로 개수를 표기하고, 버튼(`data-dashboard-action="reset-overdue"`)이 `resetOverdueToToday()` 호출. **`이번 주 핵심 작업`이 최대 5개만 보여 5개 넘어가면 지연 항목이 아예 안 보이던 "놓침"을 해소** — 배너는 보이든 안 보이든 지연 전체를 대상으로 한다.
+- **카드별 '오늘로':** 지연된 대시보드 카드(`renderDashboardTaskCard`)와 히어로(`renderHeroCard`)에 `delayed && canMoveEventDate(event)`일 때만 노출. `moveEventToToday()`=기존 `moveEventToDate(id, 오늘)` 재사용 → 이번 주 안 이동이라 order 유지.
+- **우선순위 보존 규칙:** `resetOverdueToToday()`는 지연 항목을 현재 보드 우선순위(`compareByPlanOrder`) 순으로 정렬해 상단에 두고 `order=(i+1)*10` 부여, 기존 수동 order가 있던 '지연 아님' 항목은 상대순서 유지한 채 그 뒤로 재배치, order 없던 항목은 그대로 날짜순. 저장/동기화/렌더는 마지막에 **한 번만**(루프 중 재렌더 없음). 팔로우업은 `state.trackFollowups[].date`를 오늘로, 일반 이벤트는 `overrideDate`(오늘==원본이면 null).
+
+**중요 — 고정 마감 보호:** `canMoveEventDate`(=`kind!=="opportunity" && !milestone`)를 그대로 사용하므로 **milestone·공모전은 '오늘로' 대상에서 제외**된다(CLAUDE.md "고정 마감 임의 이동 금지"와 일치). 배너 개수도 이동 가능한 지연만 센다. ⚠️ **관찰:** [schedule-data.js](../schedule-data.js) `demo-good-night`(2026-06-21, good night 곡 데모)만 `milestone:true`로 되어 있어 다른 곡 데모(`demo-psyche` 등)와 달리 이동 불가·배너 카운트 제외다 — 곡 데모 하나만 고정 마감으로 표시된 게 의도인지 데이터 확인 필요(이번엔 단일소스/데이터 임의변경 금지 원칙으로 손대지 않음).
+
+**검증(미리보기 1400px, `today=2026-07-09` 실시계):** 초기 "지연된 작업 12개" 배너 + 카드별 '오늘로' 6개 렌더. 카드별 클릭 → 해당 항목만 오늘로(12→11), 원본 불변. 일괄 클릭 → 배너 사라짐·지연 pill 0·히어로도 오늘, localStorage `album-release-event-plan-v1`에 이동 11건이 order 10~110(원 우선순위 순)·`overrideDate:2026-07-09`로 저장, `demo-good-night`(milestone)은 제외 확인. 모바일 375px 가로 오버플로우 0(버튼 줄바꿈). 테스트 후 localStorage 스냅샷 복원. `node --check` 3개 통과, `npm run build` 성공, 콘솔 오류 0. (미리보기 스크린샷 도구가 이 환경에서 반복 타임아웃 → 시각검증은 DOM 좌표·computed style·innerHTML로 대체.) **커밋·push 안 함**(워킹트리, 브랜치 feature/overdue-reset-and-topbar-fixes).
+
+### 2026-07-09 — 상단바 버그 2건 수정: 동기화 팝오버 상시 노출 + 탭 세로정렬 어긋남 (브랜치 feature/overdue-reset-and-topbar-fixes)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 신고 2건("전체 제작 일정 줄높이가 다름", "오른쪽 카드가 항상 떠 있어 불편"). **순수 CSS 수정만**(JS·데이터·RLS·시드·서비스워커 무변경). 변경 파일: [styles.css](../styles.css) 단 하나.
+
+**무엇을**
+- **① 동기화 팝오버 상시 노출(실버그):** `#sync-popover`는 HTML에 `hidden` 속성이 있고 JS(`setSyncPopoverOpen`)가 `.hidden` 토글로 여닫도록 설계됐으나, `.sync-popover { display: grid }`가 UA 기본 `[hidden]{display:none}`을 특이도로 덮어써서 **hidden이 무시되고 팝오버가 로드 직후부터 항상 화면 우상단에 떠 있었다**(JS 토글은 시각적으로 무효). → `.sync-popover[hidden] { display:none }` 규칙 추가로 해결. 검증: 로드 시 `display:none`, `#sync-dot` 클릭 시 열림(grid), 외부 클릭·ESC 닫힘 모두 DOM 측정으로 확인.
+- **② 탭 "전체 제작 일정"만 세로정렬 어긋남:** `.view-tabs`(flex, `align-items:stretch`)에서 일반 `<button>` 탭은 텍스트가 세로 중앙(브라우저 기본)인데, `전체 제작 일정` 탭만 `.desktop-only-tab { display:inline-flex }`라 flex 컨테이너가 되어 텍스트가 상단 정렬(`align-items:normal`=stretch) → 이 탭 텍스트만 약 12px 위로 떠 보였다. → `.tab-button`에 `display:inline-flex; align-items:center; justify-content:center` 부여해 모든 탭을 동일 정렬. 검증: 5개 탭 텍스트 top 좌표 전부 75px로 일치(수정 전 이 탭만 63px). `.desktop-only-tab`의 데스크톱/모바일 표시 토글은 그대로 유지.
+
+**검증:** `node --check app.js/schedule-data.js/service-worker.js` 통과, `npm run build` 성공(dist 재생성). 미리보기 1400px에서 DOM 측정으로 두 수정 검증, 콘솔 오류 0. (미리보기 스크린샷 도구가 이 환경에서 타임아웃이라 시각 확인은 DOM 좌표·computed style로 대체.) **아직 커밋·push 안 함**(워킹트리 변경만 브랜치 feature/overdue-reset-and-topbar-fixes에 존재).
+
 ### 2026-07-08 — UI 정제: 타이포 계층·가독성 + overview 중복 제거 + 태블릿 폭 가로 오버플로우 수정 (브랜치 feature/ui-refinement)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 요청("UI에서 더 수정할 수 있는 것")으로 시각/UX 정제만 진행(로직·데이터·정책 무변경).
