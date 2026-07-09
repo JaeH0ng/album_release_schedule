@@ -17,6 +17,15 @@
 
 ## 변경 로그
 
+### 2026-07-09 — 리뷰 대응(2026-07-09 Codex 리뷰): MAJOR resolved · MINOR 보류 (브랜치 feature/overdue-reset-and-topbar-fixes)
+
+**작업자:** Claude. [REVIEW_FROM_CODEX.md](REVIEW_FROM_CODEX.md) 2026-07-09 리뷰(Major 1·Minor 1) 처리.
+
+- **[resolved] MAJOR — 카드별 '오늘로'가 보류/안 함 팔로우업을 오늘 보드로 복귀 못 시킴:** `moveEventToDate()` 리팩터([app.js](../app.js) `moveEventToDate`). 보류/안 함 해제 patch(`statusPatch`: focusStatus/order)를 track-followup 분기 앞에서 **공통 계산**하고, 팔로우업 분기에서 `followup.date=오늘` + `state.eventPlan[id]` 갱신(빈 plan은 삭제)을 **한 배치**로 처리 후 저장/rebuild/renderAll 1회(활동로그 유지). 이제 팔로우업도 일반 이벤트처럼 '오늘로'가 `hold/dismissed`를 풀어 오늘 보드로 복귀. 일반 이벤트 경로 동작 불변. **검증:** 보류 팔로우업 주입→클릭→focusStatus none·date 오늘·hold-list 제거 확인, per-card/일괄 회귀 없음, `node --check`·`npm run build` 통과·콘솔 0.
+- **[보류] MINOR — 곡 데모 milestone 플래그 예측 불가:** Codex가 `demo-good-night`(schedule-data.js:123) **+ `demo-twenty-eight`(:350)** 둘이 milestone이라 지적(내 이전 핸드오프는 하나라고 오기 — 정정). 이 두 곡 데모가 `canMoveEventDate` 제외로 '오늘로'·지연 배너에서 빠짐. **milestone 유지 여부는 데이터 의도 결정**이라 이 UI 브랜치에서 schedule-data.js를 임의 변경하지 않고, 사용자가 시작한 백그라운드 조사 **task_f734fa12**로 이관(범위를 두 곡 모두로 확대해 확인 예정). 코드 버그 아님.
+
+**상태:** 열린 Blocker/Major 0(Major는 resolved, Minor는 보류). **재리뷰 요청** — 위 MAJOR 수정 diff 확인 부탁. 커밋 예정(아래 원 기능 커밋 9f41be2에 이어 후속 커밋).
+
 ### 2026-07-09 — 기능: 지연(기한 넘긴) 작업 '오늘로 다시 설정' (일괄 + 카드별) (브랜치 feature/overdue-reset-and-topbar-fixes)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 요청: "기한이 넘긴 작업을 우선순위는 유지한 채 D-day만 오늘로 되돌려 아무것도 놓치지 않게." 스코프 확인(질문) → **일괄 + 카드별 둘 다**로 확정. 변경 파일: [app.js](../app.js) · [index.html](../index.html) · [styles.css](../styles.css). 데이터/RLS/시드/서비스워커 무변경.

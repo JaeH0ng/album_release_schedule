@@ -2312,26 +2312,53 @@ function canMoveEventDate(event) {
 function moveEventToDate(eventId, nextIso) {
   const event = findEvent(eventId);
   if (!canMoveEventDate(event) || !nextIso) return;
-  if (event.kind === "track-followup") {
-    updateTrackFollowupDate(eventId, nextIso);
-    return;
-  }
   const plan = getEventPlan(eventId);
   const leavesWeek = !isIsoInCurrentWeek(nextIso);
-  const patch = { overrideDate: nextIso === event.originalDate ? null : nextIso };
-  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다.
+  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다(일반 이벤트·팔로우업 공통).
   // 보류/안 함이던 항목은 이번 주 보드 밖에 있었으므로 남아 있던 순서(order)는
   // stale이다. 다시 잡을 때 초기화한다.
+  const statusPatch = {};
   if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
-    patch.focusStatus = "none";
-    patch.order = null;
+    statusPatch.focusStatus = "none";
+    statusPatch.order = null;
   }
   // 이번 주 밖으로 보내면 '직접 수락' 고정도 풀어 이번 주 목록에서 내린다.
-  if (plan.focusStatus === "accepted" && leavesWeek) patch.focusStatus = "none";
+  if (plan.focusStatus === "accepted" && leavesWeek) statusPatch.focusStatus = "none";
   // 이번 주 밖으로 나가면 보드 순서는 의미가 없다. order를 비워 compareByPlanOrder가
   // 이 항목을 날짜와 무관하게 보드 상단에 다시 고정하지 않도록 한다.
-  if (leavesWeek) patch.order = null;
-  updateEventPlan(eventId, patch);
+  if (leavesWeek) statusPatch.order = null;
+
+  if (event.kind === "track-followup") {
+    // 팔로우업 날짜는 followup 자체(state.trackFollowups[].date)가 원천이라 overrideDate가 아니다.
+    // 하지만 보류/안 함 해제 같은 plan 패치는 일반 이벤트와 똑같이 적용해야 '오늘로'가 오늘
+    // 보드로 복귀시킨다(안 그러면 날짜만 바뀌고 회고 목록에 갇힘 — 일괄 resetOverdueToToday와
+    // 동작을 맞춘다). 날짜·plan을 함께 갱신하고 저장/렌더는 한 번만 한다.
+    const followup = state.trackFollowups.find((item) => item.id === eventId);
+    if (!followup) return;
+    const dateChanged = followup.date !== nextIso;
+    followup.date = nextIso;
+    const nextPlan = { ...plan, ...statusPatch, overrideDate: null };
+    if (nextPlan.focusStatus === "none" && !nextPlan.overrideDate && nextPlan.order == null) {
+      delete state.eventPlan[eventId];
+    } else {
+      state.eventPlan[eventId] = nextPlan;
+    }
+    if (dateChanged) {
+      const step = findTrackStep(followup.stepId);
+      addTrackActivity(followup.trackNumber, "일정 이동", `${step?.label || "반복 작업"} 날짜를 ${formatShortDate(nextIso)}로 변경`);
+    }
+    saveTrackFollowupsState();
+    saveEventPlanState();
+    queueEventPlanSync(eventId);
+    rebuildEventState();
+    renderAll();
+    return;
+  }
+
+  updateEventPlan(eventId, {
+    ...statusPatch,
+    overrideDate: nextIso === event.originalDate ? null : nextIso,
+  });
 }
 
 // 카드/히어로의 '오늘로' 버튼: 개인 오버레이만 오늘로 옮긴다(원본 일정 불변).
