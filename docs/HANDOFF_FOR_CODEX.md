@@ -17,6 +17,24 @@
 
 ## 변경 로그
 
+### 2026-07-09 — 곡 데모 milestone 오분류 제거: good night·스물 여덟 (브랜치 claude/amazing-edison-052fe7)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 요청(good night 데모가 '고정 마감'이라 이동/오늘로 재설정/지연 카운트에서 빠지는 문제 확인)으로 데이터 플래그 1종만 수정. 로직·스키마·정책 무변경.
+
+**무엇을** ([schedule-data.js](../schedule-data.js)만 수정)
+- `demo-good-night`(2026-06-21)·`demo-twenty-eight`(2026-07-19) 두 **개별 곡 데모**에서 `milestone: true` 제거. 나머지 9개 곡 데모(`demo-psyche` 등)와 동일하게 이동 가능해짐.
+
+**왜**
+- `milestone`의 실제 의미는 **단계 경계 마감/락**(`demo-buffer`·`structure-lock`·`arrangement-lock`·`recording-lock`·`post-recording-close`·`post-mix-final`·`post-master`)과 **고정 하드데이트**(`delivery-submit` 2026-11-13, `release-day` 2026-12-04), 그리고 런타임 공모전 마감뿐. 개별 곡 1곡의 데모가 이동 불가 '고정 마감'인 것은 의미상 모순.
+- 영향(코드 확인): `canMoveEventDate`([app.js:2309](../app.js))가 milestone을 이동 불가로 판정 → 작업 가져오기 시트([app.js:4396](../app.js))·상세 날짜 이동 UI([app.js:4334](../app.js) "고정 마감이라…")에서 제외되고, 지연 카운트에도 안 잡힘. 11곡 중 딱 이 2곡만 플래그가 있었고(원 리포트는 good night만 언급, **스물 여덟은 내가 발견해 사용자에게 보고 후 함께 제거 확정**), 두 곡 모두 특별한 고정 사유가 문서 어디에도 없음(`DEMO_PLAN.md`·`TRACK_STATUS.md`·`SCHEDULE.md`가 평범한 이동 가능 데모로 취급) → 복사-붙여넣기 잔재로 판단.
+
+**절대 규칙 준수**
+- **고정 마감 불변:** `delivery-submit`(11-13)·`release-day`(12-04)은 그대로 `milestone=true`. 손대지 않음.
+- **단일 소스:** `schedule-data.js`만 수정. `app.js` 일정 배열·시드 SQL 수기 이중관리 없음. `npm run schedule:sql` 재생성 정상.
+- **런타임 소스 주의:** 배포 런타임 진짜 소스는 Supabase. 이 편집은 **시드·오프라인 폴백**만 바꾼 것이라, 라이브 DB(`album_events.milestone`)는 `npm run schedule:sync`(라이브 DB write) 실행 전까지 여전히 `true`. **sync는 실행하지 않음**(배포 미요청·미승인). 즉 라이브 반영은 후속 sync 필요.
+
+**검증:** `node --check app.js/schedule-data.js/service-worker.js` 통과. `npm run build` 성공(dist 재스탬핑). `npm run schedule:sql` 출력 정상(102줄, begin/commit·upsert·정리 delete 구조 유지) — 생성 SQL에서 `demo-good-night`·`demo-twenty-eight` → `milestone=false`, 단계 락 7종+`delivery-submit`+`release-day` → `milestone=true` 전수 확인. 브라우저 미리보기는 생략: 런타임 소스가 Supabase라 sync 전에는 프리뷰에 변화가 안 보이고(폴백 강제 시에만 관측), 스키마 변경이 아니라 기존 `canMoveEventDate` 경로가 이미 처리하는 **데이터 플래그 1개** 토글이라 관측 대상 신규 렌더 로직 없음 — 정본 검증 경로인 schedule:sql 출력으로 확인. **main·gh-pages 미반영, push 안 함**(브랜치 claude/amazing-edison-052fe7에만 존재).
+
 ### 2026-07-08 — UI 정제: 타이포 계층·가독성 + overview 중복 제거 + 태블릿 폭 가로 오버플로우 수정 (브랜치 feature/ui-refinement)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 요청("UI에서 더 수정할 수 있는 것")으로 시각/UX 정제만 진행(로직·데이터·정책 무변경).
