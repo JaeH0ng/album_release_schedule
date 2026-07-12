@@ -2416,6 +2416,73 @@ function resetOverdueToToday() {
   renderAll();
 }
 
+// ── 곡 단위 일괄 리스케줄 ─────────────────────────────────────────────────
+// 한 곡의 "날짜 있는 남은 일정"을 대상으로 한다: 그 곡의 옮길 수 있는 미완료 이벤트(데모·데모리뷰)와
+// 그 곡의 팔로우업. 편곡/녹음/믹스는 곡별 날짜 이벤트가 아니라 앨범 배치 레일·단계 상태라 여기 없다
+// (레일은 getIncompleteEvents가 이미 제외). getIncompleteEvents가 날짜 오름차순이라 첫 항목이 앵커다.
+function getTrackScheduleItems(trackNumber) {
+  const track = findTrack(trackNumber);
+  if (!track) return [];
+  return getIncompleteEvents().filter((event) => {
+    if (!canMoveEventDate(event)) return false;
+    if (event.kind === "track-followup") return event.trackNumber === track.number;
+    return event.track === track.title;
+  });
+}
+
+// 곡의 가장 이른 미완료 항목이 targetIso에 오도록 델타를 구해, 그 곡의 모든 대상 항목에 같은 델타를
+// 적용한다(상대 간격 유지 → 밀기/당기기 대칭). 개인 오버레이(overrideDate)/팔로우업 날짜만 바꾸고
+// 원본 일정은 불변. resetOverdueToToday와 같은 규칙: 보류/안 함 해제, 이번 주 밖이면 order 초기화,
+// 팔로우업은 자체 date가 기준, 저장/동기화/렌더는 마지막에 한 번만.
+function rescheduleTrackToDate(trackNumber, targetIso) {
+  if (!targetIso) return;
+  const items = getTrackScheduleItems(trackNumber);
+  if (!items.length) return;
+  const anchorIso = items[0].date;
+  const deltaDays = getDayOffset(anchorIso, targetIso);
+  if (deltaDays === 0) return;
+
+  items.forEach((event) => {
+    const nextIso = toIso(addDays(parseDate(event.date), deltaDays));
+    const plan = getEventPlan(event.id);
+    const leavesWeek = !isIsoInCurrentWeek(nextIso);
+    const patch = { ...plan };
+    // 날짜를 옮기는 행동은 "하겠다"는 뜻 — 보류/안 함이던 항목은 해제(stale order도 초기화).
+    if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
+      patch.focusStatus = "none";
+      patch.order = null;
+    }
+    if (plan.focusStatus === "accepted" && leavesWeek) patch.focusStatus = "none";
+    if (leavesWeek) patch.order = null;
+
+    if (event.kind === "track-followup") {
+      const followup = state.trackFollowups.find((item) => item.id === event.id);
+      if (followup) followup.date = nextIso;
+      patch.overrideDate = null; // 팔로우업은 자체 date가 기준 — 오버라이드는 비운다.
+    } else {
+      patch.overrideDate = nextIso === event.originalDate ? null : nextIso;
+    }
+
+    // 빈 plan은 제거(updateEventPlan과 동일 기준 — 오버레이 없는 항목이 남지 않게).
+    if (patch.focusStatus === "none" && !patch.overrideDate && patch.order == null) {
+      delete state.eventPlan[event.id];
+    } else {
+      state.eventPlan[event.id] = patch;
+    }
+  });
+
+  addTrackActivity(trackNumber, "일정 이동", `남은 일정 ${items.length}개를 ${formatShortDate(targetIso)} 기준으로 다시 잡음`);
+  saveTrackFollowupsState();
+  saveEventPlanState();
+  items.forEach((event) => queueEventPlanSync(event.id));
+  rebuildEventState();
+  renderAll();
+}
+
+function rescheduleTrackToToday(trackNumber) {
+  rescheduleTrackToDate(trackNumber, toIso(today));
+}
+
 // 다이얼로그·가져오기 시트에서 쓰는 빠른 이동 목적지. 같은 날짜가 겹치면 앞의 것만 남긴다.
 function getQuickMoveTargets() {
   const weekStart = startOfWeek(today);
@@ -3976,6 +4043,7 @@ function renderTrackDetailCard(track) {
   const event = findEvent(track.eventId);
   const notes = getTrackNotes(track.number);
   const status = getTrackStatus(track.number, track.eventId);
+  const scheduleItems = getTrackScheduleItems(track.number);
   const stageSteps = getStageSteps(stageId);
   const groupedSteps = getStageGroups(stageId)
     .map((group) => ({
@@ -4036,6 +4104,24 @@ function renderTrackDetailCard(track) {
               : canUseAdminMode()
                 ? `<div class="track-action-row"><button class="opportunity-action opportunity-edit-button" type="button" data-track-edit="${escapeHtml(track.number)}">관리자: 곡 편집</button></div>`
                 : ""
+          }
+          ${
+            scheduleItems.length > 0
+              ? `<div class="track-reschedule">
+            <div class="track-reschedule-head">
+              <span class="track-reschedule-title">곡 일정 다시 잡기</span>
+              <span class="track-reschedule-hint">남은 ${scheduleItems.length}개 · 가장 이른 ${formatShortDate(scheduleItems[0].date)}${parseDate(scheduleItems[0].date) < today ? " · 지남" : ""}</span>
+            </div>
+            <div class="track-reschedule-controls">
+              <button class="opportunity-action is-primary" type="button" data-track-reschedule-today="${escapeHtml(track.number)}" title="이 곡의 남은 일정을 오늘부터 다시 잡습니다">오늘부터</button>
+              <label class="track-reschedule-date">
+                <span>날짜 지정</span>
+                <input type="date" value="${escapeHtml(scheduleItems[0].date)}" data-track-reschedule-date="${escapeHtml(track.number)}" />
+              </label>
+            </div>
+            <p class="track-reschedule-note">데모·데모리뷰와 이 곡의 반복 일정을 상대 간격을 유지한 채 함께 옮깁니다. 원본 일정은 그대로예요.</p>
+          </div>`
+              : ""
           }
           ${
             stageId === "done"
@@ -4322,6 +4408,18 @@ function bindTrackDetailControls() {
   document.querySelectorAll("[data-track-followup-date]").forEach((input) => {
     input.addEventListener("change", () => {
       updateTrackFollowupDate(input.dataset.trackFollowupDate, input.value);
+    });
+  });
+
+  document.querySelectorAll("[data-track-reschedule-today]").forEach((button) => {
+    button.addEventListener("click", () => {
+      rescheduleTrackToToday(button.dataset.trackRescheduleToday);
+    });
+  });
+
+  document.querySelectorAll("[data-track-reschedule-date]").forEach((input) => {
+    input.addEventListener("change", () => {
+      rescheduleTrackToDate(input.dataset.trackRescheduleDate, input.value);
     });
   });
 
