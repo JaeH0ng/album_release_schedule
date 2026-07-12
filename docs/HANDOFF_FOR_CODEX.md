@@ -17,6 +17,26 @@
 
 ## 변경 로그
 
+### 2026-07-12 — 리뷰 대응(2026-07-12 Codex 리뷰): MAJOR resolved — 곡 일정 대상 id 기반 재구성 (브랜치 feature/track-bulk-reschedule)
+
+**작업자:** Claude. [REVIEW_FROM_CODEX.md](REVIEW_FROM_CODEX.md) 2026-07-12 리뷰(Major 1) 처리.
+
+- **[resolved] MAJOR — 곡 일정 대상이 제목 문자열 매칭에 의존:** `getTrackScheduleItems`([app.js](../app.js))의 일반 이벤트 필터를 `event.track === track.title` → **id 기반 + demo phase 제한**으로 교체. `event.phase === "demo"` AND (`event.id === track.eventId` 또는 `event.id.startsWith(\`${track.eventId}-\`)`). 데모는 `track.eventId`로 직접 잡아 제목/곡명 편집에도 안 빠지고(누락 해소), 제목 매칭 제거 + demo phase 가드로 같은 제목의 비-demo 이벤트 과포함 배제(핸드오프 "편곡/녹음/믹스는 대상 아님"과 코드 일치). 팔로우업 분기는 미변경. **검증:** Psyche '오늘부터' → 옮겨진 id 정확히 데모+스케치 2개(과포함 0), 데모 7/12·리뷰 7/13 이전과 동일, 콘솔 0, `node --check`·`npm run build` 통과. 11곡 id 패턴 전수 확인(곡 소유 아닌 `demo-template`·`demo-buffer` 미포함).
+
+**상태:** 열린 Blocker/Major 0. **재리뷰 요청** — 위 id 기반 필터 diff 확인 부탁. 후속 커밋 예정.
+
+### 2026-07-12 — 기능: 곡 단위 일괄 리스케줄 (있는 날짜만 상대 간격 유지 이동) (브랜치 feature/track-bulk-reschedule)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 요청("일정이 밀려간다 — 한 곡이 밀리면 그 곡 일정을 한 번에 다시 잡고 싶다"). 스코프 질문 → **"있는 날짜만 일괄 이동"** 확정(곡별 단계 마감 신설안 B는 후속 보류). 변경 파일: [app.js](../app.js) · [styles.css](../styles.css). 데이터/RLS/시드/서비스워커/스키마 무변경.
+
+**무엇을** (모두 개인 오버레이 `overrideDate`/팔로우업 `date`만 조작 — 원본 일정 불변, 기존 '원래 날짜로'로 복원됨)
+- **`getTrackScheduleItems(trackNumber)`**: 그 곡의 옮길 수 있는 미완료·날짜 항목 = 데모(`demo-<곡>`)·데모리뷰(`demo-<곡>-arrangement-sketch`) 이벤트 + 그 곡의 팔로우업. 규칙: `getIncompleteEvents()`(미완료·비레일·날짜 오름차순) 위에 `canMoveEventDate` + (팔로우업이면 `trackNumber` 일치, 아니면 `event.track === track.title`) 필터. **편곡/녹음/믹스는 곡별 날짜 이벤트가 아니라 앨범 배치 레일·단계 상태라 대상 아님**(레일은 getIncompleteEvents가 이미 제외) — 그래서 "downstream 캐스케이드"는 곡이 실제로 만든 팔로우업까지만 이동한다(모델 한계, 사용자에게 설명·B안으로 확장 예정).
+- **`rescheduleTrackToDate(trackNumber, targetIso)`**: 가장 이른 미완료 항목(앵커=items[0], 정렬상 최소 날짜)이 `targetIso`에 오도록 `deltaDays=getDayOffset(anchor,target)`를 구해 **모든 대상 항목에 같은 델타** 적용(상대 간격 유지 → 밀기/당기기 대칭). 항목별로 `moveEventToDate`/`resetOverdueToToday`와 **동일 규칙**: 보류/안 함 해제(+stale order 초기화), 이번 주 밖이면 order null, 팔로우업은 `state.trackFollowups[].date` 갱신·overrideDate null, 일반 이벤트는 `overrideDate`(원본과 같으면 null·빈 plan 삭제). 저장/동기화/렌더는 **마지막에 한 번만**. 활동로그 "일정 이동" 1건. `rescheduleTrackToToday`는 target=오늘 래퍼.
+- **UI(곡 상세 카드, `renderTrackDetailCard`)**: `scheduleItems.length>0`일 때만 `.track-reschedule` 블록 — "곡 일정 다시 잡기" 제목 + "남은 N개 · 가장 이른 M월 D일 (·지남)" 힌트 + **[오늘부터]** 버튼(`data-track-reschedule-today`) + **날짜 지정** `<input type="date">`(`data-track-reschedule-date`, 값=앵커 현재 날짜). 배선은 기존 `[data-track-followup-date]` change 패턴 미러. 신뢰 불가 값(`track.number`, 날짜)은 `escapeHtml`.
+- **styles.css**: `.track-reschedule*` (카드 내부 박스, 컨트롤 flex-wrap, 날짜 input). 참조 변수 `--line`/`--muted`/`--canvas` 존재 확인, `--surface-muted`만 fallback(`rgba(0,0,0,.02)`).
+
+**검증(미리보기 4174, 실시계 `today=2026-07-12`):** Psyche(데모 6/25·리뷰 6/26 지연) 카드에 "남은 2개 · 가장 이른 6월 25일 · 지남" 렌더 확인. **오늘부터** → 데모 `overrideDate=7/12`·리뷰 `7/13`(1일 간격 유지), 힌트 "지남" 해제. **날짜 지정 7/20**(밀기) → 데모 7/20·리뷰 7/21(델타 +8 유지). **원본 6/25 복귀** → 두 plan 삭제(overrideDate 정리). **팔로우업 포함**: step `key` 팔로우업(7/13) 생성 후 오늘부터 → 데모 7/12·리뷰 7/13·팔로우업 **7/30**(모두 +17 델타). 원본 일정 불변, 테스트 후 localStorage 스냅샷 복원. 레이아웃: 박스 카드 안(right −16), 컨트롤 wrap. `node --check` 3파일·`npm run build` 통과, 콘솔 오류 0. (이 환경은 clientWidth가 0으로 측정돼 페이지 폭 오버플로우 수치는 허상 — pipeline-grid min-width 460의 기존 자체 스크롤이며 내 박스와 무관. 시각검증은 요소 상대 getBoundingClientRect로 대체.) **커밋 예정, push 안 함**(브랜치 feature/track-bulk-reschedule).
+
 ### 2026-07-09 — 곡 데모 milestone 오분류 제거: good night·스물 여덟 (브랜치 claude/amazing-edison-052fe7)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 요청(good night 데모가 '고정 마감'이라 이동/오늘로 재설정/지연 카운트에서 빠지는 문제 확인)으로 데이터 플래그 1종만 수정. 로직·스키마·정책 무변경.

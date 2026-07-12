@@ -1,4 +1,4 @@
-const RAW_BUILD_VERSION = "20260712072458";
+const RAW_BUILD_VERSION = "20260712080953";
 // 빌드를 거치지 않고(루트 직접 서빙) __BUILD_VERSION__이 치환되지 않은 경우,
 // 등록 URL의 ?v= 값을 폴백 버전으로 써서 배포마다 캐시 세대가 갈리도록 한다.
 const BUILD_VERSION =
