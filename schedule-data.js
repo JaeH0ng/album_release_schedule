@@ -120,7 +120,6 @@ const defaultEvents = [
     track: "good night",
     document: "tracks/10_good-night/README.md",
     lyrics: "lyrics/10_good_night.txt",
-    milestone: true,
   },
   {
     id: "demo-good-night-arrangement-sketch",
@@ -347,7 +346,6 @@ const defaultEvents = [
     track: "스물 여덟",
     document: "tracks/09_twenty-eight/README.md",
     lyrics: "lyrics/09_스물_여덟.txt",
-    milestone: true,
   },
   {
     id: "demo-twenty-eight-arrangement-sketch",

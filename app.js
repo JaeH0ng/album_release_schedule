@@ -2312,26 +2312,108 @@ function canMoveEventDate(event) {
 function moveEventToDate(eventId, nextIso) {
   const event = findEvent(eventId);
   if (!canMoveEventDate(event) || !nextIso) return;
-  if (event.kind === "track-followup") {
-    updateTrackFollowupDate(eventId, nextIso);
-    return;
-  }
   const plan = getEventPlan(eventId);
   const leavesWeek = !isIsoInCurrentWeek(nextIso);
-  const patch = { overrideDate: nextIso === event.originalDate ? null : nextIso };
-  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다.
+  // 날짜를 옮기는 행동 자체가 "하겠다"는 뜻 — 보류/안 함은 해제한다(일반 이벤트·팔로우업 공통).
   // 보류/안 함이던 항목은 이번 주 보드 밖에 있었으므로 남아 있던 순서(order)는
   // stale이다. 다시 잡을 때 초기화한다.
+  const statusPatch = {};
   if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
-    patch.focusStatus = "none";
-    patch.order = null;
+    statusPatch.focusStatus = "none";
+    statusPatch.order = null;
   }
   // 이번 주 밖으로 보내면 '직접 수락' 고정도 풀어 이번 주 목록에서 내린다.
-  if (plan.focusStatus === "accepted" && leavesWeek) patch.focusStatus = "none";
+  if (plan.focusStatus === "accepted" && leavesWeek) statusPatch.focusStatus = "none";
   // 이번 주 밖으로 나가면 보드 순서는 의미가 없다. order를 비워 compareByPlanOrder가
   // 이 항목을 날짜와 무관하게 보드 상단에 다시 고정하지 않도록 한다.
-  if (leavesWeek) patch.order = null;
-  updateEventPlan(eventId, patch);
+  if (leavesWeek) statusPatch.order = null;
+
+  if (event.kind === "track-followup") {
+    // 팔로우업 날짜는 followup 자체(state.trackFollowups[].date)가 원천이라 overrideDate가 아니다.
+    // 하지만 보류/안 함 해제 같은 plan 패치는 일반 이벤트와 똑같이 적용해야 '오늘로'가 오늘
+    // 보드로 복귀시킨다(안 그러면 날짜만 바뀌고 회고 목록에 갇힘 — 일괄 resetOverdueToToday와
+    // 동작을 맞춘다). 날짜·plan을 함께 갱신하고 저장/렌더는 한 번만 한다.
+    const followup = state.trackFollowups.find((item) => item.id === eventId);
+    if (!followup) return;
+    const dateChanged = followup.date !== nextIso;
+    followup.date = nextIso;
+    const nextPlan = { ...plan, ...statusPatch, overrideDate: null };
+    if (nextPlan.focusStatus === "none" && !nextPlan.overrideDate && nextPlan.order == null) {
+      delete state.eventPlan[eventId];
+    } else {
+      state.eventPlan[eventId] = nextPlan;
+    }
+    if (dateChanged) {
+      const step = findTrackStep(followup.stepId);
+      addTrackActivity(followup.trackNumber, "일정 이동", `${step?.label || "반복 작업"} 날짜를 ${formatShortDate(nextIso)}로 변경`);
+    }
+    saveTrackFollowupsState();
+    saveEventPlanState();
+    queueEventPlanSync(eventId);
+    rebuildEventState();
+    renderAll();
+    return;
+  }
+
+  updateEventPlan(eventId, {
+    ...statusPatch,
+    overrideDate: nextIso === event.originalDate ? null : nextIso,
+  });
+}
+
+// 카드/히어로의 '오늘로' 버튼: 개인 오버레이만 오늘로 옮긴다(원본 일정 불변).
+// moveEventToDate가 이번 주 안 이동이면 order를 유지하므로 우선순위가 보존된다.
+function moveEventToToday(eventId) {
+  moveEventToDate(eventId, toIso(today));
+}
+
+// 지연(기한 넘긴) + 옮길 수 있는 미완료 작업. 고정 마감(milestone)·공모전·레일은 제외된다.
+// 현재 보드 우선순위(compareByPlanOrder) 순으로 정렬해 반환한다.
+function getOverdueMovableEvents() {
+  return getIncompleteEvents()
+    .filter((event) => canMoveEventDate(event) && parseDate(event.date) < today)
+    .sort((left, right) => compareByPlanOrder(left, right));
+}
+
+// 일괄 '전부 오늘로': 지연된 작업 전체를 한 번에 오늘로 당긴다. 원본 일정은 그대로 두고
+// 개인 오버레이(overrideDate)/팔로우업 날짜만 바꾼다. 지금 보이는 우선순위 순서를 잃지 않도록,
+// 지연 블록을 상단에 두고 그 순서대로 order를 부여한다. 기존에 수동 순서가 있던 '지연 아님'
+// 항목은 상대 순서를 유지한 채 지연 블록 뒤로 재배치한다(순서 없던 항목은 그대로 날짜순).
+// 저장/동기화/렌더는 마지막에 한 번만 수행한다.
+function resetOverdueToToday() {
+  const iso = toIso(today);
+  const overdue = getOverdueMovableEvents();
+  if (!overdue.length) return;
+  const overdueIds = new Set(overdue.map((event) => event.id));
+  const orderedRest = getIncompleteEvents()
+    .filter((event) => !overdueIds.has(event.id) && getPlanOrder(event.id) !== null)
+    .sort((left, right) => getPlanOrder(left.id) - getPlanOrder(right.id));
+
+  const sequence = [...overdue, ...orderedRest];
+  sequence.forEach((event, index) => {
+    const plan = getEventPlan(event.id);
+    const patch = { ...plan, order: (index + 1) * 10 };
+    if (overdueIds.has(event.id)) {
+      if (event.kind === "track-followup") {
+        const followup = state.trackFollowups.find((item) => item.id === event.id);
+        if (followup) followup.date = iso;
+        patch.overrideDate = null; // 팔로우업은 자체 date가 기준 — 오버라이드는 비운다.
+      } else {
+        patch.overrideDate = iso === event.originalDate ? null : iso;
+      }
+      // 날짜를 오늘로 당기는 건 "하겠다"는 뜻 — 보류/안 함이던 항목은 해제한다.
+      if (plan.focusStatus === "hold" || plan.focusStatus === "dismissed") {
+        patch.focusStatus = "none";
+      }
+    }
+    state.eventPlan[event.id] = patch;
+  });
+
+  saveTrackFollowupsState();
+  saveEventPlanState();
+  sequence.forEach((event) => queueEventPlanSync(event.id));
+  rebuildEventState();
+  renderAll();
 }
 
 // 다이얼로그·가져오기 시트에서 쓰는 빠른 이동 목적지. 같은 날짜가 겹치면 앞의 것만 남긴다.
@@ -2641,12 +2723,34 @@ function renderOnboardingHint() {
   });
 }
 
+// 지연된 작업이 있을 때만 뜨는 일괄 배너: '전부 오늘로'로 밀린 작업을 한 번에 오늘로 당긴다.
+// 5개 상한에 가려 안 보이던 지연 항목까지 모두 포함되므로 "놓침"을 막는다.
+function renderOverdueBanner() {
+  const host = document.querySelector("#overdue-banner");
+  if (!host) return;
+  const overdueCount = getOverdueMovableEvents().length;
+  if (!overdueCount) {
+    host.hidden = true;
+    host.innerHTML = "";
+    return;
+  }
+  host.hidden = false;
+  host.innerHTML = `
+    <div class="overdue-banner-text">
+      <strong>지연된 작업 ${overdueCount}개</strong>
+      <span>기한이 지났습니다. 우선순위는 그대로 두고 D-day만 오늘로 당길 수 있어요.</span>
+    </div>
+    <button class="overdue-banner-action" type="button" data-dashboard-action="reset-overdue">전부 오늘로</button>
+  `;
+}
+
 function renderDashboard() {
   const weekStart = startOfWeek(today);
   const weekEnd = addDays(weekStart, 6);
   const weeklyFocusItems = getWeeklyFocusItems();
   const acceptedFocus = weeklyFocusItems.map(({ event }) => event);
   renderOnboardingHint();
+  renderOverdueBanner();
   const heldEvents = getHeldEvents();
   const dismissedEvents = getDismissedEvents();
   const urgencyEvents = getPullForwardCandidates();
@@ -2842,6 +2946,11 @@ function renderHeroCard(event, mode) {
           : `<button class="hero-primary" type="button" data-dashboard-action="complete" data-event-id="${escapeHtml(event.id)}">완료</button>`
       }
       ${
+        delayed && canMoveEventDate(event)
+          ? `<button class="hero-more hero-today" type="button" data-dashboard-action="today" data-event-id="${escapeHtml(event.id)}" title="D-day를 오늘로">오늘로</button>`
+          : ""
+      }
+      ${
         canDemote
           ? `<button class="hero-more" type="button" data-dashboard-action="move-down" data-event-id="${escapeHtml(event.id)}" aria-label="이 작업을 뒤로 미루고 다음 작업 보기" title="뒤로 미루기">↓</button>`
           : ""
@@ -2876,6 +2985,11 @@ function renderDashboardTaskCard(event, mode, options = {}) {
         : mode === "dismissed"
           ? `<button class="opportunity-action is-primary" type="button" data-dashboard-action="restore" data-event-id="${escapeHtml(event.id)}">다시 후보로</button>`
           : `<button class="opportunity-action is-primary" type="button" data-dashboard-action="accept" data-event-id="${escapeHtml(event.id)}">수락</button>`;
+  // 지연된 항목엔 '오늘로'를 노출해, ⋯ 다이얼로그를 열지 않고도 D-day를 오늘로 당길 수 있게 한다.
+  const todayButton =
+    delayed && canMoveEventDate(event)
+      ? `<button class="opportunity-action task-today" type="button" data-dashboard-action="today" data-event-id="${escapeHtml(event.id)}" title="D-day를 오늘로">오늘로</button>`
+      : "";
 
   return `
     <article class="focus-item">
@@ -2887,6 +3001,7 @@ function renderDashboardTaskCard(event, mode, options = {}) {
       </div>
       <div class="focus-actions">
         ${primaryButton}
+        ${todayButton}
         ${
           options.reorder
             ? `<button class="opportunity-action task-reorder" type="button" data-dashboard-action="move-up" data-event-id="${escapeHtml(event.id)}" aria-label="순서 위로" title="위로">↑</button>
@@ -2904,12 +3019,17 @@ function bindDashboardTaskControls() {
     button.addEventListener("click", () => {
       const eventId = button.dataset.eventId;
       const action = button.dataset.dashboardAction;
+      if (action === "reset-overdue") {
+        resetOverdueToToday();
+        return;
+      }
       if (action === "menu") {
         const target = findEvent(eventId);
         if (target) openTaskDialog(target);
         return;
       }
       if (action === "accept") acceptEventForThisWeek(eventId);
+      if (action === "today") moveEventToToday(eventId);
       if (action === "hold") holdEvent(eventId);
       if (action === "dismiss") dismissEvent(eventId);
       if (action === "pull") pullEventIntoThisWeek(eventId);
