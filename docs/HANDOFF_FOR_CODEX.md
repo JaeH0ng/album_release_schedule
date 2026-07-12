@@ -17,6 +17,14 @@
 
 ## 변경 로그
 
+### 2026-07-12 — 리뷰 대응(2026-07-12 Codex 리뷰): MAJOR resolved — 곡 일정 대상 id 기반 재구성 (브랜치 feature/track-bulk-reschedule)
+
+**작업자:** Claude. [REVIEW_FROM_CODEX.md](REVIEW_FROM_CODEX.md) 2026-07-12 리뷰(Major 1) 처리.
+
+- **[resolved] MAJOR — 곡 일정 대상이 제목 문자열 매칭에 의존:** `getTrackScheduleItems`([app.js](../app.js))의 일반 이벤트 필터를 `event.track === track.title` → **id 기반 + demo phase 제한**으로 교체. `event.phase === "demo"` AND (`event.id === track.eventId` 또는 `event.id.startsWith(\`${track.eventId}-\`)`). 데모는 `track.eventId`로 직접 잡아 제목/곡명 편집에도 안 빠지고(누락 해소), 제목 매칭 제거 + demo phase 가드로 같은 제목의 비-demo 이벤트 과포함 배제(핸드오프 "편곡/녹음/믹스는 대상 아님"과 코드 일치). 팔로우업 분기는 미변경. **검증:** Psyche '오늘부터' → 옮겨진 id 정확히 데모+스케치 2개(과포함 0), 데모 7/12·리뷰 7/13 이전과 동일, 콘솔 0, `node --check`·`npm run build` 통과. 11곡 id 패턴 전수 확인(곡 소유 아닌 `demo-template`·`demo-buffer` 미포함).
+
+**상태:** 열린 Blocker/Major 0. **재리뷰 요청** — 위 id 기반 필터 diff 확인 부탁. 후속 커밋 예정.
+
 ### 2026-07-12 — 기능: 곡 단위 일괄 리스케줄 (있는 날짜만 상대 간격 유지 이동) (브랜치 feature/track-bulk-reschedule)
 
 **작업자:** Claude (Claude Code, Windows). 사용자 요청("일정이 밀려간다 — 한 곡이 밀리면 그 곡 일정을 한 번에 다시 잡고 싶다"). 스코프 질문 → **"있는 날짜만 일괄 이동"** 확정(곡별 단계 마감 신설안 B는 후속 보류). 변경 파일: [app.js](../app.js) · [styles.css](../styles.css). 데이터/RLS/시드/서비스워커/스키마 무변경.

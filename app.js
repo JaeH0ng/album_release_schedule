@@ -2426,7 +2426,12 @@ function getTrackScheduleItems(trackNumber) {
   return getIncompleteEvents().filter((event) => {
     if (!canMoveEventDate(event)) return false;
     if (event.kind === "track-followup") return event.trackNumber === track.number;
-    return event.track === track.title;
+    // 안정적 연결: 곡의 데모 이벤트(track.eventId)와 그 하위 데모 이벤트(`${eventId}-arrangement-sketch` 등)를
+    // id로 식별한다. 제목 매칭(event.track === title)은 관리자·Supabase 라이브 편집에 취약해 — 제목/곡명을
+    // 따로 바꾸면 track.eventId로 연결된 데모가 누락되고, 같은 제목의 비-demo 이벤트를 과포함한다.
+    // demo phase로 제한해 편곡/녹음/믹스의 곡별 이벤트(대상 아님)가 섞이지 않게 한다.
+    if (event.phase !== "demo") return false;
+    return event.id === track.eventId || event.id.startsWith(`${track.eventId}-`);
   });
 }
 
