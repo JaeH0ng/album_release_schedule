@@ -17,6 +17,33 @@
 
 ## 변경 로그
 
+### 2026-07-18 — 싱어송라이터 공모전 후보 최신화 (오프라인 폴백 + 시드 마이그레이션 + 문서)
+
+**작업자:** Claude (Claude Code, Windows). 사용자 요청("공모전 정보 최신화 — 기존 공모전과 비슷한 성격대로 갱신"). **마이그레이션은 사용자가 대시보드 SQL Editor로 프로덕션에 적용 완료(검증됨). 코드 커밋은 브랜치에, push·gh-pages는 게이트로 미실행(사용자 실행 대기).**
+
+**무엇을** (데이터/문서만. 로직·스키마·RLS·서비스워커 무변경)
+- **[app.js](../app.js) `defaultOpportunities`**: 오프라인 폴백 배열을 5건으로 교체. **기존 id 3건 유지**(개인 판단 상태 보존 — `yjh-2026`·`ebs-hellorookie-watch`·`hiddenstage-2026`), 상태만 현재화. **신규 2건 추가**(`grounz-5805`·`grounz-5809`, GROUNZ id 공간 유지해 이후 자동수집이 이어받게).
+- **[supabase/migrations/20260718100000_refresh_singer_songwriter_opportunities.sql](../supabase/migrations/20260718100000_refresh_singer_songwriter_opportunities.sql)** (신규): 위 5건을 `on conflict do update`로 upsert. app.js 폴백과 값 일치. **기존 시드 마이그레이션(20260620153000)은 손대지 않음.**
+- **[docs/OPPORTUNITIES.md](OPPORTUNITIES.md)**: 현재 시드 후보 표를 5행으로 갱신 + 제외 후보 근거 명시.
+
+**갱신 내용 (오늘=2026-07-18 기준)**
+- `yjh-2026` 제37회 유재하: 접수 7/3 마감 → **open→closed**. 본선 11/7, 제38회 2027 중반 예상.
+- `ebs-hellorookie-watch` EBS 헬로루키: 2026 부활(5~9월 월별), 마지막 회차 7/6 마감 → **watch 유지**(2027 재개 대비). URL 교정(공식 space/rookie/audition).
+- `hiddenstage-2026` 히든스테이지: 제4회 4/24 마감·본선 진행 → **closed 유지**. 연례 대회로 제5회 2027.3 예상.
+- **신규** `grounz-5805` 제4회 경산 Again 대학가요제(창작곡 부문 자작곡 의무, 대학생 한정) — open, 마감 7/31, fit "확인 필요"/3.
+- **신규** `grounz-5809` 2026 전일가요제(자작곡 1곡 의무, AI 생성 금지) — open, 마감 9/6, fit "잘 맞음"/4.
+
+**왜 이 2건만** — GROUNZ 자동수집(`node scripts/build-grounz-opportunities-sql.mjs --json`) 8건을 공식 소스로 재검증(멀티에이전트 워크플로, WebSearch/WebFetch). 자작곡(미발표 창작곡) 의무 경연만 채택. **제외:** 서울음악제(협회 회원 작곡공모)·진주가인가요제(커버/헌정)·기타쇼 낙원(커버 전용 밴드)·플라이뮤지션(영상 인기투표)·대구포크스타(자작곡 비의무)·양평창작가요제(공식 공고 실존 확인 불가). GROUNZ 수집기가 이들을 "아주 잘 맞음"으로 과대평가한 것을 적대적 검증으로 걸러냄.
+
+**절대 규칙 준수**
+- **개인 상태 키:** 기존 3개 id 그대로 유지 → 사용자 수락/보류/제외 기록 고아화 없음.
+- **런타임 소스 주의:** 배포 런타임 진짜 소스는 Supabase. 이 편집은 **시드·오프라인 폴백**만 바꾼 것. 라이브 카드는 마이그레이션을 프로덕션에 적용하기 전까지 구 데이터. **라이브 반영 미실행**(사용자가 나중에: 마이그레이션 적용 또는 `npm run opportunities:grounz`류 write, 그리고 `git push`로 Pages 배포).
+- **XSS:** 신규 값은 모두 기존 렌더 경로(`escapeHtml`/`safeUrl`) 통과. officialUrl 전부 https.
+
+**검증:** `node --check` 3파일 통과, `npm run build` 성공(dist 재생성). **라이브 반영 검증:** 마이그레이션 적용 후 라이브 Supabase REST(anon 키, 인앱 브라우저 fetch)로 조회 → 5개 행 status/deadline/fit 정확히 반영 확인(`open 2 · watch 1 · closed 2`). 이 조회로 **시드/폴백에 없던 기존 라이브 행 2개**가 드러남: `cj-tuneup-27-2026`(2026 튠업 27기, closed·마감 2026-02-20, 무해)와 `grounz-5847`(제4회 진주가인가요제, watch·마감 2026-09-05). 진주가인가요제는 **커버/헌정 성격이라 부적합**(재검증)인데 예전 GROUNZ 수집으로 watch로 남아 있어, [scripts/sql/close-jinju-gain-2026.sql](../scripts/sql/close-jinju-gain-2026.sql)로 `closed` 처리하도록 준비(사용자 실행 대기). 프리뷰 시각검증은 이 환경 한계(viewport 0x0)로 생략, 대신 REST 데이터로 대체.
+
+**재개 시 할 일** — ① 진주가인가요제 정리: [scripts/sql/close-jinju-gain-2026.sql](../scripts/sql/close-jinju-gain-2026.sql)을 프로덕션에 적용(사용자 실행). ② 코드 배포: 이 커밋을 main 병합 → `git push origin main` → `npm run build` → `npx gh-pages -d dist`(모두 push라 게이트, 사용자 실행). 단 **공모전 데이터는 이미 라이브라 재배포는 오프라인 폴백·문서 동기화 목적**(사용자 노출 반영은 이미 완료). ③ 선택: 관리자 UI/`opportunities:grounz`로 후속 최신화.
+
 ### 2026-07-12 — 리뷰 대응(2026-07-12 Codex 리뷰): MAJOR resolved — 곡 일정 대상 id 기반 재구성 (브랜치 feature/track-bulk-reschedule)
 
 **작업자:** Claude. [REVIEW_FROM_CODEX.md](REVIEW_FROM_CODEX.md) 2026-07-12 리뷰(Major 1) 처리.
